@@ -302,26 +302,71 @@ public class StreamFlixStartupTask : IScheduledTask
     }
 
     /// <summary>
-    /// Returns a Jellyfin username based on <paramref name="baseName"/> that isn't taken yet ("Alex", "Alex 2", ...).
+    /// Returns a Jellyfin username based on <paramref name="baseName"/> that isn't taken yet ("Alex", "Alex 2", ...),
+    /// sanitizing punctuation/emojis that Jellyfin's UserManager rejects and checking case-insensitively for Jellyfin 12+.
     /// </summary>
     public static string GetAvailableUsername(IUserManager userManager, string? baseName)
     {
-        var clean = string.IsNullOrWhiteSpace(baseName) ? "Profile" : baseName.Trim();
-        if (userManager.GetUserByName(clean) == null)
+        var sanitized = SanitizeJellyfinUsername(baseName);
+        var existingNames = new HashSet<string>(
+            GetAllUsersCompat(userManager)
+                .Select(u => u.Username)
+                .Where(n => !string.IsNullOrWhiteSpace(n)),
+            StringComparer.OrdinalIgnoreCase);
+
+        bool IsTaken(string candidate) =>
+            existingNames.Contains(candidate) || userManager.GetUserByName(candidate) != null;
+
+        if (!IsTaken(sanitized))
         {
-            return clean;
+            return sanitized;
         }
 
         for (var i = 2; i < 100; i++)
         {
-            var candidate = $"{clean} {i}";
-            if (userManager.GetUserByName(candidate) == null)
+            var candidate = $"{sanitized} {i}";
+            if (!IsTaken(candidate))
             {
                 return candidate;
             }
         }
 
-        return $"{clean} {Guid.NewGuid().ToString("N").Substring(0, 6)}";
+        return $"{sanitized} {Guid.NewGuid().ToString("N").Substring(0, 6)}";
+    }
+
+    private static string SanitizeJellyfinUsername(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "Profile";
+        }
+
+        var sb = new System.Text.StringBuilder(raw.Length);
+        var prevSpace = false;
+        foreach (var ch in raw.Trim())
+        {
+            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == '-' || ch == '.' || ch == '\'')
+            {
+                sb.Append(ch);
+                prevSpace = false;
+            }
+            else if (char.IsWhiteSpace(ch) || ch == '/' || ch == '\\' || ch == '&' || ch == '+')
+            {
+                if (!prevSpace && sb.Length > 0)
+                {
+                    sb.Append(' ');
+                    prevSpace = true;
+                }
+            }
+        }
+
+        var cleaned = sb.ToString().Trim(' ', '.', '-', '_');
+        if (cleaned.Length > 48)
+        {
+            cleaned = cleaned.Substring(0, 48).TrimEnd();
+        }
+
+        return string.IsNullOrWhiteSpace(cleaned) ? "Profile" : cleaned;
     }
 
     public static async Task SyncAllProfilesWithJellyfinUsersAsync(

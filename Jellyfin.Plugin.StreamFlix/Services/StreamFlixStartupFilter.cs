@@ -50,18 +50,28 @@ public class StreamFlixStartupFilter : IStartupFilter
             return;
         }
 
-        // Serve StreamFlix stylesheet directly on /Branding/Css so Jellyfin Mobile / Desktop / TV apps
-        // that load server branding CSS always receive the live v6.9.0 StreamFlix stylesheet.
+        // Serve StreamFlix stylesheet directly on /Branding/Css with ETag caching so Jellyfin Mobile / Desktop / TV apps
+        // that load server branding CSS always receive the live StreamFlix stylesheet without re-allocating on repeat loads.
         if (IsBrandingCssRequest(reqPath))
         {
-            var css = Plugin.GetEmbeddedStylesheetContent();
-            if (!string.IsNullOrEmpty(css))
+            var (cssBytes, etag) = Plugin.GetEmbeddedStylesheetAsset();
+            if (cssBytes.Length > 0)
             {
-                var cssBytes = Encoding.UTF8.GetBytes(css);
-                context.Response.StatusCode = 200;
+                context.Response.Headers["Cache-Control"] = "no-cache";
+                if (!string.IsNullOrEmpty(etag))
+                {
+                    context.Response.Headers["ETag"] = etag;
+                    var inm = context.Request.Headers["If-None-Match"].ToString();
+                    if (!string.IsNullOrEmpty(inm) && inm.Contains(etag, StringComparison.Ordinal))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status304NotModified;
+                        return;
+                    }
+                }
+
+                context.Response.StatusCode = StatusCodes.Status200OK;
                 context.Response.ContentType = "text/css;charset=utf-8";
                 context.Response.ContentLength = cssBytes.Length;
-                context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
                 await context.Response.Body.WriteAsync(cssBytes, 0, cssBytes.Length).ConfigureAwait(false);
                 return;
             }

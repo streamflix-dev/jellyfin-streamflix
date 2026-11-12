@@ -148,15 +148,34 @@ public static class StreamFlixSessionService
     }
 
     /// <summary>
+    /// Compares two PIN strings in constant time without leaking PIN length (4-8 digits).
+    /// </summary>
+    public static bool ConstantTimePinEquals(string expectedPin, string suppliedPin)
+    {
+        var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expectedPin.Trim()));
+        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(suppliedPin.Trim()));
+        return CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash);
+    }
+
+    /// <summary>
     /// Returns true if PIN attempts for this key are currently locked out after repeated failures.
     /// </summary>
     public static bool IsPinLockedOut(string key, out TimeSpan retryAfter)
     {
         retryAfter = TimeSpan.Zero;
-        if (PinAttempts.TryGetValue(key, out var st) && st.LockedUntil > DateTimeOffset.UtcNow)
+        if (PinAttempts.TryGetValue(key, out var st))
         {
-            retryAfter = st.LockedUntil - DateTimeOffset.UtcNow;
-            return true;
+            var now = DateTimeOffset.UtcNow;
+            if (st.LockedUntil > now)
+            {
+                retryAfter = st.LockedUntil - now;
+                return true;
+            }
+
+            if (st.LockedUntil > DateTimeOffset.MinValue && st.LockedUntil <= now)
+            {
+                PinAttempts.TryRemove(key, out _);
+            }
         }
 
         return false;
@@ -164,21 +183,43 @@ public static class StreamFlixSessionService
 
     public static void RegisterPinFailure(string key)
     {
+        PruneExpiredPinAttemptsIfNeeded();
+        var now = DateTimeOffset.UtcNow;
         PinAttempts.AddOrUpdate(
             key,
-            _ => new PinAttemptState(1, DateTimeOffset.MinValue),
+            _ => new PinAttemptState(1, DateTimeOffset.MinValue, now),
             (_, st) =>
             {
-                var failures = st.LockedUntil > DateTimeOffset.MinValue && st.LockedUntil <= DateTimeOffset.UtcNow ? 1 : st.Failures + 1;
+                var failures = st.LockedUntil > DateTimeOffset.MinValue && st.LockedUntil <= now ? 1 : st.Failures + 1;
                 return failures >= MaxPinFailures
-                    ? new PinAttemptState(0, DateTimeOffset.UtcNow.Add(PinLockout))
-                    : new PinAttemptState(failures, DateTimeOffset.MinValue);
+                    ? new PinAttemptState(0, now.Add(PinLockout), now)
+                    : new PinAttemptState(failures, DateTimeOffset.MinValue, now);
             });
     }
 
     public static void ResetPinFailures(string key)
     {
         PinAttempts.TryRemove(key, out _);
+    }
+
+    private static void PruneExpiredPinAttemptsIfNeeded()
+    {
+        if (PinAttempts.Count < 256)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var staleCutoff = now - TimeSpan.FromHours(1);
+        foreach (var kvp in PinAttempts)
+        {
+            var st = kvp.Value;
+            if ((st.LockedUntil > DateTimeOffset.MinValue && st.LockedUntil <= now)
+                || (st.LockedUntil == DateTimeOffset.MinValue && st.UpdatedAt <= staleCutoff))
+            {
+                PinAttempts.TryRemove(kvp.Key, out _);
+            }
+        }
     }
 
     private static byte[] GetOrCreateKey(PluginConfiguration config)
@@ -223,7 +264,7 @@ public static class StreamFlixSessionService
         return Convert.FromBase64String(s);
     }
 
-    private sealed record PinAttemptState(int Failures, DateTimeOffset LockedUntil);
+    private sealed record PinAttemptState(int Failures, DateTimeOffset LockedUntil, DateTimeOffset UpdatedAt);
 
     private sealed class SessionPayload
     {

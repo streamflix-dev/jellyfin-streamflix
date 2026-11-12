@@ -245,15 +245,11 @@ public class StreamFlixController : ControllerBase
 
         if (request.ApprovedGoogleAccounts != null)
         {
-            var cleaned = request.ApprovedGoogleAccounts
+            config.ApprovedGoogleAccounts = request.ApprovedGoogleAccounts
                 .Select(e => (e ?? string.Empty).Trim().ToLowerInvariant())
                 .Where(e => EmailRegex.IsMatch(e))
-                .Distinct()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            if (cleaned.Count > 0)
-            {
-                config.ApprovedGoogleAccounts = cleaned;
-            }
         }
 
         Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
@@ -712,50 +708,59 @@ public class StreamFlixController : ControllerBase
             }
         }
 
-        if (existing == null)
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            existing = new StreamFlixProfileConfig
+            if (existing == null)
             {
-                Id = $"streamflix_{Guid.NewGuid():N}",
-            };
-            config.Profiles.Add(existing);
+                existing = new StreamFlixProfileConfig
+                {
+                    Id = $"streamflix_{Guid.NewGuid():N}",
+                };
+                config.Profiles.Add(existing);
+            }
+
+            existing.Name = cleanName;
+            existing.AvatarColorIndex = request.AvatarColorIndex;
+            existing.AvatarIconIndex = request.AvatarIconIndex;
+            existing.AvatarEmoji = !string.IsNullOrWhiteSpace(request.AvatarEmoji)
+                ? request.AvatarEmoji!
+                : (request.IsKids ? "🦊" : "🎬");
+            existing.AvatarColorHex = !string.IsNullOrWhiteSpace(request.AvatarColorHex)
+                ? request.AvatarColorHex!
+                : "#E50914";
+            existing.IsKids = request.IsKids;
+            existing.MaturityRating = !string.IsNullOrWhiteSpace(request.MaturityRating)
+                ? request.MaturityRating!
+                : (request.IsKids ? "Older Kids (TV-Y7 / PG)" : "TV-MA / R (All Maturity Levels)");
+            existing.GoogleAccountEmail = newLock;
+
+            if (cleanPin != null)
+            {
+                existing.PinCode = cleanPin == "__CLEAR__" ? null : cleanPin;
+            }
+
+            existing.AutoplayNextEpisode = request.AutoplayNextEpisode;
+            existing.AutoplayPreviews = request.AutoplayPreviews;
+
+            if (targetUser != null)
+            {
+                existing.JellyfinUserId = targetUser.Id.ToString("N");
+                existing.JellyfinUsername = targetUser.Username;
+            }
+
+            config.DeletedProfileIds?.RemoveAll(d =>
+                string.Equals(d, existing.Id, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(d, existing.Name, StringComparison.OrdinalIgnoreCase));
+
+            await StreamFlixStartupTask.SyncAllProfilesWithJellyfinUsersAsync(_userManager, config, _logger, allowCreateMissingUsers: false).ConfigureAwait(false);
+            _lastSyncUtc = DateTime.UtcNow;
+            Plugin.Instance?.SaveConfiguration();
         }
-
-        existing.Name = cleanName;
-        existing.AvatarColorIndex = request.AvatarColorIndex;
-        existing.AvatarIconIndex = request.AvatarIconIndex;
-        existing.AvatarEmoji = !string.IsNullOrWhiteSpace(request.AvatarEmoji)
-            ? request.AvatarEmoji!
-            : (request.IsKids ? "🦊" : "🎬");
-        existing.AvatarColorHex = !string.IsNullOrWhiteSpace(request.AvatarColorHex)
-            ? request.AvatarColorHex!
-            : "#E50914";
-        existing.IsKids = request.IsKids;
-        existing.MaturityRating = !string.IsNullOrWhiteSpace(request.MaturityRating)
-            ? request.MaturityRating!
-            : (request.IsKids ? "Older Kids (TV-Y7 / PG)" : "TV-MA / R (All Maturity Levels)");
-        existing.GoogleAccountEmail = newLock;
-
-        if (cleanPin != null)
+        finally
         {
-            existing.PinCode = cleanPin == "__CLEAR__" ? null : cleanPin;
+            SyncLock.Release();
         }
-
-        existing.AutoplayNextEpisode = request.AutoplayNextEpisode;
-        existing.AutoplayPreviews = request.AutoplayPreviews;
-
-        if (targetUser != null)
-        {
-            existing.JellyfinUserId = targetUser.Id.ToString("N");
-            existing.JellyfinUsername = targetUser.Username;
-        }
-
-        config.DeletedProfileIds?.RemoveAll(d =>
-            string.Equals(d, existing.Id, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(d, existing.Name, StringComparison.OrdinalIgnoreCase));
-
-        await SyncProfilesAsync(config, force: true).ConfigureAwait(false);
-        Plugin.Instance?.SaveConfiguration();
 
         return Ok(BuildPublicState(config, caller));
     }
@@ -774,30 +779,39 @@ public class StreamFlixController : ControllerBase
 
         if (request.ProfileIds != null && request.ProfileIds.Count > 0 && config.Profiles.Count > 1)
         {
-            var byId = config.Profiles
-                .GroupBy(p => p.Id, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-            var reordered = new List<StreamFlixProfileConfig>();
-            var added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var id in request.ProfileIds)
+            await SyncLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                if (!string.IsNullOrWhiteSpace(id) && byId.TryGetValue(id.Trim(), out var prof) && added.Add(prof.Id))
-                {
-                    reordered.Add(prof);
-                }
-            }
+                var currentProfiles = config.Profiles.ToList();
+                var byId = currentProfiles
+                    .GroupBy(p => p.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                var reordered = new List<StreamFlixProfileConfig>();
+                var added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var prof in config.Profiles)
+                foreach (var id in request.ProfileIds)
+                {
+                    if (!string.IsNullOrWhiteSpace(id) && byId.TryGetValue(id.Trim(), out var prof) && added.Add(prof.Id))
+                    {
+                        reordered.Add(prof);
+                    }
+                }
+
+                foreach (var prof in currentProfiles)
+                {
+                    if (added.Add(prof.Id))
+                    {
+                        reordered.Add(prof);
+                    }
+                }
+
+                config.Profiles = reordered;
+                Plugin.Instance?.SaveConfiguration();
+            }
+            finally
             {
-                if (added.Add(prof.Id))
-                {
-                    reordered.Add(prof);
-                }
+                SyncLock.Release();
             }
-
-            config.Profiles = reordered;
-            Plugin.Instance?.SaveConfiguration();
         }
 
         return Ok(BuildPublicState(config, caller));
@@ -846,30 +860,48 @@ public class StreamFlixController : ControllerBase
             }
         }
 
-        config.DeletedProfileIds ??= new List<string>();
-        if (!string.IsNullOrWhiteSpace(target.Id))
+        string? deletedUserId = null;
+        var shouldDeleteUser = false;
+
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            config.DeletedProfileIds.Add(target.Id);
+            if (config.Profiles.Count <= 1)
+            {
+                return BadRequest(new { message = "You can't delete the last remaining profile." });
+            }
+
+            config.DeletedProfileIds ??= new List<string>();
+            if (!string.IsNullOrWhiteSpace(target.Id))
+            {
+                config.DeletedProfileIds.Add(target.Id);
+            }
+
+            config.Profiles.Remove(target);
+            deletedUserId = target.JellyfinUserId;
+            shouldDeleteUser = request.DeleteJellyfinUser
+                && caller.IsAdmin
+                && !string.IsNullOrWhiteSpace(deletedUserId)
+                && !config.Profiles.Any(p => string.Equals(p.JellyfinUserId, deletedUserId, StringComparison.OrdinalIgnoreCase));
+
+            await StreamFlixStartupTask.SyncAllProfilesWithJellyfinUsersAsync(_userManager, config, _logger, allowCreateMissingUsers: false).ConfigureAwait(false);
+            _lastSyncUtc = DateTime.UtcNow;
+            Plugin.Instance?.SaveConfiguration();
+        }
+        finally
+        {
+            SyncLock.Release();
         }
 
-        config.Profiles.Remove(target);
-
         // Only delete the underlying Jellyfin user if an admin explicitly asked and it isn't shared by another profile
-        if (request.DeleteJellyfinUser
-            && caller.IsAdmin
-            && !string.IsNullOrWhiteSpace(target.JellyfinUserId)
-            && Guid.TryParse(target.JellyfinUserId, out var jfUid))
+        if (shouldDeleteUser && Guid.TryParse(deletedUserId, out var jfUid))
         {
-            var sharedByAnother = config.Profiles.Any(p => string.Equals(p.JellyfinUserId, target.JellyfinUserId, StringComparison.OrdinalIgnoreCase));
             var primaryAdmin = StreamFlixStartupTask.GetPrimaryAdminUserCompat(_userManager);
-            if (!sharedByAnother && (primaryAdmin == null || primaryAdmin.Id != jfUid))
+            if (primaryAdmin == null || primaryAdmin.Id != jfUid)
             {
                 await StreamFlixStartupTask.DeleteJellyfinUserCompatAsync(_userManager, jfUid, _logger).ConfigureAwait(false);
             }
         }
-
-        await SyncProfilesAsync(config, force: true).ConfigureAwait(false);
-        Plugin.Instance?.SaveConfiguration();
 
         return Ok(BuildPublicState(config, caller));
     }
@@ -964,9 +996,7 @@ public class StreamFlixController : ControllerBase
             return StatusCode(403, new { code = "pin_required", message = "Enter the profile PIN." });
         }
 
-        var expected = Encoding.UTF8.GetBytes(profile.PinCode.Trim());
-        var provided = Encoding.UTF8.GetBytes(suppliedPin.Trim());
-        if (!CryptographicOperations.FixedTimeEquals(expected, provided))
+        if (!StreamFlixSessionService.ConstantTimePinEquals(profile.PinCode, suppliedPin))
         {
             StreamFlixSessionService.RegisterPinFailure(lockKey);
             return StatusCode(403, new { code = "pin_invalid", message = "Incorrect PIN. Please try again." });
@@ -1046,6 +1076,9 @@ public class StreamFlixController : ControllerBase
                 .ToList()
             : new List<object>();
 
+        var profilesSnapshot = (config.Profiles ?? new List<StreamFlixProfileConfig>()).ToList();
+        var approvedSnapshot = (config.ApprovedGoogleAccounts ?? new List<string>()).ToList();
+
         return new
         {
             version = Plugin.VersionString,
@@ -1059,9 +1092,9 @@ public class StreamFlixController : ControllerBase
             hasAccess,
             isAdmin = caller.IsAdmin,
             session = caller.Session == null ? null : new { email = caller.Session.Email, expiresAt = caller.Session.ExpiresAt },
-            approvedGoogleAccounts = hasAccess && caller.IsAdmin ? config.ApprovedGoogleAccounts : new List<string>(),
+            approvedGoogleAccounts = hasAccess && caller.IsAdmin ? approvedSnapshot : new List<string>(),
             serverUsers,
-            profiles = hasAccess ? config.Profiles.Select(p => MapProfilePublic(p, caller)).ToList() : new List<object>(),
+            profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(p, caller)).ToList() : new List<object>(),
             showcaseItems = hasAccess ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
         };
     }

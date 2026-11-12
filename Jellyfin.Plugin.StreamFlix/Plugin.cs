@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Jellyfin.Plugin.StreamFlix.Configuration;
@@ -120,7 +122,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
     }
 
-    public static string GetEmbeddedStylesheetContent()
+    private static readonly Lazy<(string Text, byte[] Bytes, string ETag)> EmbeddedStylesheet = new(() =>
     {
         try
         {
@@ -128,8 +130,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             using var stream = asm.GetManifestResourceStream("Jellyfin.Plugin.StreamFlix.Web.streamflix.css");
             if (stream != null)
             {
-                using var reader = new StreamReader(stream);
-                return reader.ReadToEnd();
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                var text = reader.ReadToEnd();
+                var bytes = Encoding.UTF8.GetBytes(text);
+                var hash = SHA256.HashData(bytes);
+                var etag = "\"" + Convert.ToHexString(hash, 0, 12).ToLowerInvariant() + "\"";
+                return (text, bytes, etag);
             }
         }
         catch
@@ -137,8 +143,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             // Ignore resource read error
         }
 
-        return string.Empty;
-    }
+        return (string.Empty, Array.Empty<byte>(), string.Empty);
+    });
+
+    public static string GetEmbeddedStylesheetContent() => EmbeddedStylesheet.Value.Text;
+
+    public static (byte[] Bytes, string ETag) GetEmbeddedStylesheetAsset() =>
+        (EmbeddedStylesheet.Value.Bytes, EmbeddedStylesheet.Value.ETag);
 
     public void CleanConflictingBrandingCssIfPresent()
     {
@@ -182,7 +193,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             }
             else
             {
-                updated = xml;
+                var closeIdx = xml.LastIndexOf("</BrandingOptions>", StringComparison.OrdinalIgnoreCase);
+                updated = closeIdx >= 0
+                    ? xml.Substring(0, closeIdx) + "  " + customCssTag + "\n" + xml.Substring(closeIdx)
+                    : xml;
             }
 
             if (!string.Equals(xml, updated, StringComparison.Ordinal))
