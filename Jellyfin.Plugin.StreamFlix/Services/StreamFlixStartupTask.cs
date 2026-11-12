@@ -1,0 +1,781 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.StreamFlix.Configuration;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Tasks;
+using Microsoft.Extensions.Logging;
+
+#if JF1011 || JF12
+using JUser = Jellyfin.Database.Implementations.Entities.User;
+#else
+using JUser = Jellyfin.Data.Entities.User;
+#endif
+
+namespace Jellyfin.Plugin.StreamFlix.Services;
+
+/// <summary>
+/// Startup task and cross-version user synchronization helper that provisions real Jellyfin Server Users
+/// for every StreamFlix profile so each profile has its own
+/// independent Watch History, Continue Watching, Next Up, and Favorites on the Jellyfin server.
+/// </summary>
+public class StreamFlixStartupTask : IScheduledTask
+{
+    private static readonly string[] DefaultColors =
+    {
+        "#E50914", "#1E88E5", "#43A047", "#8E24AA", "#FB8C00", "#00ACC1", "#3949AB", "#D81B60",
+    };
+
+    private static readonly string[] DefaultEmojis =
+    {
+        "👑", "🍿", "🦊", "🚀", "🎬", "🎮", "⚡", "🔥",
+    };
+
+    // Compatibility shim for Jellyfin 10.11.9+ (which replaced IUserManager.Users with IUserManager.GetUsers())
+    private static readonly Lazy<MethodInfo?> GetUsersMethod = new(() =>
+        typeof(IUserManager).GetMethod("GetUsers", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null));
+
+    private static readonly Lazy<PropertyInfo?> UsersProperty = new(() =>
+        typeof(IUserManager).GetProperty("Users", BindingFlags.Public | BindingFlags.Instance));
+
+    private readonly IUserManager _userManager;
+    private readonly ILogger<StreamFlixStartupTask> _logger;
+
+    public StreamFlixStartupTask(IUserManager userManager, ILogger<StreamFlixStartupTask> logger)
+    {
+        _userManager = userManager;
+        _logger = logger;
+    }
+
+    public string Name => "StreamFlix Startup & Server Profile Sync";
+
+    public string Key => "StreamFlixStartupProfileSync";
+
+    public string Description =>
+        "Provisions real Jellyfin Server Users for every StreamFlix profile so each profile has separate watch history, and injects the StreamFlix UI.";
+
+    public string Category => "StreamFlix";
+
+    public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    {
+        progress.Report(10);
+        Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
+        progress.Report(40);
+
+        var config = Plugin.Instance?.Configuration;
+        if (config != null)
+        {
+            await SyncAllProfilesWithJellyfinUsersAsync(_userManager, config, _logger).ConfigureAwait(false);
+            Plugin.Instance?.SaveConfiguration();
+        }
+
+        progress.Report(100);
+    }
+
+    /// <summary>
+    /// Returns all Jellyfin users across both Jellyfin &lt;=10.11.8 (<c>IUserManager.Users</c> property)
+    /// and Jellyfin 10.11.9+ (<c>IUserManager.GetUsers()</c> method) without triggering a JIT MissingMethodException.
+    /// </summary>
+    public static IReadOnlyList<JUser> GetAllUsersCompat(IUserManager userManager)
+    {
+        try
+        {
+            var method = GetUsersMethod.Value
+                ?? userManager.GetType().GetMethod("GetUsers", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+            if (method != null && method.Invoke(userManager, null) is IEnumerable<JUser> fromMethod)
+            {
+                return fromMethod.ToList();
+            }
+
+            var prop = UsersProperty.Value
+                ?? userManager.GetType().GetProperty("Users", BindingFlags.Public | BindingFlags.Instance);
+            if (prop != null && prop.GetValue(userManager) is IEnumerable<JUser> fromProp)
+            {
+                return fromProp.ToList();
+            }
+        }
+        catch
+        {
+        }
+
+        return Array.Empty<JUser>();
+    }
+
+    /// <summary>
+    /// Checks whether a Jellyfin user entity has <c>PermissionKind.IsAdministrator</c> enabled.
+    /// </summary>
+    public static bool IsUserAdminCompat(object? user)
+    {
+        if (user == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (permsProp?.GetValue(user) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindProp = perm.GetType().GetProperty("Kind", BindingFlags.Public | BindingFlags.Instance);
+                    var valProp = perm.GetType().GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+                    var kindObj = kindProp?.GetValue(perm);
+                    var valObj = valProp?.GetValue(perm);
+                    if (kindObj != null && valObj is bool isTrue && isTrue)
+                    {
+                        if (string.Equals(kindObj.ToString(), "IsAdministrator", StringComparison.OrdinalIgnoreCase)
+                            || Convert.ToInt32(kindObj) == 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: check HasPermission(PermissionKind.IsAdministrator) on the user instance
+            var hasPermMethod = user.GetType().GetMethod("HasPermission", BindingFlags.Public | BindingFlags.Instance);
+            if (hasPermMethod != null)
+            {
+                var ps = hasPermMethod.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType.IsEnum)
+                {
+                    if (Enum.TryParse(ps[0].ParameterType, "IsAdministrator", ignoreCase: true, out var adminEnum) && adminEnum != null)
+                    {
+                        if (hasPermMethod.Invoke(user, new[] { adminEnum }) is bool hasAdmin && hasAdmin)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    public static long GetInternalIdCompat(object? user)
+    {
+        if (user == null)
+        {
+            return long.MaxValue;
+        }
+
+        try
+        {
+            var prop = user.GetType().GetProperty("InternalId", BindingFlags.Public | BindingFlags.Instance);
+            if (prop?.GetValue(user) is long id && id > 0)
+            {
+                return id;
+            }
+        }
+        catch
+        {
+        }
+
+        return long.MaxValue;
+    }
+
+    /// <summary>
+    /// Finds the primary Administrator user on the Jellyfin server (created during initial server setup).
+    /// </summary>
+    public static JUser? GetPrimaryAdminUserCompat(IUserManager userManager)
+    {
+        var all = GetAllUsersCompat(userManager);
+        if (all.Count == 0)
+        {
+            return null;
+        }
+
+        return all
+            .OrderByDescending(u => IsUserAdminCompat(u))
+            .ThenBy(u => GetInternalIdCompat(u))
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Deletes a Jellyfin user across both Jellyfin 10.9/10.10 and Jellyfin 10.11 (supports DeleteUserAsync(Guid) and DeleteUserAsync(User)).
+    /// </summary>
+    public static async Task DeleteJellyfinUserCompatAsync(IUserManager userManager, Guid userId, ILogger? logger = null)
+    {
+        try
+        {
+            var user = userManager.GetUserById(userId);
+            if (user == null || IsUserAdminCompat(user))
+            {
+                return;
+            }
+
+            var deleteByGuid = typeof(IUserManager).GetMethod("DeleteUserAsync", new[] { typeof(Guid) })
+                ?? userManager.GetType().GetMethod("DeleteUserAsync", new[] { typeof(Guid) });
+            if (deleteByGuid != null)
+            {
+                if (deleteByGuid.Invoke(userManager, new object[] { userId }) is Task t1)
+                {
+                    await t1.ConfigureAwait(false);
+                    return;
+                }
+            }
+
+            var deleteByUser = typeof(IUserManager).GetMethod("DeleteUserAsync", new[] { user.GetType() })
+                ?? userManager.GetType().GetMethod("DeleteUserAsync", new[] { user.GetType() });
+            if (deleteByUser != null)
+            {
+                if (deleteByUser.Invoke(userManager, new object[] { user }) is Task t2)
+                {
+                    await t2.ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "StreamFlix: could not delete Jellyfin user {UserId}.", userId);
+        }
+    }
+
+    /// <summary>
+    /// Returns true for the built-in owner profile, which is always bound to the primary administrator.
+    /// </summary>
+    public static bool IsOwnerProfile(StreamFlixProfileConfig? profile)
+    {
+        return profile != null && string.Equals(profile.Id, "streamflix_owner", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns true when another StreamFlix profile (not <paramref name="profile"/>) is already linked to the given Jellyfin user.
+    /// </summary>
+    public static bool IsUserLinkedToOtherProfile(PluginConfiguration config, StreamFlixProfileConfig? profile, Guid userId)
+    {
+        var n = userId.ToString("N");
+        return (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Any(p => !ReferenceEquals(p, profile) && string.Equals(p.JellyfinUserId, n, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Finds an existing Jellyfin user by name for an unlinked profile, but only when it is safe to do so:
+    /// administrator accounts are only ever matched for the owner profile, and accounts that already belong to
+    /// another profile are never matched. This stops a household member from creating or renaming a profile after
+    /// an administrator (or another person) and inheriting that account.
+    /// </summary>
+    public static JUser? FindSafeUserByName(IUserManager userManager, PluginConfiguration config, StreamFlixProfileConfig profile, params string?[] names)
+    {
+        var isOwner = IsOwnerProfile(profile);
+        foreach (var raw in names)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var u = userManager.GetUserByName(raw.Trim());
+            if (u == null)
+            {
+                continue;
+            }
+
+            if (!isOwner && IsUserAdminCompat(u))
+            {
+                continue;
+            }
+
+            if (IsUserLinkedToOtherProfile(config, profile, u.Id))
+            {
+                continue;
+            }
+
+            return u;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns a Jellyfin username based on <paramref name="baseName"/> that isn't taken yet ("Alex", "Alex 2", ...).
+    /// </summary>
+    public static string GetAvailableUsername(IUserManager userManager, string? baseName)
+    {
+        var clean = string.IsNullOrWhiteSpace(baseName) ? "Profile" : baseName.Trim();
+        if (userManager.GetUserByName(clean) == null)
+        {
+            return clean;
+        }
+
+        for (var i = 2; i < 100; i++)
+        {
+            var candidate = $"{clean} {i}";
+            if (userManager.GetUserByName(candidate) == null)
+            {
+                return candidate;
+            }
+        }
+
+        return $"{clean} {Guid.NewGuid().ToString("N").Substring(0, 6)}";
+    }
+
+    public static async Task SyncAllProfilesWithJellyfinUsersAsync(
+        IUserManager userManager,
+        PluginConfiguration config,
+        ILogger? logger = null,
+        bool allowCreateMissingUsers = false)
+    {
+        try
+        {
+            config.ApprovedGoogleAccounts ??= new List<string>();
+            config.Profiles ??= new List<StreamFlixProfileConfig>();
+            config.DeletedProfileIds ??= new List<string>();
+
+            var deletedSet = new HashSet<string>(
+                config.DeletedProfileIds.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
+            var primaryAdmin = GetPrimaryAdminUserCompat(userManager);
+            var allUsers = GetAllUsersCompat(userManager);
+
+            // Deduplicate ApprovedGoogleAccounts
+            config.ApprovedGoogleAccounts = config.ApprovedGoogleAccounts
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Filter out any deleted profiles and deduplicate by Id while strictly preserving user-defined order
+            if (config.Profiles.Count > 0)
+            {
+                var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var ordered = new List<StreamFlixProfileConfig>();
+                foreach (var p in config.Profiles)
+                {
+                    if (p == null || string.IsNullOrWhiteSpace(p.Name))
+                    {
+                        continue;
+                    }
+
+                    if (deletedSet.Contains(p.Id))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(p.Id))
+                    {
+                        p.Id = $"streamflix_{Guid.NewGuid():N}";
+                    }
+
+                    if (seenIds.Add(p.Id))
+                    {
+                        ordered.Add(p);
+                    }
+                }
+
+                config.Profiles = ordered;
+            }
+
+            for (var i = 0; i < config.Profiles.Count; i++)
+            {
+                var profile = config.Profiles[i];
+                if (string.IsNullOrWhiteSpace(profile.Name))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(profile.AvatarColorHex))
+                {
+                    profile.AvatarColorHex = DefaultColors[i % DefaultColors.Length];
+                }
+
+                if (string.IsNullOrWhiteSpace(profile.AvatarEmoji))
+                {
+                    profile.AvatarEmoji = DefaultEmojis[i % DefaultEmojis.Length];
+                }
+
+                // 1. If this is the Owner profile and it was accidentally linked to a non-admin duplicate account
+                // while a real Administrator exists, restore it to primaryAdmin.
+                var isOwner = IsOwnerProfile(profile);
+
+                JUser? user = null;
+                if (!string.IsNullOrWhiteSpace(profile.JellyfinUserId) && Guid.TryParse(profile.JellyfinUserId, out var linkedGuid))
+                {
+                    user = userManager.GetUserById(linkedGuid);
+                }
+
+                if (isOwner && primaryAdmin != null && IsUserAdminCompat(primaryAdmin))
+                {
+                    if (user == null || (!IsUserAdminCompat(user) && user.Id != primaryAdmin.Id))
+                    {
+                        var staleNonAdmin = user;
+                        user = primaryAdmin;
+                        if (staleNonAdmin != null && staleNonAdmin.Id != primaryAdmin.Id)
+                        {
+                            var usedByOther = config.Profiles
+                                .Where(p => !ReferenceEquals(p, profile))
+                                .Any(p => string.Equals(p.JellyfinUserId, staleNonAdmin.Id.ToString("N"), StringComparison.OrdinalIgnoreCase));
+                            if (!usedByOther)
+                            {
+                                await DeleteJellyfinUserCompatAsync(userManager, staleNonAdmin.Id, logger).ConfigureAwait(false);
+                            }
+                        }
+                    }
+                }
+
+                // 2. If no valid linked user exists yet, look up an existing Jellyfin user without creating phantom accounts
+                if (user == null)
+                {
+                    if (isOwner && primaryAdmin != null)
+                    {
+                        user = primaryAdmin;
+                    }
+                    else
+                    {
+                        var desiredName = !string.IsNullOrWhiteSpace(profile.JellyfinUsername)
+                            ? profile.JellyfinUsername.Trim()
+                            : profile.Name.Trim();
+
+                        // Safe match only: never an administrator account, never an account used by another profile.
+                        user = FindSafeUserByName(userManager, config, profile, desiredName, profile.Name);
+
+                        // Never silently fall back to the administrator account: a Kids/Guest profile whose user was
+                        // deleted would otherwise inherit full admin rights with no parental controls.
+                        if (user == null && (allowCreateMissingUsers || config.AutoProvisionJellyfinUsers))
+                        {
+                            try
+                            {
+                                user = await userManager.CreateUserAsync(GetAvailableUsername(userManager, desiredName)).ConfigureAwait(false);
+                                logger?.LogInformation("StreamFlix: created Jellyfin Server User '{Username}' for profile '{ProfileName}'.", user.Username, profile.Name);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger?.LogWarning(ex, "StreamFlix: could not create Jellyfin user '{DesiredName}'.", desiredName);
+                            }
+                        }
+                    }
+                }
+
+                if (user != null)
+                {
+                    profile.JellyfinUserId = user.Id.ToString("N");
+                    profile.JellyfinUsername = user.Username;
+
+                    var isPrimaryAdminUser = (primaryAdmin != null && user.Id == primaryAdmin.Id) || IsUserAdminCompat(user);
+                    var needsUpdate = false;
+
+                    if (isPrimaryAdminUser)
+                    {
+                        // Never restrict primaryAdmin with a parental age rating; only clear if one was accidentally set
+                        if (TryGetMaxParentalAge(user) != null)
+                        {
+                            if (TrySetMaxParentalAge(user, null))
+                            {
+                                needsUpdate = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var desiredParentalAge = ParentalAgeFromMaturity(profile.MaturityRating, profile.IsKids);
+                        if (TryGetMaxParentalAge(user) != desiredParentalAge)
+                        {
+                            if (TrySetMaxParentalAge(user, desiredParentalAge))
+                            {
+                                needsUpdate = true;
+                            }
+                        }
+
+                        if (EnsureUserLibraryAccessAndPermissions(user, primaryAdmin))
+                        {
+                            needsUpdate = true;
+                        }
+                    }
+
+                    if (needsUpdate)
+                    {
+                        try
+                        {
+                            await userManager.UpdateUserAsync(user).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger?.LogDebug(ex, "StreamFlix: could not update settings for '{Username}'.", user.Username);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "StreamFlix: non-fatal error during profile user sync.");
+        }
+    }
+
+    public static bool EnsureUserLibraryAccessAndPermissions(object targetUser, object? sourceAdminUser)
+    {
+        var changed = false;
+        try
+        {
+            var enableAllProp = targetUser.GetType().GetProperty("EnableAllFolders", BindingFlags.Public | BindingFlags.Instance);
+            if (enableAllProp != null && enableAllProp.CanWrite)
+            {
+                if (enableAllProp.GetValue(targetUser) is bool b && !b)
+                {
+                    enableAllProp.SetValue(targetUser, true);
+                    changed = true;
+                }
+            }
+
+            var requiredPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "EnableAllFolders",
+                "EnableAllDevices",
+                "EnableAllChannels",
+                "EnableMediaPlayback",
+                "EnableAudioPlaybackTranscoding",
+                "EnableVideoPlaybackTranscoding",
+                "EnablePlaybackRemuxing",
+                "EnableContentDownloading",
+                "EnableRemoteAccess",
+            };
+
+            var foundPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var permsProp = targetUser.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+
+            // 1. Directly mutate existing Permission entities in user.Permissions (works across Jellyfin 10.9, 10.10, and 10.11 EF Core)
+            if (permsProp?.GetValue(targetUser) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindProp = perm.GetType().GetProperty("Kind", BindingFlags.Public | BindingFlags.Instance);
+                    var valProp = perm.GetType().GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+                    var kindName = kindProp?.GetValue(perm)?.ToString();
+                    if (!string.IsNullOrEmpty(kindName) && requiredPermissions.Contains(kindName))
+                    {
+                        foundPermissions.Add(kindName);
+                        if (valProp != null && valProp.CanWrite && valProp.GetValue(perm) is bool curVal && !curVal)
+                        {
+                            valProp.SetValue(perm, true);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            // 2. For any missing permissions, invoke SetPermission (either instance method or static extension method)
+            if (foundPermissions.Count < requiredPermissions.Count)
+            {
+                var instanceSetPerm = targetUser.GetType().GetMethod("SetPermission", BindingFlags.Public | BindingFlags.Instance);
+                MethodInfo? extSetPerm = null;
+                if (instanceSetPerm == null)
+                {
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            var asmName = asm.GetName().Name ?? string.Empty;
+                            if (!asmName.StartsWith("Jellyfin", StringComparison.OrdinalIgnoreCase)
+                                && !asmName.StartsWith("MediaBrowser", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            foreach (var t in asm.GetExportedTypes())
+                            {
+                                if (!t.IsAbstract || !t.IsSealed)
+                                {
+                                    continue;
+                                }
+
+                                foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                                {
+                                    if (m.Name == "SetPermission")
+                                    {
+                                        var ps = m.GetParameters();
+                                        if (ps.Length == 3 && ps[0].ParameterType.IsAssignableFrom(targetUser.GetType()) && ps[1].ParameterType.IsEnum && ps[2].ParameterType == typeof(bool))
+                                        {
+                                            extSetPerm = m;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (extSetPerm != null)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                        }
+
+                        if (extSetPerm != null)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                foreach (var permName in requiredPermissions)
+                {
+                    if (foundPermissions.Contains(permName))
+                    {
+                        continue;
+                    }
+
+                    if (instanceSetPerm != null)
+                    {
+                        var enumType = instanceSetPerm.GetParameters()[0].ParameterType;
+                        if (Enum.TryParse(enumType, permName, ignoreCase: true, out var enumVal) && enumVal != null)
+                        {
+                            instanceSetPerm.Invoke(targetUser, new object[] { enumVal, true });
+                            changed = true;
+                        }
+                    }
+                    else if (extSetPerm != null)
+                    {
+                        var enumType = extSetPerm.GetParameters()[1].ParameterType;
+                        if (Enum.TryParse(enumType, permName, ignoreCase: true, out var enumVal) && enumVal != null)
+                        {
+                            extSetPerm.Invoke(null, new object[] { targetUser, enumVal, true });
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            if (sourceAdminUser != null && TrySyncDisplayCollectionsView(targetUser, sourceAdminUser))
+            {
+                changed = true;
+            }
+        }
+        catch
+        {
+        }
+
+        return changed;
+    }
+
+    private static bool HasUserPermissionCompat(object user, PropertyInfo? permsProp, string permissionName)
+    {
+        try
+        {
+            if (permsProp?.GetValue(user) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindObj = perm.GetType().GetProperty("Kind")?.GetValue(perm);
+                    var valObj = perm.GetType().GetProperty("Value")?.GetValue(perm);
+                    if (kindObj != null && string.Equals(kindObj.ToString(), permissionName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return valObj is bool b && b;
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    public static bool TrySyncDisplayCollectionsView(object targetUser, object sourceAdminUser)
+    {
+        try
+        {
+            var prop = targetUser.GetType().GetProperty("DisplayCollectionsView", BindingFlags.Public | BindingFlags.Instance);
+            var srcProp = sourceAdminUser.GetType().GetProperty("DisplayCollectionsView", BindingFlags.Public | BindingFlags.Instance);
+            if (prop != null && prop.CanWrite && srcProp?.GetValue(sourceAdminUser) is bool adminVal)
+            {
+                if (prop.GetValue(targetUser) is bool curVal && curVal != adminVal)
+                {
+                    prop.SetValue(targetUser, adminVal);
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    public static int? TryGetMaxParentalAge(object user)
+    {
+        var prop = user.GetType().GetProperty("MaxParentalAgeRating")
+            ?? user.GetType().GetProperty("MaxParentalRatingScore");
+        return prop?.GetValue(user) as int?;
+    }
+
+    public static bool TrySetMaxParentalAge(object user, int? age)
+    {
+        var prop = user.GetType().GetProperty("MaxParentalAgeRating")
+            ?? user.GetType().GetProperty("MaxParentalRatingScore");
+        if (prop == null || !prop.CanWrite)
+        {
+            return false;
+        }
+
+        prop.SetValue(user, age);
+        return true;
+    }
+
+    public static int? ParentalAgeFromMaturity(string? maturityRating, bool isKids)
+    {
+        if (string.IsNullOrWhiteSpace(maturityRating))
+        {
+            return isKids ? 7 : null;
+        }
+
+        if (maturityRating.StartsWith("Little Kids", StringComparison.OrdinalIgnoreCase))
+        {
+            return 5;
+        }
+
+        if (isKids || maturityRating.StartsWith("Older Kids", StringComparison.OrdinalIgnoreCase))
+        {
+            return 7;
+        }
+
+        if (maturityRating.StartsWith("Teens", StringComparison.OrdinalIgnoreCase))
+        {
+            return 13;
+        }
+
+        return null;
+    }
+
+    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
+    {
+#if JF1011 || JF12
+        yield return new TaskTriggerInfo
+        {
+            Type = TaskTriggerInfoType.StartupTrigger,
+        };
+#else
+        yield return new TaskTriggerInfo
+        {
+            Type = TaskTriggerInfo.TriggerStartup,
+        };
+#endif
+    }
+}

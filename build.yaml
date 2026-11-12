@@ -1,0 +1,20 @@
+---
+name: "StreamFlix"
+guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
+version: "0.5.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+owner: "StreamFlix"
+overview: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
+description: >
+  Transforms Jellyfin Web into StreamFlix with a Netflix #141414 dark cinema UI,
+  a server-verified Google Sign-In gate (signed, revocable household sessions checked
+  against the ApprovedGoogleAccounts allowlist), and Netflix "Who's watching?" profiles
+  backed by real Jellyfin Server Users so every profile has its own independent Watch
+  History, Continue Watching, Next Up, and Favorites. Profiles can be protected with a
+  PIN and/or locked to a single Google account.
+category: "General"
+artifacts:
+  - "Jellyfin.Plugin.StreamFlix.dll"
+changelog: >
+  - v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user "Who's watching?" profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts

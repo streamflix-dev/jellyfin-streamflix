@@ -1,0 +1,44 @@
+[
+  {
+    "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
+    "name": "StreamFlix",
+    "overview": "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks.",
+    "owner": "StreamFlix",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.5.0.0",
+        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_12.0.0.zip",
+        "checksum": "719f43be14d6a411cbb1b1211968d389",
+        "timestamp": "2026-11-12T21:46:14Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.11.0.zip",
+        "checksum": "ebcc111fa51787681240a90f1615851d",
+        "timestamp": "2026-11-12T21:46:14Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.9.0.zip",
+        "checksum": "c24f9c5dd1d19bbea57b70d8be25750c",
+        "timestamp": "2026-11-12T21:46:14Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.9.0.zip",
+        "checksum": "c24f9c5dd1d19bbea57b70d8be25750c",
+        "timestamp": "2026-11-12T21:46:14Z"
+      }
+    ]
+  }
+]

@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <JellyfinTarget Condition="'$(JellyfinTarget)' == ''">jf109</JellyfinTarget>
+    <StreamFlixVersion Condition="'$(StreamFlixVersion)' == ''">0.5.0.0</StreamFlixVersion>
+    <RootNamespace>Jellyfin.Plugin.StreamFlix</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.StreamFlix</AssemblyName>
+    <Version>$(StreamFlixVersion)</Version>
+    <AssemblyVersion>$(StreamFlixVersion)</AssemblyVersion>
+    <FileVersion>$(StreamFlixVersion)</FileVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Jellyfin 10.9 & 10.10 (.NET 8.0) -->
+  <PropertyGroup Condition="'$(JellyfinTarget)' == 'jf109'">
+    <TargetFramework>net8.0</TargetFramework>
+    <JellyfinVersion>10.9.0</JellyfinVersion>
+    <Version>$(StreamFlixVersion)</Version>
+    <AssemblyVersion>$(StreamFlixVersion)</AssemblyVersion>
+    <FileVersion>$(StreamFlixVersion)</FileVersion>
+    <DefineConstants>$(DefineConstants);JF109</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Jellyfin 10.11 (.NET 9.0) -->
+  <PropertyGroup Condition="'$(JellyfinTarget)' == 'jf1011'">
+    <TargetFramework>net9.0</TargetFramework>
+    <JellyfinVersion>10.11.0</JellyfinVersion>
+    <Version>$(StreamFlixVersion)</Version>
+    <AssemblyVersion>$(StreamFlixVersion)</AssemblyVersion>
+    <FileVersion>$(StreamFlixVersion)</FileVersion>
+    <DefineConstants>$(DefineConstants);JF1011</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Jellyfin 12.x (.NET 10.0) -->
+  <PropertyGroup Condition="'$(JellyfinTarget)' == 'jf12'">
+    <TargetFramework>net10.0</TargetFramework>
+    <JellyfinVersion>12.4.0</JellyfinVersion>
+    <Version>$(StreamFlixVersion)</Version>
+    <AssemblyVersion>$(StreamFlixVersion)</AssemblyVersion>
+    <FileVersion>$(StreamFlixVersion)</FileVersion>
+    <DefineConstants>$(DefineConstants);JF12</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Configuration\configPage.html" />
+    <EmbeddedResource Include="Configuration\configPage.html" />
+    <None Remove="Web\streamflix.css" />
+    <EmbeddedResource Include="Web\streamflix.css" />
+    <None Remove="Web\streamflix.js" />
+    <EmbeddedResource Include="Web\streamflix.js" />
+  </ItemGroup>
+
+</Project>

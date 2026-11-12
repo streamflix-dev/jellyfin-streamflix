@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>StreamFlix</title>
+</head>
+<body>
+    <div id="StreamFlixConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <style>
+            #StreamFlixConfigPage .bfx-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:22px; }
+            #StreamFlixConfigPage .bfx-brand { display:flex; align-items:center; gap:14px; }
+            #StreamFlixConfigPage .bfx-logo { background:#E50914; color:#fff; font-weight:900; font-size:20px; letter-spacing:3px; padding:8px 16px; border-radius:6px; box-shadow:0 6px 20px rgba(229,9,20,.35); }
+            #StreamFlixConfigPage .bfx-head h2 { margin:0; font-size:1.35em; }
+            #StreamFlixConfigPage .bfx-sub { opacity:.65; font-size:.9em; margin-top:2px; }
+            #StreamFlixConfigPage .bfx-btn { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:inherit; padding:8px 14px; border-radius:6px; font:inherit; font-size:.9em; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s, transform .15s; }
+            #StreamFlixConfigPage .bfx-btn:hover:not(:disabled) { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3); }
+            #StreamFlixConfigPage .bfx-btn:active:not(:disabled) { transform:scale(.97); }
+            #StreamFlixConfigPage .bfx-btn:disabled { opacity:.35; cursor:default; }
+            #StreamFlixConfigPage .bfx-btn-red { background:#E50914; border-color:#E50914; color:#fff; }
+            #StreamFlixConfigPage .bfx-btn-red:hover:not(:disabled) { background:#f6121d; border-color:#f6121d; }
+            #StreamFlixConfigPage .bfx-btn-danger { color:#ff8a80; border-color:rgba(229,9,20,.5); }
+            #StreamFlixConfigPage .bfx-btn-sm { padding:5px 9px; font-size:.8em; }
+            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-bottom:26px; }
+            #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:14px 16px; }
+            #StreamFlixConfigPage .bfx-card-label { font-size:.75em; text-transform:uppercase; letter-spacing:.08em; opacity:.6; }
+            #StreamFlixConfigPage .bfx-card-value { font-size:1.15em; font-weight:700; margin-top:6px; display:flex; align-items:center; gap:8px; }
+            #StreamFlixConfigPage .bfx-dot { width:9px; height:9px; border-radius:50%; background:#777; flex:none; }
+            #StreamFlixConfigPage .bfx-dot.ok { background:#46d369; box-shadow:0 0 8px rgba(70,211,105,.6); }
+            #StreamFlixConfigPage .bfx-dot.warn { background:#f5b041; box-shadow:0 0 8px rgba(245,176,65,.5); }
+            #StreamFlixConfigPage .bfx-dot.bad { background:#E50914; box-shadow:0 0 8px rgba(229,9,20,.6); }
+            #StreamFlixConfigPage .bfx-section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:18px 20px; margin-bottom:22px; }
+            #StreamFlixConfigPage .bfx-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+            #StreamFlixConfigPage .bfx-section h3 { margin:0 0 4px; }
+            #StreamFlixConfigPage .bfx-profiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:12px; }
+            #StreamFlixConfigPage .bfx-prof { display:flex; align-items:center; gap:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:10px 12px; transition:border-color .15s, opacity .2s; }
+            #StreamFlixConfigPage .bfx-prof:hover { border-color:rgba(255,255,255,.25); }
+            #StreamFlixConfigPage .bfx-prof.busy { opacity:.45; pointer-events:none; }
+            #StreamFlixConfigPage .bfx-avatar { width:44px; height:44px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:22px; flex:none; }
+            #StreamFlixConfigPage .bfx-prof-main { flex:1; min-width:0; }
+            #StreamFlixConfigPage .bfx-prof-name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            #StreamFlixConfigPage .bfx-prof-meta { font-size:.78em; opacity:.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            #StreamFlixConfigPage .bfx-badges { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+            #StreamFlixConfigPage .bfx-badge { font-size:.68em; font-weight:700; letter-spacing:.03em; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,.1); }
+            #StreamFlixConfigPage .bfx-badge.red { background:rgba(229,9,20,.25); color:#ff8a80; }
+            #StreamFlixConfigPage .bfx-badge.blue { background:rgba(66,133,244,.22); color:#9ec1ff; }
+            #StreamFlixConfigPage .bfx-badge.green { background:rgba(70,211,105,.18); color:#8de5a6; }
+            #StreamFlixConfigPage .bfx-badge.amber { background:rgba(245,176,65,.2); color:#f8cd85; }
+            #StreamFlixConfigPage .bfx-prof-actions { display:flex; gap:4px; flex:none; }
+            #StreamFlixConfigPage .bfx-empty { opacity:.6; padding:10px 0; }
+            #StreamFlixConfigPage .bfx-callout { border-left:3px solid #f5b041; background:rgba(245,176,65,.08); padding:10px 12px; border-radius:4px; font-size:.88em; margin:6px 0 14px; }
+            #StreamFlixConfigPage .bfx-callout.red { border-left-color:#E50914; background:rgba(229,9,20,.08); }
+            #StreamFlixConfigPage .bfx-callout.hide { display:none; }
+            #StreamFlixConfigPage .bfx-uri { display:flex; align-items:center; gap:8px; margin:6px 0; }
+            #StreamFlixConfigPage .bfx-uri code { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:5px; font-size:.85em; }
+            #StreamFlixConfigPage .bfx-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+            #StreamFlixConfigPage textarea.bfx-textarea { width:100%; box-sizing:border-box; font-family:monospace; padding:10px; min-height:120px; border-radius:6px; }
+            #StreamFlixConfigPage .bfx-save-bar { position:sticky; bottom:0; padding:12px 0; background:linear-gradient(to top, rgba(16,16,16,.95) 60%, rgba(16,16,16,0)); z-index:2; }
+            #StreamFlixConfigPage .bfx-skeleton { height:66px; border-radius:8px; background:linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%); background-size:200% 100%; animation:bfxShimmer 1.3s ease-in-out infinite; }
+            @keyframes bfxShimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+            @media (prefers-reduced-motion: reduce) { #StreamFlixConfigPage .bfx-skeleton { animation:none; } }
+        </style>
+
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="StreamFlixConfigForm">
+                    <div class="bfx-head">
+                        <div class="bfx-brand">
+                            <div class="bfx-logo">STREAMFLIX</div>
+                            <div>
+                                <h2>StreamFlix</h2>
+                                <div class="bfx-sub">Netflix-style home, Google sign-in and household profiles for Jellyfin Web <span id="StreamFlixVersionLabel"></span></div>
+                            </div>
+                        </div>
+                        <div class="bfx-row">
+                            <button type="button" class="bfx-btn" id="StreamFlixManageProfilesBtn">✎ Manage profiles</button>
+                            <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixOpenPickerBtn">Who's watching?</button>
+                        </div>
+                    </div>
+
+                    <div class="bfx-cards">
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Google sign-in</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGoogleDot"></span><span id="StreamFlixStatusGoogle">…</span></div>
+                        </div>
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Household access</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGateDot"></span><span id="StreamFlixStatusGate">…</span></div>
+                        </div>
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Approved accounts</div>
+                            <div class="bfx-card-value" id="StreamFlixStatusAccounts">…</div>
+                        </div>
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Profiles</div>
+                            <div class="bfx-card-value" id="StreamFlixStatusProfiles">…</div>
+                        </div>
+                    </div>
+
+                    <div class="bfx-section">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Profiles</h3>
+                                <div class="fieldDescription">Each profile is linked to its own Jellyfin user, so watch history, Continue Watching and favorites stay separate. Add a PIN or lock a profile to a Google account from <strong>Manage profiles</strong>.</div>
+                            </div>
+                        </div>
+                        <div class="bfx-callout red hide" id="StreamFlixOwnerWarning">
+                            The <strong>Owner</strong> profile is linked to an administrator account but has no PIN or Google lock. Anyone signed in to your household can open it — consider protecting it.
+                        </div>
+                        <div class="bfx-profiles" id="StreamFlixProfilesGrid">
+                            <div class="bfx-skeleton"></div><div class="bfx-skeleton"></div><div class="bfx-skeleton"></div>
+                        </div>
+                    </div>
+
+                    <div class="bfx-section">
+                        <h3>Access &amp; security</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="EnableStreamFlixUi" name="EnableStreamFlixUi" type="checkbox" is="emby-checkbox" />
+                                <span>Enable the StreamFlix interface</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Netflix-style home with hero billboard, profile switcher and themed library pages in Jellyfin Web.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="RequireGoogleAuth" name="RequireGoogleAuth" type="checkbox" is="emby-checkbox" />
+                                <span>Require Google sign-in before "Who's watching?"</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Each browser signs in once with an approved Google account (verified by the server), then picks a profile.</div>
+                        </div>
+                        <div class="bfx-callout red hide" id="StreamFlixOpenGateWarning">
+                            <strong>Google sign-in is off.</strong> Anyone who can reach this server can open unprotected profiles without a password. Only disable this on a trusted private network.
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="AutoProvisionJellyfinUsers" name="AutoProvisionJellyfinUsers" type="checkbox" is="emby-checkbox" />
+                                <span>Create a Jellyfin user for each new profile</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">New profiles automatically get a dedicated (non-admin) Jellyfin user so their watch history is independent.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="SessionLifetimeDays">Stay signed in for (days)</label>
+                            <input id="SessionLifetimeDays" name="SessionLifetimeDays" type="number" min="1" max="365" step="1" is="emby-input" />
+                            <div class="fieldDescription">How long a Google sign-in lasts on a device before it has to sign in again (1–365).</div>
+                        </div>
+
+                        <div class="bfx-row">
+                            <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">Sign out all devices</button>
+                            <span class="fieldDescription" style="margin:0;">Immediately ends every StreamFlix Google session. Everyone will need to sign in again.</span>
+                        </div>
+                    </div>
+
+                    <div class="bfx-section">
+                        <h3>Google sign-in</h3>
+                        <div class="fieldDescription" style="margin-bottom:12px;">
+                            In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="button-link">Google Cloud Console → Credentials</a>, create an <strong>OAuth client ID</strong> of type <em>Web application</em> and add the following:
+                        </div>
+                        <div class="fieldDescription">Authorized JavaScript origin</div>
+                        <div class="bfx-uri"><code id="StreamFlixOriginUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOriginUri">Copy</button></div>
+                        <div class="fieldDescription">Authorized redirect URIs</div>
+                        <div class="bfx-uri"><code id="StreamFlixRedirectUri1"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri1">Copy</button></div>
+                        <div class="bfx-uri"><code id="StreamFlixRedirectUri2"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri2">Copy</button></div>
+
+                        <div class="inputContainer" style="margin-top:18px;">
+                            <label class="inputLabel inputLabelUnfocused" for="GoogleClientId">OAuth Client ID</label>
+                            <input id="GoogleClientId" name="GoogleClientId" type="text" is="emby-input" autocomplete="off" placeholder="your-client-id.apps.googleusercontent.com" />
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="GoogleClientSecret">OAuth Client secret (optional)</label>
+                            <input id="GoogleClientSecret" name="GoogleClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                            <div class="fieldDescription">Not required for sign-in. Stored only on the server and never sent to browsers.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="ApprovedGoogleEmails">Approved Google accounts</label>
+                            <textarea id="ApprovedGoogleEmails" name="ApprovedGoogleEmails" rows="6" class="emby-input bfx-textarea" placeholder="user@example.com&#10;member@example.com"></textarea>
+                            <div class="fieldDescription">One email per line. Only these accounts (plus any account a profile is locked to) can unlock StreamFlix.</div>
+                        </div>
+                        <div class="bfx-callout hide" id="StreamFlixNoAccountsWarning">
+                            No approved accounts yet. On a brand-new install the first Google account to sign in is approved automatically; otherwise only accounts that a profile is locked to can get in.
+                        </div>
+                    </div>
+
+                    <div class="bfx-save-bar">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '7cc1a505-91f6-4661-b4f9-7eee8be33b19';
+                var page = document.querySelector('#StreamFlixConfigPage');
+                var form = page.querySelector('#StreamFlixConfigForm');
+                var grid = page.querySelector('#StreamFlixProfilesGrid');
+                var profiles = [];
+                var lastPublic = null;
+
+                function $(sel) {
+                    return page.querySelector(sel);
+                }
+
+                function esc(value) {
+                    return String(value == null ? '' : value)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                }
+
+                function toast(message) {
+                    if (window.require) {
+                        try {
+                            window.require(['toast'], function (t) { t(message); });
+                            return;
+                        } catch (e) {}
+                    }
+                    if (window.Dashboard && Dashboard.alert) {
+                        Dashboard.alert(message);
+                    }
+                }
+
+                function confirmAction(text, title) {
+                    if (window.Dashboard && typeof Dashboard.confirm === 'function') {
+                        return new Promise(function (resolve) {
+                            Dashboard.confirm(text, title || 'StreamFlix', function (ok) { resolve(Boolean(ok)); });
+                        });
+                    }
+                    return Promise.resolve(window.confirm(text));
+                }
+
+                /* Authenticated call to the StreamFlix API (ApiClient attaches this admin's Jellyfin token). */
+                function streamflixApi(method, path, body) {
+                    var options = {
+                        type: method,
+                        url: ApiClient.getUrl('StreamFlix/' + path),
+                        dataType: 'json'
+                    };
+                    if (body !== undefined) {
+                        options.data = JSON.stringify(body);
+                        options.contentType = 'application/json';
+                    }
+                    return ApiClient.ajax(options).catch(function (err) {
+                        if (err && typeof err.json === 'function') {
+                            return err.json().catch(function () { return {}; }).then(function (data) {
+                                var e = new Error((data && data.message) || ('Request failed (' + err.status + ')'));
+                                e.status = err.status;
+                                throw e;
+                            });
+                        }
+                        throw err instanceof Error ? err : new Error('Request failed');
+                    });
+                }
+
+                function ensureClientBundle() {
+                    if (typeof window.__STREAMFLIX_OPEN_PROFILE_PICKER__ === 'function') {
+                        return Promise.resolve();
+                    }
+                    if (!document.querySelector('link[href*="StreamFlix/ClientStyles"]')) {
+                        var link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = ApiClient.getUrl('StreamFlix/ClientStyles');
+                        document.head.appendChild(link);
+                    }
+                    return fetch(ApiClient.getUrl('StreamFlix/ClientScript'))
+                        .then(function (r) { return r.text(); })
+                        .then(function (code) {
+                            var sc = document.createElement('script');
+                            sc.text = code;
+                            document.head.appendChild(sc);
+                        })
+                        .catch(function () {});
+                }
+
+                function openPicker(manage) {
+                    ensureClientBundle().then(function () {
+                        if (typeof window.__STREAMFLIX_OPEN_PROFILE_PICKER__ === 'function') {
+                            window.__STREAMFLIX_OPEN_PROFILE_PICKER__(Boolean(manage));
+                        } else {
+                            toast('The StreamFlix interface is not loaded. Reload the page and try again.');
+                        }
+                    });
+                }
+
+                function switchTo(profileId) {
+                    ensureClientBundle().then(function () {
+                        if (typeof window.__STREAMFLIX_SWITCH_PROFILE__ === 'function') {
+                            window.__STREAMFLIX_SWITCH_PROFILE__(profileId);
+                        } else {
+                            openPicker(false);
+                        }
+                    });
+                }
+
+                function setStatus(dotId, textId, level, text) {
+                    var dot = $('#' + dotId);
+                    dot.className = 'bfx-dot' + (level ? ' ' + level : '');
+                    $('#' + textId).textContent = text;
+                }
+
+                function renderStatus() {
+                    var clientId = $('#GoogleClientId').value.trim();
+                    var requireGoogle = $('#RequireGoogleAuth').checked;
+                    var accounts = parseEmails($('#ApprovedGoogleEmails').value);
+
+                    setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', clientId ? 'ok' : 'bad', clientId ? 'Configured' : 'Not configured');
+                    setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', requireGoogle ? 'ok' : 'warn', requireGoogle ? 'Google required' : 'Open');
+                    $('#StreamFlixStatusAccounts').textContent = String(accounts.length);
+                    $('#StreamFlixStatusProfiles').textContent = String(profiles.length);
+
+                    $('#StreamFlixOpenGateWarning').classList.toggle('hide', requireGoogle);
+                    $('#StreamFlixNoAccountsWarning').classList.toggle('hide', !(requireGoogle && accounts.length === 0));
+
+                    var exposedOwner = profiles.some(function (p) {
+                        return p.isAdmin && !p.hasPin && !p.googleLocked;
+                    });
+                    $('#StreamFlixOwnerWarning').classList.toggle('hide', !exposedOwner);
+                }
+
+                function parseEmails(text) {
+                    var seen = {};
+                    return String(text || '')
+                        .split(/[\r\n,;\s]+/)
+                        .map(function (s) { return s.trim().toLowerCase(); })
+                        .filter(function (s) {
+                            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) || seen[s]) {
+                                return false;
+                            }
+                            seen[s] = true;
+                            return true;
+                        });
+                }
+
+                function renderProfiles() {
+                    if (!profiles.length) {
+                        grid.innerHTML = '<div class="bfx-empty">No profiles yet. Open <strong>Manage profiles</strong> to create one.</div>';
+                        renderStatus();
+                        return;
+                    }
+                    var canDelete = profiles.length > 1;
+                    grid.innerHTML = profiles.map(function (p, idx) {
+                        var badges = ''
+                            + (p.isOwner ? '<span class="bfx-badge red">OWNER</span>' : '')
+                            + (p.isAdmin ? '<span class="bfx-badge amber">ADMIN</span>' : '')
+                            + (p.isKids ? '<span class="bfx-badge green">KIDS</span>' : '')
+                            + (p.hasPin ? '<span class="bfx-badge">🔒 PIN</span>' : '')
+                            + (p.googleLocked ? '<span class="bfx-badge blue" title="Locked to a Google account">G ' + esc(p.googleAccountEmail || p.googleAccountHint || '') + '</span>' : '')
+                            + (!p.jellyfinUserId ? '<span class="bfx-badge red">NOT LINKED</span>' : '');
+                        return ''
+                            + '<div class="bfx-prof" data-id="' + esc(p.id) + '">'
+                            + '  <div class="bfx-avatar" style="background:' + esc(p.avatarColorHex || '#E50914') + ';">' + esc(p.avatarEmoji || '🎬') + '</div>'
+                            + '  <div class="bfx-prof-main">'
+                            + '    <div class="bfx-prof-name">' + esc(p.name || 'Profile') + '</div>'
+                            + '    <div class="bfx-prof-meta">Jellyfin user: ' + esc(p.jellyfinUsername || '—') + '</div>'
+                            + (badges ? '<div class="bfx-badges">' + badges + '</div>' : '')
+                            + '  </div>'
+                            + '  <div class="bfx-prof-actions">'
+                            + '    <button type="button" class="bfx-btn bfx-btn-sm" data-act="up" title="Move earlier"' + (idx === 0 ? ' disabled' : '') + '>◀</button>'
+                            + '    <button type="button" class="bfx-btn bfx-btn-sm" data-act="down" title="Move later"' + (idx === profiles.length - 1 ? ' disabled' : '') + '>▶</button>'
+                            + '    <button type="button" class="bfx-btn bfx-btn-sm bfx-btn-red" data-act="switch" title="Switch to this profile">Open</button>'
+                            + (canDelete ? '<button type="button" class="bfx-btn bfx-btn-sm bfx-btn-danger" data-act="delete" title="Delete profile">🗑</button>' : '')
+                            + '  </div>'
+                            + '</div>';
+                    }).join('');
+                    renderStatus();
+                }
+
+                function applyPublic(pub) {
+                    lastPublic = pub || null;
+                    if (pub && Array.isArray(pub.profiles)) {
+                        profiles = pub.profiles;
+                    }
+                    if (pub && pub.version) {
+                        $('#StreamFlixVersionLabel').textContent = '· v' + String(pub.version).replace(/\.0$/, '');
+                    }
+                    renderProfiles();
+                }
+
+                function reorder(profileId, delta) {
+                    var list = profiles.slice();
+                    var idx = list.findIndex(function (p) { return p.id === profileId; });
+                    var target = idx + delta;
+                    if (idx < 0 || target < 0 || target >= list.length) {
+                        return;
+                    }
+                    var tmp = list[idx];
+                    list[idx] = list[target];
+                    list[target] = tmp;
+                    profiles = list;
+                    renderProfiles();
+                    streamflixApi('POST', 'Profiles/Reorder', { profileIds: list.map(function (p) { return p.id; }) })
+                        .then(applyPublic)
+                        .catch(function (err) {
+                            toast(err.message);
+                            loadProfiles();
+                        });
+                }
+
+                function removeProfile(profileId) {
+                    var p = profiles.find(function (x) { return x.id === profileId; });
+                    if (!p) {
+                        return;
+                    }
+                    confirmAction('Delete the profile "' + p.name + '"? Its linked Jellyfin user and watch history are kept.', 'Delete profile').then(function (ok) {
+                        if (!ok) {
+                            return;
+                        }
+                        var card = grid.querySelector('.bfx-prof[data-id="' + CSS.escape(profileId) + '"]');
+                        if (card) {
+                            card.classList.add('busy');
+                        }
+                        streamflixApi('POST', 'Profiles/Delete', { profileId: profileId, currentPin: '' })
+                            .then(function (pub) {
+                                applyPublic(pub);
+                                toast('Profile deleted');
+                            })
+                            .catch(function (err) {
+                                if (card) {
+                                    card.classList.remove('busy');
+                                }
+                                toast(err.message);
+                            });
+                    });
+                }
+
+                grid.addEventListener('click', function (e) {
+                    var btn = e.target.closest('button[data-act]');
+                    var card = btn && btn.closest('.bfx-prof');
+                    if (!btn || !card) {
+                        return;
+                    }
+                    var id = card.getAttribute('data-id');
+                    var act = btn.getAttribute('data-act');
+                    if (act === 'up') {
+                        reorder(id, -1);
+                    } else if (act === 'down') {
+                        reorder(id, 1);
+                    } else if (act === 'switch') {
+                        switchTo(id);
+                    } else if (act === 'delete') {
+                        removeProfile(id);
+                    }
+                });
+
+                $('#StreamFlixOpenPickerBtn').addEventListener('click', function () { openPicker(false); });
+                $('#StreamFlixManageProfilesBtn').addEventListener('click', function () { openPicker(true); });
+
+                $('#StreamFlixRevokeAllBtn').addEventListener('click', function () {
+                    confirmAction('Sign every device out of StreamFlix? Everyone (including you on other devices) will need to sign in with Google again.', 'Sign out all devices').then(function (ok) {
+                        if (!ok) {
+                            return;
+                        }
+                        streamflixApi('POST', 'Sessions/RevokeAll')
+                            .then(function () { toast('All devices have been signed out'); })
+                            .catch(function (err) { toast(err.message); });
+                    });
+                });
+
+                Array.prototype.forEach.call(page.querySelectorAll('[data-copy]'), function (btn) {
+                    btn.addEventListener('click', function () {
+                        var text = $('#' + btn.getAttribute('data-copy')).textContent;
+                        var done = function () {
+                            var label = btn.textContent;
+                            btn.textContent = 'Copied';
+                            setTimeout(function () { btn.textContent = label; }, 1400);
+                        };
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(text).then(done, function () { toast(text); });
+                        } else {
+                            toast(text);
+                        }
+                    });
+                });
+
+                ['#GoogleClientId', '#ApprovedGoogleEmails'].forEach(function (sel) {
+                    $(sel).addEventListener('input', renderStatus);
+                });
+                $('#RequireGoogleAuth').addEventListener('change', renderStatus);
+
+                function renderRedirectUris() {
+                    var base = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
+                    $('#StreamFlixOriginUri').textContent = window.location.origin;
+                    $('#StreamFlixRedirectUri1').textContent = base;
+                    $('#StreamFlixRedirectUri2').textContent = base.replace(/\/?$/, '/') + 'index.html';
+                }
+
+                function loadProfiles() {
+                    return streamflixApi('GET', 'PublicConfig').then(applyPublic).catch(function () {
+                        renderProfiles();
+                    });
+                }
+
+                function loadPageData() {
+                    Dashboard.showLoadingMsg();
+                    renderRedirectUris();
+                    ensureClientBundle();
+                    loadProfiles();
+
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        $('#EnableStreamFlixUi').checked = config.EnableStreamFlixUi !== false;
+                        $('#RequireGoogleAuth').checked = config.RequireGoogleAuth !== false;
+                        $('#AutoProvisionJellyfinUsers').checked = config.AutoProvisionJellyfinUsers !== false;
+                        $('#SessionLifetimeDays').value = config.SessionLifetimeDays > 0 ? config.SessionLifetimeDays : 30;
+                        $('#GoogleClientId').value = config.GoogleClientId || '';
+                        $('#GoogleClientSecret').value = config.GoogleClientSecret || '';
+                        $('#ApprovedGoogleEmails').value = (config.ApprovedGoogleAccounts || []).join('\n');
+                        renderStatus();
+                        Dashboard.hideLoadingMsg();
+                    }).catch(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+                }
+
+                page.addEventListener('viewshow', loadPageData);
+
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var days = parseInt($('#SessionLifetimeDays').value, 10);
+                    if (!(days >= 1 && days <= 365)) {
+                        toast('"Stay signed in" must be between 1 and 365 days.');
+                        return false;
+                    }
+                    Dashboard.showLoadingMsg();
+                    // Re-read the stored configuration right before saving so profile changes made elsewhere aren't overwritten
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.EnableStreamFlixUi = $('#EnableStreamFlixUi').checked;
+                        config.RequireGoogleAuth = $('#RequireGoogleAuth').checked;
+                        config.AutoProvisionJellyfinUsers = $('#AutoProvisionJellyfinUsers').checked;
+                        config.SessionLifetimeDays = days;
+                        config.GoogleClientId = $('#GoogleClientId').value.trim();
+                        config.GoogleClientSecret = $('#GoogleClientSecret').value.trim();
+                        config.ApprovedGoogleAccounts = parseEmails($('#ApprovedGoogleEmails').value);
+                        $('#ApprovedGoogleEmails').value = config.ApprovedGoogleAccounts.join('\n');
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        renderStatus();
+                        loadProfiles();
+                    }).catch(function () {
+                        Dashboard.hideLoadingMsg();
+                        toast('Saving failed. Please try again.');
+                    });
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
