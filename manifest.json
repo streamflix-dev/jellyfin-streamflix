@@ -8,36 +8,36 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.5.1.0",
-        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
+        "version": "0.5.2.0",
+        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_12.0.0.zip",
-        "checksum": "6d9c958fb078d60a5a1ae8ec7351d6fd",
-        "timestamp": "2026-11-12T23:23:02Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_12.0.0.zip",
+        "checksum": "4ebdc7eb25b0eeef9e0a51ff80204b8d",
+        "timestamp": "2026-11-12T23:53:24Z"
       },
       {
-        "version": "0.5.1.0",
-        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
+        "version": "0.5.2.0",
+        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.11.0.zip",
-        "checksum": "ee535368e7b210462149a66fe345bd9b",
-        "timestamp": "2026-11-12T23:23:02Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.11.0.zip",
+        "checksum": "da44225b5a51d53cb6ef6fde4d0dbbce",
+        "timestamp": "2026-11-12T23:53:24Z"
       },
       {
-        "version": "0.5.1.0",
-        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
+        "version": "0.5.2.0",
+        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.9.0.zip",
-        "checksum": "9ea0500a0cd182ac0aac05951621f4a4",
-        "timestamp": "2026-11-12T23:23:02Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.9.0.zip",
+        "checksum": "6e81ea986c2fdeed925dbaea53b6d349",
+        "timestamp": "2026-11-12T23:53:24Z"
       },
       {
-        "version": "0.5.1.0",
-        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
+        "version": "0.5.2.0",
+        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.9.0.zip",
-        "checksum": "9ea0500a0cd182ac0aac05951621f4a4",
-        "timestamp": "2026-11-12T23:23:02Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.9.0.zip",
+        "checksum": "6e81ea986c2fdeed925dbaea53b6d349",
+        "timestamp": "2026-11-12T23:53:24Z"
       }
     ]
   }
