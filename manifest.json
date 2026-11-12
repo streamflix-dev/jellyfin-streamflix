@@ -8,36 +8,36 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.5.0.0",
-        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "version": "0.5.1.0",
+        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
         "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_12.0.0.zip",
-        "checksum": "b90b2dea6430f1bba96d5d13b13131f0",
-        "timestamp": "2026-11-12T21:55:29Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_12.0.0.zip",
+        "checksum": "6d9c958fb078d60a5a1ae8ec7351d6fd",
+        "timestamp": "2026-11-12T23:23:02Z"
       },
       {
-        "version": "0.5.0.0",
-        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "version": "0.5.1.0",
+        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.11.0.zip",
-        "checksum": "766b1aef5b739584570ea3ed7bf45a8a",
-        "timestamp": "2026-11-12T21:55:29Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.11.0.zip",
+        "checksum": "ee535368e7b210462149a66fe345bd9b",
+        "timestamp": "2026-11-12T23:23:02Z"
       },
       {
-        "version": "0.5.0.0",
-        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "version": "0.5.1.0",
+        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.9.0.zip",
-        "checksum": "d5d02643cbf935665143c7bbf460e71d",
-        "timestamp": "2026-11-12T21:55:29Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.9.0.zip",
+        "checksum": "9ea0500a0cd182ac0aac05951621f4a4",
+        "timestamp": "2026-11-12T23:23:02Z"
       },
       {
-        "version": "0.5.0.0",
-        "changelog": "v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user 'Who's watching?' profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts.",
+        "version": "0.5.1.0",
+        "changelog": "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release.",
         "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.9.0.zip",
-        "checksum": "d5d02643cbf935665143c7bbf460e71d",
-        "timestamp": "2026-11-12T21:55:29Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.9.0.zip",
+        "checksum": "9ea0500a0cd182ac0aac05951621f4a4",
+        "timestamp": "2026-11-12T23:23:02Z"
       }
     ]
   }
