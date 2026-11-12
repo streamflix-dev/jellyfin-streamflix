@@ -287,10 +287,15 @@ public class StreamFlixController : ControllerBase
                 if (!string.IsNullOrEmpty(configuredClientId))
                 {
                     using var infoDoc = JsonDocument.Parse(await infoResp.Content.ReadAsStringAsync().ConfigureAwait(false));
-                    var aud = infoDoc.RootElement.TryGetProperty("aud", out var audProp) ? audProp.GetString() : null;
-                    var azp = infoDoc.RootElement.TryGetProperty("azp", out var azpProp) ? azpProp.GetString() : null;
+                    var infoRoot = infoDoc.RootElement;
+                    var aud = infoRoot.TryGetProperty("aud", out var audProp) ? audProp.GetString() : null;
+                    var azp = infoRoot.TryGetProperty("azp", out var azpProp) ? azpProp.GetString() : null;
+                    var issuedTo = infoRoot.TryGetProperty("issued_to", out var itProp) ? itProp.GetString() : null;
+                    var audience = infoRoot.TryGetProperty("audience", out var auProp) ? auProp.GetString() : null;
                     if (!string.Equals(aud, configuredClientId, StringComparison.Ordinal)
-                        && !string.Equals(azp, configuredClientId, StringComparison.Ordinal))
+                        && !string.Equals(azp, configuredClientId, StringComparison.Ordinal)
+                        && !string.Equals(issuedTo, configuredClientId, StringComparison.Ordinal)
+                        && !string.Equals(audience, configuredClientId, StringComparison.Ordinal))
                     {
                         return StatusCode(401, new { verified = false, message = "This Google token was issued for a different app." });
                     }
@@ -511,7 +516,16 @@ public class StreamFlixController : ControllerBase
             RemoteEndPoint = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1",
         };
 
-        var authResult = await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+        AuthenticationResult authResult;
+        try
+        {
+            authResult = await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: direct authentication failed for profile '{ProfileName}' (Jellyfin user '{Username}').", profile.Name, user.Username);
+            return StatusCode(403, new { code = "auth_failed", message = $"Could not sign in to Jellyfin as \"{user.Username}\". Ensure the account is enabled in Server Dashboard → Users." });
+        }
 
         return Ok(new
         {

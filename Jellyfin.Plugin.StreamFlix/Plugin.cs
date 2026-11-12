@@ -24,6 +24,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public const string StartComment = "<!-- BEGIN StreamFlix Plugin -->";
     public const string EndComment = "<!-- END StreamFlix Plugin -->";
 
+    private static readonly object DiskIndexLock = new();
     private static long _lastInjectTicks;
 
     private readonly IApplicationPaths _appPaths;
@@ -213,42 +214,45 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public bool InjectScriptIntoDiskIndexIfWritable()
     {
-        CleanConflictingBrandingCssIfPresent();
-        try
+        lock (DiskIndexLock)
         {
-            var indexPath = IndexHtmlPath;
-            if (!File.Exists(indexPath))
+            CleanConflictingBrandingCssIfPresent();
+            try
             {
-                _logger.LogWarning("StreamFlix: index.html not found at {Path}", indexPath);
-                return false;
+                var indexPath = IndexHtmlPath;
+                if (!File.Exists(indexPath))
+                {
+                    _logger.LogWarning("StreamFlix: index.html not found at {Path}", indexPath);
+                    return false;
+                }
+
+                var injectionBlock = BuildInjectionBlock();
+                var content = File.ReadAllText(indexPath);
+                if (content.Contains(injectionBlock, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                var cleanupRegex = new Regex($"{Regex.Escape(StartComment)}[\\s\\S]*?{Regex.Escape(EndComment)}\\s*", RegexOptions.Multiline);
+                content = cleanupRegex.Replace(content, string.Empty);
+
+                const string closingBody = "</body>";
+                var idx = content.LastIndexOf(closingBody, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    content = content.Substring(0, idx) + injectionBlock + "\n" + content.Substring(idx);
+                    File.WriteAllText(indexPath, content);
+                    _logger.LogInformation("StreamFlix: injected client bundle into {Path}", indexPath);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "StreamFlix: index.html is read-only on disk; using request-time IStartupFilter middleware.");
             }
 
-            var injectionBlock = BuildInjectionBlock();
-            var content = File.ReadAllText(indexPath);
-            if (content.Contains(injectionBlock, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            var cleanupRegex = new Regex($"{Regex.Escape(StartComment)}[\\s\\S]*?{Regex.Escape(EndComment)}\\s*", RegexOptions.Multiline);
-            content = cleanupRegex.Replace(content, string.Empty);
-
-            const string closingBody = "</body>";
-            var idx = content.LastIndexOf(closingBody, StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0)
-            {
-                content = content.Substring(0, idx) + injectionBlock + "\n" + content.Substring(idx);
-                File.WriteAllText(indexPath, content);
-                _logger.LogInformation("StreamFlix: injected client bundle into {Path}", indexPath);
-                return true;
-            }
+            return false;
         }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "StreamFlix: index.html is read-only on disk; using request-time IStartupFilter middleware.");
-        }
-
-        return false;
     }
 
     public override void OnUninstalling()

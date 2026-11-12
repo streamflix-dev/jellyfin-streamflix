@@ -211,8 +211,10 @@ public class StreamFlixStartupFilter : IStartupFilter
             return false;
         }
 
-        return path.EndsWith("/Branding/Css", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith("/Branding/Css.css", StringComparison.OrdinalIgnoreCase);
+        var trimmed = path.TrimEnd('/');
+        return trimmed.EndsWith("/Branding/Css", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("/Branding/Css.css", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(trimmed, "/Branding/Css", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsIndexRequest(string? path)

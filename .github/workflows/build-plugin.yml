@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.5.1.0"
+  PLUGIN_VERSION: "0.5.2.0"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks."
-  PLUGIN_CHANGELOG: "v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion | v0.5: initial public beta release."
+  PLUGIN_CHANGELOG: "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release."
 
 jobs:
   build-and-publish:

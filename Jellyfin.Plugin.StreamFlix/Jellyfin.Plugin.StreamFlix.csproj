@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <JellyfinTarget Condition="'$(JellyfinTarget)' == ''">jf109</JellyfinTarget>
-    <StreamFlixVersion Condition="'$(StreamFlixVersion)' == ''">0.5.1.0</StreamFlixVersion>
+    <StreamFlixVersion Condition="'$(StreamFlixVersion)' == ''">0.5.2.0</StreamFlixVersion>
     <RootNamespace>Jellyfin.Plugin.StreamFlix</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.StreamFlix</AssemblyName>
     <Version>$(StreamFlixVersion)</Version>

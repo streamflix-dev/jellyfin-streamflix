@@ -42,6 +42,10 @@ public class StreamFlixStartupTask : IScheduledTask
     private static readonly Lazy<PropertyInfo?> UsersProperty = new(() =>
         typeof(IUserManager).GetProperty("Users", BindingFlags.Public | BindingFlags.Instance));
 
+    private static readonly object ExtSetPermLock = new();
+    private static MethodInfo? _cachedExtSetPermMethod;
+    private static bool _extSetPermSearched;
+
     private readonly IUserManager _userManager;
     private readonly ILogger<StreamFlixStartupTask> _logger;
 
@@ -279,7 +283,9 @@ public class StreamFlixStartupTask : IScheduledTask
                 continue;
             }
 
-            var u = userManager.GetUserByName(raw.Trim());
+            var clean = raw.Trim();
+            var u = userManager.GetUserByName(clean)
+                ?? GetAllUsersCompat(userManager).FirstOrDefault(usr => string.Equals(usr.Username, clean, StringComparison.OrdinalIgnoreCase));
             if (u == null)
             {
                 continue;
@@ -625,51 +631,61 @@ public class StreamFlixStartupTask : IScheduledTask
                 MethodInfo? extSetPerm = null;
                 if (instanceSetPerm == null)
                 {
-                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    lock (ExtSetPermLock)
                     {
-                        try
+                        if (!_extSetPermSearched)
                         {
-                            var asmName = asm.GetName().Name ?? string.Empty;
-                            if (!asmName.StartsWith("Jellyfin", StringComparison.OrdinalIgnoreCase)
-                                && !asmName.StartsWith("MediaBrowser", StringComparison.OrdinalIgnoreCase))
+                            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                             {
-                                continue;
-                            }
-
-                            foreach (var t in asm.GetExportedTypes())
-                            {
-                                if (!t.IsAbstract || !t.IsSealed)
+                                try
                                 {
-                                    continue;
-                                }
-
-                                foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Static))
-                                {
-                                    if (m.Name == "SetPermission")
+                                    var asmName = asm.GetName().Name ?? string.Empty;
+                                    if (!asmName.StartsWith("Jellyfin", StringComparison.OrdinalIgnoreCase)
+                                        && !asmName.StartsWith("MediaBrowser", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        var ps = m.GetParameters();
-                                        if (ps.Length == 3 && ps[0].ParameterType.IsAssignableFrom(targetUser.GetType()) && ps[1].ParameterType.IsEnum && ps[2].ParameterType == typeof(bool))
+                                        continue;
+                                    }
+
+                                    foreach (var t in asm.GetExportedTypes())
+                                    {
+                                        if (!t.IsAbstract || !t.IsSealed)
                                         {
-                                            extSetPerm = m;
+                                            continue;
+                                        }
+
+                                        foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                                        {
+                                            if (m.Name == "SetPermission")
+                                            {
+                                                var ps = m.GetParameters();
+                                                if (ps.Length == 3 && ps[0].ParameterType.IsAssignableFrom(targetUser.GetType()) && ps[1].ParameterType.IsEnum && ps[2].ParameterType == typeof(bool))
+                                                {
+                                                    _cachedExtSetPermMethod = m;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (_cachedExtSetPermMethod != null)
+                                        {
                                             break;
                                         }
                                     }
                                 }
+                                catch
+                                {
+                                }
 
-                                if (extSetPerm != null)
+                                if (_cachedExtSetPermMethod != null)
                                 {
                                     break;
                                 }
                             }
-                        }
-                        catch
-                        {
+
+                            _extSetPermSearched = true;
                         }
 
-                        if (extSetPerm != null)
-                        {
-                            break;
-                        }
+                        extSetPerm = _cachedExtSetPermMethod;
                     }
                 }
 
