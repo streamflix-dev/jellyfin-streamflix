@@ -3,11 +3,35 @@
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
     "overview": "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks.",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), optional themed Standard/Hybrid Jellyfin login & strict Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
+      {
+        "version": "0.5.6.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass\n- Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting\n- Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.6.0_12.0.0.zip",
+        "checksum": "f32640e697ce680b86059b77305d8b9b",
+        "timestamp": "2026-11-13T03:02:53Z"
+      },
+      {
+        "version": "0.5.6.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass\n- Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting\n- Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.6.0_10.11.0.zip",
+        "checksum": "775284cac94fc0f3e560fad1caef35ae",
+        "timestamp": "2026-11-13T03:02:53Z"
+      },
+      {
+        "version": "0.5.6.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass\n- Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting\n- Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.6.0_10.9.0.zip",
+        "checksum": "18774e0654826a192f8ef8c04990e38b",
+        "timestamp": "2026-11-13T03:02:53Z"
+      },
       {
         "version": "0.5.5.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels",
