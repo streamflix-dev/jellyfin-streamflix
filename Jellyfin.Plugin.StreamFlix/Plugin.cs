@@ -269,7 +269,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || cfg.AllowAdminFallbackLogin
             || cfg.AdminFallbackLanOnly
             || cfg.BypassLoginGateOnLan
-            || !cfg.RequireGoogleAuth
             || !cfg.EnableGoogleSignIn
             || !cfg.EnableGuestPasses
             || !cfg.EnableStreamFlixUi;
@@ -429,7 +428,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 EnableStreamFlixUi = BoolVal(root, nameof(PluginConfiguration.EnableStreamFlixUi), true),
                 CustomBrandName = Val(root, nameof(PluginConfiguration.CustomBrandName)) ?? string.Empty,
-                RequireGoogleAuth = BoolVal(root, nameof(PluginConfiguration.RequireGoogleAuth), true),
+                RequireGoogleAuth = true,
                 EnableGoogleSignIn = BoolVal(root, nameof(PluginConfiguration.EnableGoogleSignIn), true),
                 AllowStandardJellyfinLogin = BoolVal(root, nameof(PluginConfiguration.AllowStandardJellyfinLogin), false),
                 AllowAdminFallbackLogin = BoolVal(root, nameof(PluginConfiguration.AllowAdminFallbackLogin), false),
@@ -574,6 +573,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         {
             var cfg = Configuration;
             var dirty = false;
+
+            if (!cfg.RequireGoogleAuth)
+            {
+                cfg.RequireGoogleAuth = true;
+                dirty = true;
+            }
 
             if (cfg.SessionVersion <= 0)
             {

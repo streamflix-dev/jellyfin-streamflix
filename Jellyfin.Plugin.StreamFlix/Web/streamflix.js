@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes, Movie Night Matcher & Seerr (v0.7.5)
+   "Who's watching?" profiles, Guest Passes, Movie Night Matcher & Seerr (v0.7.5.1)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.7.5';
+    var VERSION = '0.7.5.1';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -1493,7 +1493,7 @@
         if (!cfg) {
             return false;
         }
-        return cfg.requireGoogleAuth === false || Boolean(cfg.bypassLoginGateOnLan && cfg.isLocalLan);
+        return Boolean(cfg.bypassLoginGateOnLan && cfg.isLocalLan);
     }
 
     function hasHouseholdAccess() {
@@ -1595,10 +1595,10 @@
         var normalizedProfiles = rawProfiles.map(function (p, i) {
             return normalizeProfileModel(p, i);
         });
-        var requireGoogle = cfg.requireGoogleAuth !== false;
+        var requireGoogle = true;
         var isLocalLan = Boolean(cfg.isLocalLan);
         var bypassLan = Boolean(cfg.bypassLoginGateOnLan);
-        var resolvedAccess = Boolean(cfg.hasAccess) || !requireGoogle || (bypassLan && isLocalLan);
+        var resolvedAccess = Boolean(cfg.hasAccess) || (bypassLan && isLocalLan);
         var serverShowcase = [];
         if (resolvedAccess) {
             serverShowcase = Array.isArray(cfg.showcaseItems) && cfg.showcaseItems.length > 0
@@ -3645,7 +3645,7 @@
                 + badge + '<span class="streamflix-account-chip-email">' + escapeHtml(label) + '</span></div>';
         }
         var cfg = state.config;
-        if (cfg && cfg.bypassLoginGateOnLan && cfg.isLocalLan && cfg.requireGoogleAuth !== false) {
+        if (cfg && cfg.bypassLoginGateOnLan && cfg.isLocalLan) {
             return '<div class="streamflix-account-chip streamflix-account-chip-lan" title="Connected on local network">'
                 + '<span class="streamflix-account-chip-initial streamflix-chip-lan">' + icon('wifi') + '</span>'
                 + '<span class="streamflix-account-chip-email">Local Network</span></div>';

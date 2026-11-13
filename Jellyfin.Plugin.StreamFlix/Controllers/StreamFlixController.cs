@@ -466,7 +466,8 @@ public class StreamFlixController : ControllerBase
             var brand = (request.CustomBrandName ?? string.Empty).Trim();
             config.CustomBrandName = brand.Length > 32 ? brand.Substring(0, 32).Trim() : brand;
 
-            config.RequireGoogleAuth = request.RequireGoogleAuth;
+            // Household sign-in before "Who's watching?" is always enforced for security
+            config.RequireGoogleAuth = true;
             config.EnableGoogleSignIn = request.EnableGoogleSignIn;
             config.AllowStandardJellyfinLogin = request.AllowStandardJellyfinLogin;
             config.AllowAdminFallbackLogin = request.AllowAdminFallbackLogin;
@@ -616,10 +617,7 @@ public class StreamFlixController : ControllerBase
             config.GoogleClientSecret = request.GoogleClientSecret.Trim();
         }
 
-        if (request.RequireGoogleAuth.HasValue)
-        {
-            config.RequireGoogleAuth = request.RequireGoogleAuth.Value;
-        }
+        config.RequireGoogleAuth = true;
 
         if (request.ApprovedGoogleAccounts != null)
         {
@@ -653,7 +651,7 @@ public class StreamFlixController : ControllerBase
         }
 
         var config = Config;
-        if (config.RequireGoogleAuth && !config.EnableGoogleSignIn)
+        if (!config.EnableGoogleSignIn)
         {
             return StatusCode(403, new { verified = false, code = "google_disabled", message = "Google Sign-In is currently disabled in StreamFlix settings." });
         }
@@ -2835,16 +2833,14 @@ public class StreamFlixController : ControllerBase
 
     private static bool IsGateUnconfigured(PluginConfiguration config)
     {
-        return config.RequireGoogleAuth
-            && (!config.EnableGoogleSignIn || string.IsNullOrWhiteSpace(config.GoogleClientId))
+        return (!config.EnableGoogleSignIn || string.IsNullOrWhiteSpace(config.GoogleClientId))
             && !StreamFlixOidcService.IsConfigured(config)
             && !config.AllowStandardJellyfinLogin;
     }
 
     private static bool HasHouseholdAccess(PluginConfiguration config, CallerContext caller)
     {
-        return !config.RequireGoogleAuth
-            || (config.BypassLoginGateOnLan && caller.IsLocalLan)
+        return (config.BypassLoginGateOnLan && caller.IsLocalLan)
             || caller.Session != null
             || caller.IsAdmin;
     }
@@ -2950,14 +2946,14 @@ public class StreamFlixController : ControllerBase
         {
             if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindGoogle, StringComparison.Ordinal))
             {
-                if (config.RequireGoogleAuth && !config.EnableGoogleSignIn)
+                if (!config.EnableGoogleSignIn)
                 {
                     session = null;
                 }
             }
             else if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindOidc, StringComparison.Ordinal))
             {
-                if (config.RequireGoogleAuth && !StreamFlixOidcService.IsConfigured(config))
+                if (!StreamFlixOidcService.IsConfigured(config))
                 {
                     session = null;
                 }
@@ -3174,7 +3170,7 @@ public class StreamFlixController : ControllerBase
             serverName = _appHost.FriendlyName,
             customBrandName = (config.CustomBrandName ?? string.Empty).Trim(),
             enableStreamFlixUi = config.EnableStreamFlixUi,
-            requireGoogleAuth = config.RequireGoogleAuth,
+            requireGoogleAuth = true,
             enableGoogleSignIn = config.EnableGoogleSignIn,
             enableCustomOidc = config.EnableCustomOidc,
             oidcConfigured,
@@ -3878,7 +3874,7 @@ public class StreamFlixController : ControllerBase
             version = Plugin.VersionString,
             enableStreamFlixUi = config.EnableStreamFlixUi,
             customBrandName = config.CustomBrandName ?? string.Empty,
-            requireGoogleAuth = config.RequireGoogleAuth,
+            requireGoogleAuth = true,
             enableGoogleSignIn = config.EnableGoogleSignIn,
             allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,
             allowAdminFallbackLogin = config.AllowAdminFallbackLogin,

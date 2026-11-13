@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.7.5.0"
+version: "0.7.5.1"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -17,6 +17,5 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - Simplified Progressive-Disclosure Settings: clean, compact configuration cards that stay collapsed until each sign-in method or feature (Google OAuth, Jellyfin Password, Admin Fallback, LAN Bypass, Guest Passes, Hero Advanced Filters, Seerr, Custom OIDC) is enabled
-  - Toggleable Guest Passes & Modal Fixes: add master EnableGuestPasses switch (hiding UI entry points and disconnecting active guest sessions when disabled) and fix sanitizeHexColor / expiry / unlimited-redemption rendering in the Guest Passes & Movie Night Matcher modals
-  - First-Attempt OIDC Sign-In Reliability: eliminate cold-start double-navigation and shared-host cookie collisions (HTTP 400 on /Account/Login) via mutex-guarded POST /StreamFlix/Oidc/Begin, /StreamFlix/Oidc path-scoped per-attempt state cookies, background discovery pre-warming, and loopback host diagnostics
+  - Unified Sign-In Methods List: move Custom OpenID Connect (OIDC) directly into the Sign-In Methods card stack alongside Google Sign-In, Jellyfin Password, Admin Fallback, and Local LAN Bypass with progressive-disclosure expansion
+  - Mandatory Household Sign-In Security: remove the option to completely disable household authentication before "Who's watching?" across the Settings UI, client gate, and backend API (explicit private-network LAN Bypass remains available)

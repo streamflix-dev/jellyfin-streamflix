@@ -96,7 +96,6 @@
             #StreamFlixConfigPage .bfx-oauth-pill.ok { background:rgba(70,211,105,.2); color:#7ef09d; }
             #StreamFlixConfigPage .bfx-oauth-pill.warn { background:rgba(245,176,65,.22); color:#ffd280; }
             #StreamFlixConfigPage .bfx-oauth-pill.error { background:rgba(229,9,20,.28); color:#ff8a80; }
-            #StreamFlixConfigPage .bfx-beta-section { border-color:rgba(245,176,65,.28); background:linear-gradient(180deg, rgba(245,176,65,.045) 0%, rgba(255,255,255,.025) 100%); }
             #StreamFlixConfigPage .bfx-beta-tag { display:inline-flex; align-items:center; vertical-align:middle; padding:2px 8px; border-radius:999px; font-size:.66em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; background:rgba(245,176,65,.18); color:#ffd280; border:1px solid rgba(245,176,65,.42); }
             #StreamFlixConfigPage .bfx-save-bar { position:sticky; bottom:0; padding:12px 0; background:linear-gradient(to top, rgba(16,16,16,.95) 60%, rgba(16,16,16,0)); z-index:2; }
             #StreamFlixConfigPage .bfx-skeleton { height:66px; border-radius:8px; background:linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%); background-size:200% 100%; animation:bfxShimmer 1.3s ease-in-out infinite; }
@@ -177,7 +176,7 @@
                     <!-- 2. Interface & Sign-In Gate (Progressive Disclosure) -->
                     <div class="bfx-section">
                         <h3>Interface &amp; Sign-In</h3>
-                        <div class="fieldDescription" style="margin-bottom:12px;">Turn on only the sign-in methods you want to use — configuration fields appear automatically when enabled.</div>
+                        <div class="fieldDescription" style="margin-bottom:12px;">Household sign-in is always required before "Who's watching?". Enable the sign-in methods you want to offer — configuration fields appear automatically when turned on.</div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
@@ -193,19 +192,8 @@
                             <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
                         </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:12px; margin-bottom:6px;">
-                            <label class="emby-checkbox-label">
-                                <input id="RequireGoogleAuth" name="RequireGoogleAuth" type="checkbox" is="emby-checkbox" />
-                                <span>Require household sign-in before "Who's watching?"</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Protects the profile picker behind one or more sign-in methods below.</div>
-                        </div>
-
-                        <div class="bfx-callout red hide" id="StreamFlixOpenGateWarning">
-                            <strong>Sign-in gate is off.</strong> Anyone who can reach this server can open PIN-free profiles directly. Only turn this off on a trusted private network.
-                        </div>
-
                         <div id="StreamFlixGateMethodsWrap">
+                            <div class="bfx-subbox-title" style="margin:14px 0 4px;">Sign-In Methods</div>
                             <div class="bfx-method-stack">
                                 <!-- Method 1: Google Sign-In -->
                                 <div class="bfx-method-card" id="GoogleMethodCard">
@@ -266,7 +254,73 @@
                                     </div>
                                 </div>
 
-                                <!-- Method 2: Standard Jellyfin Username & Password -->
+                                <!-- Method 2: Custom OpenID Connect (OIDC) -->
+                                <div class="bfx-method-card" id="OidcMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="EnableCustomOidc" name="EnableCustomOidc" type="checkbox" is="emby-checkbox" />
+                                                <span>Custom OpenID Connect (OIDC) <span class="bfx-beta-tag" style="margin-left:4px;">Beta</span></span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Self-hosted &amp; cloud SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) via Authorization Code + PKCE (<code>S256</code>).</div>
+                                        </div>
+                                        <span class="bfx-pill" id="OidcCardPill">Off</span>
+                                    </div>
+
+                                    <div class="bfx-method-body hide" id="OidcConfigBody">
+                                        <div class="bfx-row" style="justify-content:space-between; margin-bottom:8px;">
+                                            <div class="fieldDescription" style="margin:0;">OIDC Redirect / Callback URI (register this exact URL in your identity provider)</div>
+                                            <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixTestOidcBtn">✓ Test OIDC Discovery</button>
+                                        </div>
+                                        <div class="bfx-uri"><code id="StreamFlixOidcCallbackUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOidcCallbackUri">Copy</button></div>
+
+                                        <div class="bfx-oauth-results hide" id="StreamFlixOidcTestResult" role="status" aria-live="polite" style="margin-bottom:14px;"></div>
+
+                                        <div class="bfx-grid-2" style="margin-top:12px;">
+                                            <div class="inputContainer">
+                                                <label class="inputLabel inputLabelUnfocused" for="OidcProviderName">Provider button label</label>
+                                                <input id="OidcProviderName" name="OidcProviderName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="Authentik" />
+                                                <div class="fieldDescription">Displayed as <em>Continue with &lt;Label&gt;</em>.</div>
+                                            </div>
+
+                                            <div class="inputContainer">
+                                                <label class="inputLabel inputLabelUnfocused" for="OidcClientId">OIDC Client ID</label>
+                                                <input id="OidcClientId" name="OidcClientId" type="text" is="emby-input" autocomplete="off" placeholder="streamflix-web" />
+                                            </div>
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label class="inputLabel inputLabelUnfocused" for="OidcIssuerUrl">OIDC Issuer / Discovery URL</label>
+                                            <input id="OidcIssuerUrl" name="OidcIssuerUrl" type="text" is="emby-input" autocomplete="off" placeholder="https://auth.example.com/application/o/streamflix/" />
+                                            <div class="fieldDescription">Base issuer URL or full <code>/.well-known/openid-configuration</code> URL.</div>
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label class="inputLabel inputLabelUnfocused" for="OidcClientSecret">OIDC Client Secret (optional for public PKCE clients)</label>
+                                            <div class="bfx-secret-row">
+                                                <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearOidcClientSecretBtn">Clear</button>
+                                            </div>
+                                            <div class="bfx-secret-status hide" id="OidcClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
+                                        </div>
+
+                                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
+                                            <label class="emby-checkbox-label">
+                                                <input id="OidcRequireAllowlist" name="OidcRequireAllowlist" type="checkbox" is="emby-checkbox" />
+                                                <span>Restrict OIDC sign-in to an approved allowlist</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Enable only if your OIDC provider does not already restrict user assignments for this client.</div>
+                                        </div>
+
+                                        <div class="inputContainer hide" id="OidcAllowlistBody" style="margin:12px 0 0;">
+                                            <label class="inputLabel inputLabelUnfocused" for="ApprovedOidcUsers">Approved OIDC emails, usernames, or subjects</label>
+                                            <textarea id="ApprovedOidcUsers" name="ApprovedOidcUsers" rows="4" class="emby-input bfx-textarea" style="min-height:88px;" placeholder="user@example.com&#10;household_member"></textarea>
+                                            <div class="fieldDescription">One email, username, or OIDC <code>sub</code> identifier per line.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Method 3: Standard Jellyfin Username & Password -->
                                 <div class="bfx-method-card" id="StandardMethodCard">
                                     <div class="bfx-method-top">
                                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -287,7 +341,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Method 3: Admin-Only Sign-In Fallback -->
+                                <!-- Method 4: Admin-Only Sign-In Fallback -->
                                 <div class="bfx-method-card" id="AdminFallbackMethodCard">
                                     <div class="bfx-method-top">
                                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -311,7 +365,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Method 4: Local LAN Bypass -->
+                                <!-- Method 5: Local LAN Bypass -->
                                 <div class="bfx-method-card" id="LanBypassMethodCard">
                                     <div class="bfx-method-top">
                                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -333,7 +387,7 @@
                             </div>
 
                             <div class="bfx-callout hide" id="StreamFlixNoAuthMethodWarning">
-                                All household sign-in methods (<strong>Google</strong>, <strong>Jellyfin Password</strong>, and <strong>Beta OIDC</strong>) are currently off or unconfigured — only Jellyfin Administrators (and Guest Pass holders, if enabled) will be able to sign in.
+                                All household sign-in methods (<strong>Google</strong>, <strong>Custom OIDC</strong>, and <strong>Jellyfin Password</strong>) are currently off or unconfigured — only Jellyfin Administrators (and Guest Pass holders, if enabled) will be able to sign in.
                             </div>
 
                             <div class="bfx-session-row">
@@ -542,74 +596,6 @@
                                     <span>Allow Temporary Guest Pass viewers to submit media requests</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">Off by default so guests can watch your existing library without queuing downloads unless permitted.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 6. Beta Custom OpenID Connect (Collapsed Until Enabled) -->
-                    <div class="bfx-section bfx-beta-section" id="StreamFlixBetaOidcSection">
-                        <div class="bfx-section-head" style="margin-bottom:6px;">
-                            <div>
-                                <h3>Custom OpenID Connect (OIDC) <span class="bfx-beta-tag">Beta Test</span> <span class="bfx-pill" id="OidcSectionPill">Off</span></h3>
-                                <div class="fieldDescription">Self-hosted &amp; cloud SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) using Authorization Code + PKCE (<code>S256</code>) and JWKS verification.</div>
-                            </div>
-                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixTestOidcBtn">✓ Test OIDC Discovery</button>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
-                            <label class="emby-checkbox-label">
-                                <input id="EnableCustomOidc" name="EnableCustomOidc" type="checkbox" is="emby-checkbox" />
-                                <span>Enable Custom OpenID Connect (OIDC) sign-in (Beta)</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Continue with &lt;Provider&gt;</strong> button to the StreamFlix sign-in gate.</div>
-                        </div>
-
-                        <div class="bfx-collapse-body hide" id="OidcConfigBody">
-                            <div class="fieldDescription">OIDC Redirect / Callback URI (register this exact URL in your identity provider)</div>
-                            <div class="bfx-uri"><code id="StreamFlixOidcCallbackUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOidcCallbackUri">Copy</button></div>
-
-                            <div class="bfx-oauth-results hide" id="StreamFlixOidcTestResult" role="status" aria-live="polite" style="margin-bottom:14px;"></div>
-
-                            <div class="bfx-grid-2" style="margin-top:12px;">
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="OidcProviderName">Provider button label</label>
-                                    <input id="OidcProviderName" name="OidcProviderName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="Authentik" />
-                                    <div class="fieldDescription">Displayed as <em>Continue with &lt;Label&gt;</em>.</div>
-                                </div>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="OidcClientId">OIDC Client ID</label>
-                                    <input id="OidcClientId" name="OidcClientId" type="text" is="emby-input" autocomplete="off" placeholder="streamflix-web" />
-                                </div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidcIssuerUrl">OIDC Issuer / Discovery URL</label>
-                                <input id="OidcIssuerUrl" name="OidcIssuerUrl" type="text" is="emby-input" autocomplete="off" placeholder="https://auth.example.com/application/o/streamflix/" />
-                                <div class="fieldDescription">Base issuer URL or full <code>/.well-known/openid-configuration</code> URL.</div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidcClientSecret">OIDC Client Secret (optional for public PKCE clients)</label>
-                                <div class="bfx-secret-row">
-                                    <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
-                                    <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearOidcClientSecretBtn">Clear</button>
-                                </div>
-                                <div class="bfx-secret-status hide" id="OidcClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="OidcRequireAllowlist" name="OidcRequireAllowlist" type="checkbox" is="emby-checkbox" />
-                                    <span>Restrict OIDC sign-in to an approved allowlist</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Enable only if your OIDC provider does not already restrict user assignments for this client.</div>
-                            </div>
-
-                            <div class="inputContainer hide" id="OidcAllowlistBody" style="margin:12px 0 0;">
-                                <label class="inputLabel inputLabelUnfocused" for="ApprovedOidcUsers">Approved OIDC emails, usernames, or subjects</label>
-                                <textarea id="ApprovedOidcUsers" name="ApprovedOidcUsers" rows="4" class="emby-input bfx-textarea" style="min-height:88px;" placeholder="user@example.com&#10;household_member"></textarea>
-                                <div class="fieldDescription">One email, username, or OIDC <code>sub</code> identifier per line.</div>
                             </div>
                         </div>
                     </div>
@@ -980,25 +966,25 @@
 
                 function syncVisibility() {
                     var uiEnabled = $('#EnableStreamFlixUi').checked;
-                    var requireGate = $('#RequireGoogleAuth').checked;
                     var enableGoogle = $('#EnableGoogleSignIn').checked;
+                    var enableOidc = $('#EnableCustomOidc').checked;
+                    var oidcAllowlist = $('#OidcRequireAllowlist').checked;
                     var allowStandard = $('#AllowStandardJellyfinLogin').checked;
                     var allowAdminFallback = $('#AllowAdminFallbackLogin').checked;
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
                     var enableGuestPasses = $('#EnableGuestPasses').checked;
                     var showHeroAdv = $('#ShowHeroAdvanced').checked;
                     var enableSeerr = $('#EnableSeerr').checked;
-                    var enableOidc = $('#EnableCustomOidc').checked;
-                    var oidcAllowlist = $('#OidcRequireAllowlist').checked;
 
                     $('#StreamFlixUiBrandingBox').classList.toggle('hide', !uiEnabled);
                     $('#StreamFlixHomeSection').classList.toggle('hide', !uiEnabled);
 
-                    $('#StreamFlixGateMethodsWrap').classList.toggle('hide', !requireGate);
-                    $('#StreamFlixBetaOidcSection').classList.toggle('hide', !requireGate);
-
                     $('#GoogleMethodCard').classList.toggle('is-on', enableGoogle);
                     $('#GoogleConfigBody').classList.toggle('hide', !enableGoogle);
+
+                    $('#OidcMethodCard').classList.toggle('is-on', enableOidc);
+                    $('#OidcConfigBody').classList.toggle('hide', !enableOidc);
+                    $('#OidcAllowlistBody').classList.toggle('hide', !oidcAllowlist);
 
                     $('#StandardMethodCard').classList.toggle('is-on', allowStandard);
                     $('#StandardConfigBody').classList.toggle('hide', !allowStandard);
@@ -1018,17 +1004,12 @@
                     $('#SeerrConfigBody').classList.toggle('hide', !enableSeerr);
                     $('#StreamFlixTestSeerrBtn').classList.toggle('hide', !enableSeerr);
                     $('#SeerrAllowGuestsRow').classList.toggle('hide', !enableGuestPasses);
-
-                    $('#OidcConfigBody').classList.toggle('hide', !enableOidc);
-                    $('#StreamFlixTestOidcBtn').classList.toggle('hide', !enableOidc);
-                    $('#OidcAllowlistBody').classList.toggle('hide', !oidcAllowlist);
                 }
 
                 function renderStatus() {
                     syncVisibility();
 
                     var clientId = $('#GoogleClientId').value.trim();
-                    var requireGate = $('#RequireGoogleAuth').checked;
                     var enableGoogle = $('#EnableGoogleSignIn').checked;
                     var googleReady = enableGoogle && Boolean(clientId);
                     var enableOidc = $('#EnableCustomOidc').checked;
@@ -1052,6 +1033,14 @@
                         setPill('GoogleCardPill', 'ok', 'Active');
                     } else {
                         setPill('GoogleCardPill', 'warn', 'Needs Client ID');
+                    }
+
+                    if (!enableOidc) {
+                        setPill('OidcCardPill', '', 'Off');
+                    } else if (oidcReady) {
+                        setPill('OidcCardPill', 'ok', 'Active');
+                    } else {
+                        setPill('OidcCardPill', 'warn', 'Needs Issuer & ID');
                     }
 
                     if (!allowStandard) {
@@ -1092,14 +1081,6 @@
                         setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'warn', 'Needs URL & API key');
                     }
 
-                    if (!enableOidc) {
-                        setPill('OidcSectionPill', '', 'Off');
-                    } else if (oidcReady) {
-                        setPill('OidcSectionPill', 'ok', 'Active');
-                    } else {
-                        setPill('OidcSectionPill', 'warn', 'Needs Issuer & ID');
-                    }
-
                     // Top Status Strip
                     if (!enableGoogle && !enableOidc) {
                         setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', '', 'Disabled');
@@ -1113,9 +1094,7 @@
                         setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'warn', 'Needs setup');
                     }
 
-                    if (!requireGate) {
-                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'warn', 'Open (no gate)');
-                    } else if ((googleReady || oidcReady) && allowStandard) {
+                    if ((googleReady || oidcReady) && allowStandard) {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Hybrid + LAN bypass' : 'Hybrid (SSO + JF)');
                     } else if (googleReady && oidcReady) {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Google + OIDC + LAN' : 'Google + OIDC');
@@ -1125,15 +1104,16 @@
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Jellyfin + LAN bypass' : 'Jellyfin password');
                     } else if (googleReady) {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Google + LAN bypass' : 'Google sign-in');
+                    } else if (lanBypass) {
+                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', 'LAN bypass + Admin WAN');
                     } else {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'warn', 'Admin setup mode');
                     }
 
                     $('#StreamFlixStatusProfiles').textContent = String(profiles.length);
 
-                    $('#StreamFlixOpenGateWarning').classList.toggle('hide', requireGate);
-                    $('#StreamFlixNoAuthMethodWarning').classList.toggle('hide', !(requireGate && !googleReady && !oidcReady && !allowStandard));
-                    $('#StreamFlixNoAccountsWarning').classList.toggle('hide', !(requireGate && googleReady && accounts.length === 0));
+                    $('#StreamFlixNoAuthMethodWarning').classList.toggle('hide', !(!googleReady && !oidcReady && !allowStandard));
+                    $('#StreamFlixNoAccountsWarning').classList.toggle('hide', !(googleReady && accounts.length === 0));
 
                     var exposedOwner = profiles.some(function (p) {
                         return p.isAdmin && !p.hasPin && !p.googleLocked;
@@ -1672,17 +1652,16 @@
                 });
                 [
                     '#EnableStreamFlixUi',
-                    '#RequireGoogleAuth',
                     '#EnableGoogleSignIn',
+                    '#EnableCustomOidc',
+                    '#OidcRequireAllowlist',
                     '#AllowStandardJellyfinLogin',
                     '#AllowAdminFallbackLogin',
                     '#AdminFallbackLanOnly',
                     '#BypassLoginGateOnLan',
                     '#EnableGuestPasses',
                     '#ShowHeroAdvanced',
-                    '#EnableSeerr',
-                    '#EnableCustomOidc',
-                    '#OidcRequireAllowlist'
+                    '#EnableSeerr'
                 ].forEach(function (sel) {
                     $(sel).addEventListener('change', renderStatus);
                 });
@@ -1712,7 +1691,6 @@
                     $('#EnableStreamFlixUi').checked = cfg.enableStreamFlixUi !== false;
                     $('#CustomBrandName').value = cfg.customBrandName || '';
                     $('#StreamFlixConfigLogo').textContent = ((cfg.customBrandName || '').trim() || 'STREAMFLIX').toUpperCase();
-                    $('#RequireGoogleAuth').checked = cfg.requireGoogleAuth !== false;
                     $('#EnableGoogleSignIn').checked = cfg.enableGoogleSignIn !== false;
                     $('#AllowStandardJellyfinLogin').checked = Boolean(cfg.allowStandardJellyfinLogin);
                     $('#AllowAdminFallbackLogin').checked = Boolean(cfg.allowAdminFallbackLogin);
@@ -1817,7 +1795,7 @@
                     var payload = {
                         enableStreamFlixUi: $('#EnableStreamFlixUi').checked,
                         customBrandName: $('#CustomBrandName').value.trim().slice(0, 32),
-                        requireGoogleAuth: $('#RequireGoogleAuth').checked,
+                        requireGoogleAuth: true,
                         enableGoogleSignIn: $('#EnableGoogleSignIn').checked,
                         allowStandardJellyfinLogin: $('#AllowStandardJellyfinLogin').checked,
                         allowAdminFallbackLogin: $('#AllowAdminFallbackLogin').checked,
