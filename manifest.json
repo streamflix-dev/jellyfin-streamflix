@@ -2,12 +2,36 @@
   {
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
-    "overview": "Netflix-style UI, server-verified Google/OIDC Sign-In & Netflix profiles backed by real Jellyfin users",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In & Beta Custom OpenID Connect (OIDC) SSO, optional themed Standard/Hybrid Jellyfin login & opt-in Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
+    "overview": "Netflix-style UI, Household Profiles, Guest Passes, Movie Night Matcher & Seerr Requests for Jellyfin",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, expiring QR Guest Passes, Movie Night Matcher, optional Seerr/Jellyseerr search requests, and 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
+      {
+        "version": "0.7.0.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Temporary Guest Passes: create expiring invite links & locally rendered QR codes locked to a single non-admin profile, with redemption caps and instant 1-click session revocation\n- Movie Night Matcher: pick 2+ household profiles to intersect unwatched titles (honoring strictest parental ratings & shared My Lists) and vote through a quick head-to-head tournament bracket\n- Seerr / Jellyseerr / Overseerr Integration: optional server-proxied media search & 1-click Movie / TV Season requests built seamlessly into StreamFlix Live Search\n- Major Security, Stability & Performance Overhaul: strict same-origin auth token guard, secret-masked AdminConfig API, Docker/reverse-proxy X-Forwarded-For rate-limit hardening, OIDC client_secret_basic + post fallback, strict-CSP artwork loading, race-free Live Search, video OSD track/pause fixes, and TV D-pad enhancements",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.0.0_12.0.0.zip",
+        "checksum": "2b90e0a40937c6b30a7ec7623c9b77d5",
+        "timestamp": "2026-11-13T17:45:22Z"
+      },
+      {
+        "version": "0.7.0.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Temporary Guest Passes: create expiring invite links & locally rendered QR codes locked to a single non-admin profile, with redemption caps and instant 1-click session revocation\n- Movie Night Matcher: pick 2+ household profiles to intersect unwatched titles (honoring strictest parental ratings & shared My Lists) and vote through a quick head-to-head tournament bracket\n- Seerr / Jellyseerr / Overseerr Integration: optional server-proxied media search & 1-click Movie / TV Season requests built seamlessly into StreamFlix Live Search\n- Major Security, Stability & Performance Overhaul: strict same-origin auth token guard, secret-masked AdminConfig API, Docker/reverse-proxy X-Forwarded-For rate-limit hardening, OIDC client_secret_basic + post fallback, strict-CSP artwork loading, race-free Live Search, video OSD track/pause fixes, and TV D-pad enhancements",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.0.0_10.11.0.zip",
+        "checksum": "d05442bd7adbedef58e8ba7e06b2a30d",
+        "timestamp": "2026-11-13T17:45:22Z"
+      },
+      {
+        "version": "0.7.0.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Temporary Guest Passes: create expiring invite links & locally rendered QR codes locked to a single non-admin profile, with redemption caps and instant 1-click session revocation\n- Movie Night Matcher: pick 2+ household profiles to intersect unwatched titles (honoring strictest parental ratings & shared My Lists) and vote through a quick head-to-head tournament bracket\n- Seerr / Jellyseerr / Overseerr Integration: optional server-proxied media search & 1-click Movie / TV Season requests built seamlessly into StreamFlix Live Search\n- Major Security, Stability & Performance Overhaul: strict same-origin auth token guard, secret-masked AdminConfig API, Docker/reverse-proxy X-Forwarded-For rate-limit hardening, OIDC client_secret_basic + post fallback, strict-CSP artwork loading, race-free Live Search, video OSD track/pause fixes, and TV D-pad enhancements",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.0.0_10.9.0.zip",
+        "checksum": "ad3a863cb56bd69c5275d32715351329",
+        "timestamp": "2026-11-13T17:45:22Z"
+      },
       {
         "version": "0.6.0.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add Beta Test Custom OpenID Connect (OIDC) SSO section at the bottom of plugin settings (Authorization Code + PKCE S256, RSA/ECDSA JWKS id_token verification, optional allowlist, and one-click Test OIDC Discovery for Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel & Okta)\n- Add \"Surprise Me\" random unwatched title picker in the Cinema Hub subnav with in-modal \"Shuffle Again\"\n- Upgrade \"More Info\" modal with ClearLogo artwork, movie/series taglines, resume progress bar, and interactive clickable Genre, Director & Cast discovery chips\n- UI polish: remove native browser tooltip over the top-right profile pill, honor custom brand initial across badges & mosaic tiles, and refine keyboard/TV Back filter clearing",
