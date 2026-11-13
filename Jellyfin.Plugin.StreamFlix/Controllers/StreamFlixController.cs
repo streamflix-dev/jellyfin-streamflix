@@ -50,6 +50,32 @@ public class VerifyGoogleRequest
     public bool ApproveIfUnlisted { get; set; }
 }
 
+public class PasswordLoginRequest
+{
+    public string Username { get; set; } = string.Empty;
+
+    public string? Password { get; set; }
+
+    public string? DeviceId { get; set; }
+
+    public string? DeviceName { get; set; }
+
+    public string? AppName { get; set; }
+
+    public string? AppVersion { get; set; }
+}
+
+public class TestOAuthConfigRequest
+{
+    public string? GoogleClientId { get; set; }
+
+    public string? OriginUri { get; set; }
+
+    public List<string>? RedirectUris { get; set; }
+
+    public List<string>? ApprovedEmails { get; set; }
+}
+
 public class ActivateProfileRequest
 {
     public string ProfileId { get; set; } = string.Empty;
@@ -159,13 +185,22 @@ public class StreamFlixController : ControllerBase
 
     private static readonly Regex PinRegex = new(@"^\d{4,8}$", RegexOptions.Compiled);
 
+    private static readonly Regex GoogleClientIdRegex = new(@"^[0-9]{6,}-[a-zA-Z0-9_-]{8,}\.apps\.googleusercontent\.com$", RegexOptions.Compiled);
+
+    private static readonly object PopularCacheLock = new();
+
     private static DateTime _lastSyncUtc = DateTime.MinValue;
 
     private static DateTime _showcaseCachedAtUtc = DateTime.MinValue;
 
     private static List<object> _showcaseCache = new();
 
+    private static DateTime _popularCachedAtUtc = DateTime.MinValue;
+
+    private static Dictionary<string, double> _popularScoresCache = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly IUserManager _userManager;
+    private readonly IUserDataManager _userDataManager;
     private readonly ISessionManager _sessionManager;
     private readonly IServerApplicationHost _appHost;
     private readonly ILibraryManager _libraryManager;
@@ -174,6 +209,7 @@ public class StreamFlixController : ControllerBase
 
     public StreamFlixController(
         IUserManager userManager,
+        IUserDataManager userDataManager,
         ISessionManager sessionManager,
         IServerApplicationHost appHost,
         ILibraryManager libraryManager,
@@ -181,6 +217,7 @@ public class StreamFlixController : ControllerBase
         ILogger<StreamFlixController> logger)
     {
         _userManager = userManager;
+        _userDataManager = userDataManager;
         _sessionManager = sessionManager;
         _appHost = appHost;
         _libraryManager = libraryManager;
@@ -270,6 +307,11 @@ public class StreamFlixController : ControllerBase
         }
 
         var config = Config;
+        if (config.RequireGoogleAuth && !config.EnableGoogleSignIn)
+        {
+            return StatusCode(403, new { verified = false, code = "google_disabled", message = "Google Sign-In is currently disabled in StreamFlix settings." });
+        }
+
         var accessToken = request.AccessToken.Trim();
 
         try
@@ -369,6 +411,422 @@ public class StreamFlixController : ControllerBase
         }
     }
 
+    [HttpPost("Auth/StandardLogin")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> StandardLogin([FromBody] PasswordLoginRequest request)
+    {
+        var config = Config;
+        if (!config.AllowStandardJellyfinLogin)
+        {
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "standard_login_disabled",
+                message = "Standard Jellyfin account sign-in is disabled on this server.",
+            });
+        }
+
+        var username = (request?.Username ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(username))
+        {
+            return BadRequest(new { verified = false, message = "Enter your Jellyfin username." });
+        }
+
+        var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+        var lockKey = "std|" + remoteIp;
+        if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
+        {
+            var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
+            Response.Headers["Retry-After"] = secs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return StatusCode(429, new
+            {
+                verified = false,
+                code = "login_locked",
+                retryAfterSeconds = secs,
+                message = $"Too many failed sign-in attempts. Try again in {Math.Max(1, (secs + 59) / 60)} min.",
+            });
+        }
+
+        var user = await StreamFlixStartupTask.AuthenticateUserCompatAsync(
+            _userManager,
+            username,
+            request?.Password ?? string.Empty,
+            remoteIp,
+            _logger).ConfigureAwait(false);
+
+        if (user == null)
+        {
+            StreamFlixSessionService.RegisterLoginFailure(lockKey);
+            return StatusCode(401, new
+            {
+                verified = false,
+                code = "invalid_credentials",
+                message = "Invalid Jellyfin username or password.",
+            });
+        }
+
+        StreamFlixSessionService.ResetLoginFailures(lockKey);
+        var isAdmin = StreamFlixStartupTask.IsUserAdminCompat(user);
+        var kind = isAdmin
+            ? StreamFlixSessionService.AuthKindJellyfinAdmin
+            : StreamFlixSessionService.AuthKindJellyfin;
+        var session = StreamFlixSessionService.IssueJellyfinSession(
+            config,
+            kind,
+            user.Id.ToString("N"),
+            user.Username,
+            out var sessionToken);
+
+        string? jellyfinAccessToken = null;
+        if (isAdmin)
+        {
+            jellyfinAccessToken = await TryMintAdminJellyfinTokenAsync(user, request, remoteIp).ConfigureAwait(false);
+        }
+
+        return Ok(new
+        {
+            verified = true,
+            authKind = session.AuthKind,
+            userId = user.Id.ToString("N"),
+            username = user.Username,
+            name = user.Username,
+            isAdmin,
+            sessionToken,
+            expiresAt = session.ExpiresAt,
+            jellyfinAccessToken,
+            serverId = _appHost.SystemId,
+        });
+    }
+
+    [HttpPost("Auth/AdminLogin")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> AdminLogin([FromBody] PasswordLoginRequest request)
+    {
+        var config = Config;
+        var isUnconfiguredGate = IsGateUnconfigured(config);
+        if (!config.AllowAdminFallbackLogin && !isUnconfiguredGate)
+        {
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "admin_fallback_disabled",
+                message = "Admin Sign-In is disabled in StreamFlix settings.",
+            });
+        }
+
+        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext);
+        if (config.AdminFallbackLanOnly && !isUnconfiguredGate && !isLocalLan)
+        {
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "lan_only",
+                message = "Admin Sign-In is restricted to local network (LAN) connections.",
+            });
+        }
+
+        var username = (request?.Username ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(username))
+        {
+            return BadRequest(new { verified = false, message = "Enter an Administrator username." });
+        }
+
+        var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+        var lockKey = "adm|" + remoteIp;
+        if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
+        {
+            var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
+            Response.Headers["Retry-After"] = secs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return StatusCode(429, new
+            {
+                verified = false,
+                code = "login_locked",
+                retryAfterSeconds = secs,
+                message = $"Too many failed sign-in attempts. Try again in {Math.Max(1, (secs + 59) / 60)} min.",
+            });
+        }
+
+        var user = await StreamFlixStartupTask.AuthenticateUserCompatAsync(
+            _userManager,
+            username,
+            request?.Password ?? string.Empty,
+            remoteIp,
+            _logger).ConfigureAwait(false);
+
+        if (user == null)
+        {
+            StreamFlixSessionService.RegisterLoginFailure(lockKey);
+            return StatusCode(401, new
+            {
+                verified = false,
+                code = "invalid_credentials",
+                message = "Invalid Jellyfin username or password.",
+            });
+        }
+
+        // Strict backend Administrator privilege enforcement — non-admin Jellyfin accounts are never allowed here
+        if (!StreamFlixStartupTask.IsUserAdminCompat(user))
+        {
+            StreamFlixSessionService.RegisterLoginFailure(lockKey);
+            _logger.LogWarning("StreamFlix: denied Admin Sign-In attempt for non-administrator Jellyfin user '{Username}'.", user.Username);
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "admin_only",
+                message = "Access denied: Only Jellyfin accounts with Administrator privileges can sign in through Admin Sign-In.",
+            });
+        }
+
+        StreamFlixSessionService.ResetLoginFailures(lockKey);
+        var session = StreamFlixSessionService.IssueJellyfinSession(
+            config,
+            StreamFlixSessionService.AuthKindJellyfinAdmin,
+            user.Id.ToString("N"),
+            user.Username,
+            out var sessionToken);
+
+        var jellyfinAccessToken = await TryMintAdminJellyfinTokenAsync(user, request, remoteIp).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            verified = true,
+            authKind = session.AuthKind,
+            userId = user.Id.ToString("N"),
+            username = user.Username,
+            name = user.Username,
+            isAdmin = true,
+            sessionToken,
+            expiresAt = session.ExpiresAt,
+            jellyfinAccessToken,
+            serverId = _appHost.SystemId,
+        });
+    }
+
+    [HttpPost("TestOAuthConfig")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> TestOAuthConfig([FromBody] TestOAuthConfigRequest request)
+    {
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can validate OAuth settings." });
+        }
+
+        var checks = new List<object>();
+        var hasError = false;
+        var hasWarn = false;
+
+        void AddCheck(string label, string status, string detail)
+        {
+            if (status == "error")
+            {
+                hasError = true;
+            }
+            else if (status == "warn")
+            {
+                hasWarn = true;
+            }
+
+            checks.Add(new { label, status, detail });
+        }
+
+        // 1. Validate Google Client ID format
+        var rawClientId = request?.GoogleClientId ?? string.Empty;
+        var clientId = rawClientId.Trim();
+        if (string.IsNullOrEmpty(clientId))
+        {
+            AddCheck("OAuth Client ID", "error", "Client ID is empty. Paste your Web application Client ID ending in .apps.googleusercontent.com.");
+        }
+        else if (clientId.StartsWith("{", StringComparison.Ordinal) || clientId.Contains("\"client_id\"", StringComparison.OrdinalIgnoreCase))
+        {
+            AddCheck("OAuth Client ID", "error", "It looks like full JSON was pasted. Paste only the client_id value (123456-abc.apps.googleusercontent.com).");
+        }
+        else if (clientId.StartsWith("GOCSPX-", StringComparison.OrdinalIgnoreCase))
+        {
+            AddCheck("OAuth Client ID", "error", "That value is a Client Secret (GOCSPX-...), not a Client ID. Move it to Client Secret and paste your .apps.googleusercontent.com Client ID above.");
+        }
+        else if (!GoogleClientIdRegex.IsMatch(clientId))
+        {
+            AddCheck("OAuth Client ID", "error", $"\"{clientId}\" does not match Google's Web OAuth Client ID format (<project-number>-<id>.apps.googleusercontent.com).");
+        }
+        else if (!string.Equals(rawClientId, clientId, StringComparison.Ordinal))
+        {
+            AddCheck("OAuth Client ID", "ok", "Valid Google Web Client ID format (extra leading/trailing spaces will be trimmed automatically on Save).");
+        }
+        else
+        {
+            AddCheck("OAuth Client ID", "ok", "Valid Google Web Client ID format.");
+        }
+
+        // 2. Validate Authorized JavaScript Origin
+        var originRaw = (request?.OriginUri ?? string.Empty).Trim();
+        Uri? originParsed = null;
+        if (string.IsNullOrEmpty(originRaw) || !Uri.TryCreate(originRaw, UriKind.Absolute, out originParsed))
+        {
+            AddCheck("JavaScript Origin", "error", "Browser origin URL could not be parsed as a valid http(s) origin.");
+        }
+        else
+        {
+            var authority = originParsed.GetLeftPart(UriPartial.Authority);
+            var isHttps = string.Equals(originParsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+            var isHttp = string.Equals(originParsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
+            var isLocalhost = string.Equals(originParsed.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(originParsed.Host, "127.0.0.1", StringComparison.Ordinal);
+            var isRawIp = System.Net.IPAddress.TryParse(originParsed.Host, out _);
+
+            if (!string.Equals(originRaw, authority, StringComparison.Ordinal) || !string.IsNullOrEmpty(originParsed.Query) || !string.IsNullOrEmpty(originParsed.Fragment))
+            {
+                AddCheck("JavaScript Origin", "error", $"Origin must be scheme + host (+ optional port) with no path or trailing slash: {authority}");
+            }
+            else if (isHttps && !isRawIp)
+            {
+                AddCheck("JavaScript Origin", "ok", $"Valid HTTPS domain origin ({authority}). Ensure this exact URL is listed under Authorized JavaScript origins in Google Cloud Console.");
+            }
+            else if (isHttp && isLocalhost)
+            {
+                AddCheck("JavaScript Origin", "ok", $"Localhost HTTP origin ({authority}) is accepted by Google OAuth for local browser testing.");
+            }
+            else if (isRawIp)
+            {
+                AddCheck("JavaScript Origin", "warn", $"You are currently browsing via a raw IP address ({authority}). Google Cloud Console rejects raw IP addresses (except localhost) in Web OAuth origins — open Jellyfin via an HTTPS domain for Google Sign-In, or enable Standard Jellyfin Login / LAN Bypass for local IP access.");
+            }
+            else if (isHttp)
+            {
+                AddCheck("JavaScript Origin", "warn", $"Current origin uses plain HTTP ({authority}). Google Cloud Console requires HTTPS for non-localhost Web OAuth origins.");
+            }
+            else
+            {
+                AddCheck("JavaScript Origin", "error", $"Unsupported URI scheme '{originParsed.Scheme}'.");
+            }
+        }
+
+        // 3. Validate Authorized Redirect URIs
+        var redirects = (request?.RedirectUris ?? new List<string>())
+            .Select(u => (u ?? string.Empty).Trim())
+            .Where(u => !string.IsNullOrEmpty(u))
+            .ToList();
+        if (redirects.Count == 0)
+        {
+            AddCheck("Redirect URIs", "error", "No redirect URIs provided.");
+        }
+        else
+        {
+            var badRedirect = redirects.FirstOrDefault(r =>
+                !Uri.TryCreate(r, UriKind.Absolute, out var ru)
+                || !string.IsNullOrEmpty(ru.Fragment)
+                || (originParsed != null && !string.Equals(ru.GetLeftPart(UriPartial.Authority), originParsed.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)));
+
+            if (badRedirect != null)
+            {
+                AddCheck("Redirect URIs", "error", $"Redirect URI \"{badRedirect}\" is malformed, contains a #fragment, or does not match the JavaScript origin.");
+            }
+            else
+            {
+                AddCheck("Redirect URIs", "ok", $"{redirects.Count} redirect URI(s) properly formatted and matched to origin.");
+            }
+        }
+
+        // 4. Validate Approved Google Accounts list
+        var rawEmails = request?.ApprovedEmails ?? new List<string>();
+        var validEmails = new List<string>();
+        var invalidEmails = new List<string>();
+        foreach (var entry in rawEmails)
+        {
+            var e = (entry ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(e))
+            {
+                continue;
+            }
+
+            if (EmailRegex.IsMatch(e))
+            {
+                if (!validEmails.Contains(e, StringComparer.OrdinalIgnoreCase))
+                {
+                    validEmails.Add(e);
+                }
+            }
+            else
+            {
+                invalidEmails.Add(entry?.Trim() ?? string.Empty);
+            }
+        }
+
+        var lockedProfileCount = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Count(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail));
+        if (invalidEmails.Count > 0)
+        {
+            AddCheck("Approved Google Accounts", "error", $"Invalid email syntax: {string.Join(", ", invalidEmails.Take(4))}");
+        }
+        else if (validEmails.Count == 0 && lockedProfileCount == 0)
+        {
+            AddCheck("Approved Google Accounts", "warn", "Allowlist is empty. Add at least one Gmail / Google Workspace address before enabling Google Sign-In.");
+        }
+        else
+        {
+            AddCheck("Approved Google Accounts", "ok", $"{validEmails.Count} approved email(s) valid" + (lockedProfileCount > 0 ? $" (+ {lockedProfileCount} profile-locked email(s))." : "."));
+        }
+
+        // 5. Probe outbound HTTPS reachability from Jellyfin Server to Google OAuth
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var probeResp = await HttpClient.GetAsync("https://accounts.google.com/.well-known/openid-configuration", cts.Token).ConfigureAwait(false);
+            sw.Stop();
+            if (probeResp.IsSuccessStatusCode)
+            {
+                AddCheck("Server → Google HTTPS", "ok", $"Jellyfin server reached Google OAuth endpoints in {sw.ElapsedMilliseconds} ms.");
+            }
+            else
+            {
+                AddCheck("Server → Google HTTPS", "warn", $"Google discovery endpoint returned HTTP {(int)probeResp.StatusCode} ({sw.ElapsedMilliseconds} ms).");
+            }
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            AddCheck("Server → Google HTTPS", "error", $"Jellyfin server cannot reach accounts.google.com over HTTPS ({ex.GetType().Name}). Check container DNS / outbound firewall rules.");
+        }
+
+        var overall = hasError ? "error" : (hasWarn ? "warn" : "ok");
+        var summary = overall == "ok"
+            ? "All OAuth format & server connectivity checks passed."
+            : (overall == "warn"
+                ? "Configuration is syntactically valid, with warnings to review below."
+                : "One or more OAuth configuration issues must be fixed before Google Sign-In will work.");
+
+        return Ok(new
+        {
+            status = overall,
+            summary,
+            checks,
+        });
+    }
+
+    [HttpGet("PopularScores")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> GetPopularScores()
+    {
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!HasHouseholdAccess(config, caller))
+        {
+            return GoogleRequired(config);
+        }
+
+        var scores = GetPopularScoresCached(_libraryManager, _userManager, _userDataManager);
+        return Ok(new
+        {
+            mode = NormalizeTop10Mode(config.Top10SelectionMode),
+            scores,
+        });
+    }
+
     [HttpPost("Sessions/RevokeAll")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
@@ -383,7 +841,7 @@ public class StreamFlixController : ControllerBase
 
         config.SessionVersion = Math.Max(1, config.SessionVersion) + 1;
         Plugin.Instance?.SaveConfiguration();
-        _logger.LogInformation("StreamFlix: all Google sessions revoked by an administrator (session version {Version}).", config.SessionVersion);
+        _logger.LogInformation("StreamFlix: all household sessions revoked by an administrator (session version {Version}).", config.SessionVersion);
         return Ok(new { revoked = true, sessionVersion = config.SessionVersion });
     }
 
@@ -960,19 +1418,59 @@ public class StreamFlixController : ControllerBase
             ?? config.Profiles.FirstOrDefault(p => string.Equals(p.Name, idOrName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool HasHouseholdAccess(PluginConfiguration config, CallerContext caller)
+    private static bool IsGateUnconfigured(PluginConfiguration config)
     {
-        return !config.RequireGoogleAuth || caller.Session != null || caller.IsAdmin;
+        return config.RequireGoogleAuth
+            && (!config.EnableGoogleSignIn || string.IsNullOrWhiteSpace(config.GoogleClientId))
+            && !config.AllowStandardJellyfinLogin;
     }
 
-    private ObjectResult GoogleRequired()
+    private static bool HasHouseholdAccess(PluginConfiguration config, CallerContext caller)
     {
-        return StatusCode(401, new { code = "google_required", message = "Please sign in with Google to continue." });
+        return !config.RequireGoogleAuth
+            || (config.BypassLoginGateOnLan && caller.IsLocalLan)
+            || caller.Session != null
+            || caller.IsAdmin;
+    }
+
+    private ObjectResult GoogleRequired(PluginConfiguration? config = null)
+    {
+        var cfg = config ?? Config;
+        var msg = cfg.EnableGoogleSignIn && cfg.AllowStandardJellyfinLogin
+            ? "Please sign in with Google or your Jellyfin account to continue."
+            : (cfg.AllowStandardJellyfinLogin && !cfg.EnableGoogleSignIn
+                ? "Please sign in with your Jellyfin account to continue."
+                : "Please sign in to continue.");
+        return StatusCode(401, new { code = "google_required", message = msg });
+    }
+
+    private async Task<string?> TryMintAdminJellyfinTokenAsync(JUser user, PasswordLoginRequest? request, string remoteIp)
+    {
+        try
+        {
+            var authReq = new AuthenticationRequest
+            {
+                App = !string.IsNullOrWhiteSpace(request?.AppName) ? request!.AppName!.Trim() : "Jellyfin Web",
+                AppVersion = !string.IsNullOrWhiteSpace(request?.AppVersion) ? request!.AppVersion!.Trim() : "10.11.0",
+                DeviceId = !string.IsNullOrWhiteSpace(request?.DeviceId) ? request!.DeviceId!.Trim() : $"streamflix-admin-{user.Id:N}",
+                DeviceName = !string.IsNullOrWhiteSpace(request?.DeviceName) ? request!.DeviceName!.Trim() : $"StreamFlix Admin ({user.Username})",
+                UserId = user.Id,
+                Username = user.Username,
+                RemoteEndPoint = remoteIp,
+            };
+            var res = await _sessionManager.AuthenticateDirect(authReq).ConfigureAwait(false);
+            return res?.AccessToken;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "StreamFlix: optional AuthenticateDirect token mint skipped for '{Username}'.", user.Username);
+            return null;
+        }
     }
 
     private ObjectResult? CheckGoogleLock(StreamFlixProfileConfig profile, CallerContext caller)
     {
-        if (string.IsNullOrWhiteSpace(profile.GoogleAccountEmail))
+        if (string.IsNullOrWhiteSpace(profile.GoogleAccountEmail) || caller.IsAdmin)
         {
             return null;
         }
@@ -1022,18 +1520,73 @@ public class StreamFlixController : ControllerBase
 
     private async Task<CallerContext> GetCallerAsync(PluginConfiguration config)
     {
+        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext);
         var token = Request.Headers[StreamFlixSessionService.HeaderName].FirstOrDefault();
         var session = StreamFlixSessionService.Validate(config, token);
+        var sessionIsAdmin = false;
+
+        if (session != null)
+        {
+            if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindGoogle, StringComparison.Ordinal))
+            {
+                if (config.RequireGoogleAuth && !config.EnableGoogleSignIn)
+                {
+                    session = null;
+                }
+            }
+            else if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal))
+            {
+                if (!Guid.TryParse(session.JellyfinUserId, out var adminUid))
+                {
+                    session = null;
+                }
+                else
+                {
+                    var u = _userManager.GetUserById(adminUid);
+                    if (u == null || !StreamFlixStartupTask.IsUserAdminCompat(u))
+                    {
+                        session = null;
+                    }
+                    else if (config.AdminFallbackLanOnly && !IsGateUnconfigured(config) && !config.AllowStandardJellyfinLogin && !isLocalLan)
+                    {
+                        session = null;
+                    }
+                    else
+                    {
+                        sessionIsAdmin = true;
+                    }
+                }
+            }
+            else if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindJellyfin, StringComparison.Ordinal))
+            {
+                if (!Guid.TryParse(session.JellyfinUserId, out var jfUid))
+                {
+                    session = null;
+                }
+                else
+                {
+                    var u = _userManager.GetUserById(jfUid);
+                    if (u == null)
+                    {
+                        session = null;
+                    }
+                    else if (StreamFlixStartupTask.IsUserAdminCompat(u))
+                    {
+                        sessionIsAdmin = true;
+                    }
+                }
+            }
+        }
 
         var isAuthenticated = false;
-        var isAdmin = false;
+        var isAdmin = sessionIsAdmin;
         try
         {
             var info = await _authContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
             if (info != null && info.IsAuthenticated)
             {
                 isAuthenticated = true;
-                isAdmin = info.IsApiKey || StreamFlixStartupTask.IsUserAdminCompat(info.User);
+                isAdmin = isAdmin || info.IsApiKey || StreamFlixStartupTask.IsUserAdminCompat(info.User);
             }
         }
         catch (Exception ex)
@@ -1041,7 +1594,7 @@ public class StreamFlixController : ControllerBase
             _logger.LogDebug(ex, "StreamFlix: could not read Jellyfin authorization info.");
         }
 
-        return new CallerContext(session, isAuthenticated, isAdmin);
+        return new CallerContext(session, isAuthenticated, isAdmin, isLocalLan);
     }
 
     private async Task SyncProfilesAsync(PluginConfiguration config, bool force)
@@ -1072,9 +1625,48 @@ public class StreamFlixController : ControllerBase
         }
     }
 
+    private static string NormalizeTop10Mode(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return s switch
+        {
+            "community_rating" => "community_rating",
+            "recently_added" => "recently_added",
+            "daily_random" => "daily_random",
+            "session_random" => "session_random",
+            _ => "most_played",
+        };
+    }
+
+    private static string NormalizeHeroSelectionMode(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return s switch
+        {
+            "random" => "random",
+            "top_rated" => "top_rated",
+            "top10" => "top10",
+            _ => "recent",
+        };
+    }
+
+    private static string NormalizeHeroContentType(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return s switch
+        {
+            "movies" => "movies",
+            "series" => "series",
+            _ => "all",
+        };
+    }
+
     private object BuildPublicState(PluginConfiguration config, CallerContext caller)
     {
         var hasAccess = HasHouseholdAccess(config, caller);
+        var isUnconfiguredGate = IsGateUnconfigured(config);
+        var canShowAdminFallback = isUnconfiguredGate
+            || (config.AllowAdminFallbackLogin && (!config.AdminFallbackLanOnly || caller.IsLocalLan));
 
         // The full Jellyfin user list is only needed (and only shown) to administrators choosing a profile's account.
         var serverUsers = hasAccess && caller.IsAdmin
@@ -1092,26 +1684,340 @@ public class StreamFlixController : ControllerBase
 
         var profilesSnapshot = (config.Profiles ?? new List<StreamFlixProfileConfig>()).ToList();
         var approvedSnapshot = (config.ApprovedGoogleAccounts ?? new List<string>()).ToList();
+        var heroLibrariesSnapshot = (config.HeroLibraryIds ?? new List<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return new
         {
             version = Plugin.VersionString,
+            assetVersion = Plugin.AssetCacheVersion,
             serverId = _appHost.SystemId,
             serverName = _appHost.FriendlyName,
             customBrandName = (config.CustomBrandName ?? string.Empty).Trim(),
             enableStreamFlixUi = config.EnableStreamFlixUi,
             requireGoogleAuth = config.RequireGoogleAuth,
+            enableGoogleSignIn = config.EnableGoogleSignIn,
+            allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,
+            allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
+            adminFallbackLanOnly = config.AdminFallbackLanOnly,
+            bypassLoginGateOnLan = config.BypassLoginGateOnLan,
+            isLocalLan = caller.IsLocalLan,
+            canShowAdminFallback,
             googleClientId = config.GoogleClientId,
             googleConfigured = !string.IsNullOrWhiteSpace(config.GoogleClientId),
             hasGoogleClientSecret = !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
             hasAccess,
             isAdmin = caller.IsAdmin,
-            session = caller.Session == null ? null : new { email = caller.Session.Email, expiresAt = caller.Session.ExpiresAt },
+            session = caller.Session == null
+                ? null
+                : new
+                {
+                    authKind = caller.Session.AuthKind,
+                    email = caller.Session.Email,
+                    username = caller.Session.Username,
+                    userId = caller.Session.JellyfinUserId,
+                    expiresAt = caller.Session.ExpiresAt,
+                },
+            top10SelectionMode = NormalizeTop10Mode(config.Top10SelectionMode),
+            heroRotationSeconds = Math.Clamp(config.HeroRotationSeconds, 0, 120),
+            heroSlideCount = Math.Clamp(config.HeroSlideCount <= 0 ? 8 : config.HeroSlideCount, 1, 15),
+            heroSelectionMode = NormalizeHeroSelectionMode(config.HeroSelectionMode),
+            heroContentType = NormalizeHeroContentType(config.HeroContentType),
+            heroLibraryIds = heroLibrariesSnapshot,
             approvedGoogleAccounts = hasAccess && caller.IsAdmin ? approvedSnapshot : new List<string>(),
             serverUsers,
             profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(p, caller)).ToList() : new List<object>(),
             showcaseItems = hasAccess ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
         };
+    }
+
+    private static Dictionary<string, double> GetPopularScoresCached(
+        ILibraryManager libraryManager,
+        IUserManager userManager,
+        IUserDataManager userDataManager)
+    {
+        lock (PopularCacheLock)
+        {
+            if (DateTime.UtcNow - _popularCachedAtUtc < TimeSpan.FromMinutes(3) && _popularScoresCache.Count > 0)
+            {
+                return _popularScoresCache;
+            }
+        }
+
+        var fresh = ComputePopularScoresCompat(libraryManager, userManager, userDataManager);
+        lock (PopularCacheLock)
+        {
+            _popularScoresCache = fresh;
+            _popularCachedAtUtc = DateTime.UtcNow;
+        }
+
+        return fresh;
+    }
+
+    private static Dictionary<string, double> ComputePopularScoresCompat(
+        ILibraryManager libraryManager,
+        IUserManager userManager,
+        IUserDataManager userDataManager)
+    {
+        var totals = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var users = StreamFlixStartupTask.GetAllUsersCompat(userManager);
+            if (users.Count == 0)
+            {
+                return totals;
+            }
+
+            var queryType = typeof(ILibraryManager).Assembly.GetType("MediaBrowser.Controller.Entities.InternalItemsQuery");
+            var getItemList = queryType != null ? typeof(ILibraryManager).GetMethod("GetItemList", new[] { queryType }) : null;
+            if (queryType == null || getItemList == null)
+            {
+                return totals;
+            }
+
+            var getUserDataMethod = typeof(IUserDataManager).GetMethods()
+                .FirstOrDefault(m => m.Name == "GetUserData" && m.GetParameters().Length == 2)
+                ?? userDataManager.GetType().GetMethods()
+                    .FirstOrDefault(m => m.Name == "GetUserData" && m.GetParameters().Length == 2);
+
+            var includeProp = queryType.GetProperty("IncludeItemTypes");
+            var elemType = includeProp?.PropertyType.IsArray == true ? includeProp.PropertyType.GetElementType() : null;
+            Array? movieSeriesEpisodeArr = null;
+            Array? movieSeriesArr = null;
+            if (elemType != null
+                && elemType.IsEnum
+                && Enum.TryParse(elemType, "Movie", ignoreCase: true, out var movieKind)
+                && Enum.TryParse(elemType, "Series", ignoreCase: true, out var seriesKind)
+                && movieKind != null
+                && seriesKind != null)
+            {
+                movieSeriesArr = Array.CreateInstance(elemType, 2);
+                movieSeriesArr.SetValue(movieKind, 0);
+                movieSeriesArr.SetValue(seriesKind, 1);
+
+                if (Enum.TryParse(elemType, "Episode", ignoreCase: true, out var epKind) && epKind != null)
+                {
+                    movieSeriesEpisodeArr = Array.CreateInstance(elemType, 3);
+                    movieSeriesEpisodeArr.SetValue(movieKind, 0);
+                    movieSeriesEpisodeArr.SetValue(seriesKind, 1);
+                    movieSeriesEpisodeArr.SetValue(epKind, 2);
+                }
+                else
+                {
+                    movieSeriesEpisodeArr = movieSeriesArr;
+                }
+            }
+
+            var perTitlePerUser = new Dictionary<string, Dictionary<Guid, UserTitleEngagement>>(StringComparer.OrdinalIgnoreCase);
+            var nowUtc = DateTime.UtcNow;
+
+            foreach (var user in users)
+            {
+                if (user == null)
+                {
+                    continue;
+                }
+
+                var seenItemIds = new HashSet<Guid>();
+                var userCtor = queryType.GetConstructor(new[] { user.GetType() });
+
+                object? CreateUserQuery(Array? kinds, string filterPropName, int limit)
+                {
+                    var q = userCtor != null
+                        ? userCtor.Invoke(new object[] { user })
+                        : Activator.CreateInstance(queryType);
+                    if (q == null)
+                    {
+                        return null;
+                    }
+
+                    if (userCtor == null)
+                    {
+                        queryType.GetProperty("User")?.SetValue(q, user);
+                    }
+
+                    queryType.GetProperty("Recursive")?.SetValue(q, true);
+                    queryType.GetProperty("Limit")?.SetValue(q, limit);
+                    if (kinds != null)
+                    {
+                        includeProp?.SetValue(q, kinds);
+                    }
+
+                    queryType.GetProperty(filterPropName)?.SetValue(q, true);
+                    return q;
+                }
+
+                foreach (var q in new[]
+                {
+                    CreateUserQuery(movieSeriesEpisodeArr, "IsPlayed", 400),
+                    CreateUserQuery(movieSeriesEpisodeArr, "IsResumable", 100),
+                    CreateUserQuery(movieSeriesArr, "IsFavorite", 100),
+                })
+                {
+                    if (q == null || getItemList.Invoke(libraryManager, new[] { q }) is not System.Collections.IEnumerable list)
+                    {
+                        continue;
+                    }
+
+                    foreach (var item in list)
+                    {
+                        if (item == null)
+                        {
+                            continue;
+                        }
+
+                        var itemType = item.GetType();
+                        if (itemType.GetProperty("Id")?.GetValue(item) is not Guid itemId || itemId == Guid.Empty || !seenItemIds.Add(itemId))
+                        {
+                            continue;
+                        }
+
+                        var isEpisode = string.Equals(itemType.Name, "Episode", StringComparison.OrdinalIgnoreCase);
+                        Guid targetGuid = itemId;
+                        if (isEpisode)
+                        {
+                            if (itemType.GetProperty("SeriesId")?.GetValue(item) is Guid sId && sId != Guid.Empty)
+                            {
+                                targetGuid = sId;
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+
+                        var playCount = 0;
+                        var played = false;
+                        long posTicks = 0;
+                        var isFav = false;
+                        DateTime? lastPlayed = null;
+
+                        if (getUserDataMethod != null)
+                        {
+                            try
+                            {
+                                var firstParamType = getUserDataMethod.GetParameters()[0].ParameterType;
+                                var arg0 = firstParamType == typeof(Guid) ? (object)user.Id : user;
+                                var ud = getUserDataMethod.Invoke(userDataManager, new[] { arg0, item });
+                                if (ud != null)
+                                {
+                                    var udt = ud.GetType();
+                                    if (udt.GetProperty("PlayCount")?.GetValue(ud) is int pc)
+                                    {
+                                        playCount = pc;
+                                    }
+
+                                    if (udt.GetProperty("Played")?.GetValue(ud) is bool pl)
+                                    {
+                                        played = pl;
+                                    }
+
+                                    if (udt.GetProperty("PlaybackPositionTicks")?.GetValue(ud) is long pt)
+                                    {
+                                        posTicks = pt;
+                                    }
+
+                                    if (udt.GetProperty("IsFavorite")?.GetValue(ud) is bool fv)
+                                    {
+                                        isFav = fv;
+                                    }
+
+                                    if (udt.GetProperty("LastPlayedDate")?.GetValue(ud) is DateTime lp)
+                                    {
+                                        lastPlayed = lp;
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+
+                        if (!played && playCount <= 0 && posTicks <= 0 && !isFav)
+                        {
+                            continue;
+                        }
+
+                        var targetKey = targetGuid.ToString("N");
+                        if (!perTitlePerUser.TryGetValue(targetKey, out var byUser))
+                        {
+                            byUser = new Dictionary<Guid, UserTitleEngagement>();
+                            perTitlePerUser[targetKey] = byUser;
+                        }
+
+                        if (!byUser.TryGetValue(user.Id, out var eng))
+                        {
+                            eng = new UserTitleEngagement();
+                            byUser[user.Id] = eng;
+                        }
+
+                        if (isEpisode)
+                        {
+                            var epUnits = Math.Min(3.0, Math.Max(played ? 1 : 0, playCount) * 1.5);
+                            eng.PlayUnits = Math.Min(12.0, eng.PlayUnits + epUnits);
+                        }
+                        else
+                        {
+                            var movieUnits = Math.Min(16.0, Math.Max(played ? 1 : 0, playCount) * 4.0);
+                            eng.PlayUnits = Math.Max(eng.PlayUnits, movieUnits);
+                        }
+
+                        if (posTicks > 0)
+                        {
+                            eng.ResumeBonus = 2.5;
+                        }
+
+                        if (isFav)
+                        {
+                            eng.FavBonus = 3.0;
+                        }
+
+                        if (lastPlayed.HasValue)
+                        {
+                            var ageDays = (nowUtc - lastPlayed.Value.ToUniversalTime()).TotalDays;
+                            var rec = ageDays <= 7 ? 3.0 : (ageDays <= 30 ? 1.5 : 0.0);
+                            if (rec > eng.RecencyBonus)
+                            {
+                                eng.RecencyBonus = rec;
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (var kvp in perTitlePerUser)
+            {
+                var score = 0.0;
+                foreach (var uEng in kvp.Value.Values)
+                {
+                    score += 10.0 + uEng.PlayUnits + uEng.ResumeBonus + uEng.FavBonus + uEng.RecencyBonus;
+                }
+
+                if (score > 0)
+                {
+                    totals[kvp.Key] = Math.Round(score, 2);
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return totals;
+    }
+
+    private sealed class UserTitleEngagement
+    {
+        public double PlayUnits { get; set; }
+
+        public double ResumeBonus { get; set; }
+
+        public double FavBonus { get; set; }
+
+        public double RecencyBonus { get; set; }
     }
 
     private static List<object> GetShowcaseItemsCached(ILibraryManager libraryManager)
@@ -1241,7 +2147,7 @@ public class StreamFlixController : ControllerBase
             googleLocked = lockEmail != null,
             googleAccountEmail = lockEmail != null && (caller.IsAdmin || callerOwnsLock) ? lockEmail : null,
             googleAccountHint = lockEmail != null ? StreamFlixSessionService.MaskEmail(lockEmail) : null,
-            googleLockSatisfied = lockEmail == null || callerOwnsLock,
+            googleLockSatisfied = lockEmail == null || callerOwnsLock || caller.IsAdmin,
             autoplayNextEpisode = p.AutoplayNextEpisode,
             autoplayPreviews = p.AutoplayPreviews,
             jellyfinUserId = p.JellyfinUserId,
@@ -1251,7 +2157,11 @@ public class StreamFlixController : ControllerBase
 
     private ActionResult ServeAsset(EmbeddedAsset asset, string contentType)
     {
-        Response.Headers["Cache-Control"] = "no-cache";
+        var requestedVer = Request.Query["v"].ToString();
+        Response.Headers["Cache-Control"] = !string.IsNullOrEmpty(requestedVer)
+            && string.Equals(requestedVer, Plugin.AssetCacheVersion, StringComparison.Ordinal)
+            ? "public, max-age=86400"
+            : "no-cache";
         Response.Headers["ETag"] = asset.ETag;
 
         var ifNoneMatch = Request.Headers["If-None-Match"].ToString();
@@ -1263,7 +2173,11 @@ public class StreamFlixController : ControllerBase
         return Content(asset.Content, contentType);
     }
 
-    private sealed record CallerContext(StreamFlixSessionService.SessionInfo? Session, bool IsJellyfinAuthenticated, bool IsAdmin);
+    private sealed record CallerContext(
+        StreamFlixSessionService.SessionInfo? Session,
+        bool IsJellyfinAuthenticated,
+        bool IsAdmin,
+        bool IsLocalLan = false);
 
     private sealed class EmbeddedAsset
     {

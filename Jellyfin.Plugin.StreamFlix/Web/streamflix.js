@@ -10,8 +10,8 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.5.5';
-    // Household session issued by the server after Google verification ({ token, email, name, picture, expiresAt })
+    var VERSION = '0.5.6';
+    // Household session issued by the server ({ token, authKind, email, username, userId, name, picture, isAdmin, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
     var PENDING_PROFILE_KEY = 'streamflix_pending_profile';
@@ -55,17 +55,31 @@
 
     var DEFAULT_CONFIG = {
         version: '',
+        assetVersion: '',
         serverId: '',
         serverName: 'StreamFlix',
         customBrandName: '',
         enableStreamFlixUi: true,
         requireGoogleAuth: true,
+        enableGoogleSignIn: true,
+        allowStandardJellyfinLogin: false,
+        allowAdminFallbackLogin: true,
+        adminFallbackLanOnly: false,
+        bypassLoginGateOnLan: false,
+        isLocalLan: false,
+        canShowAdminFallback: true,
         googleClientId: '',
         googleConfigured: false,
         hasGoogleClientSecret: false,
         hasAccess: false,
         isAdmin: false,
         session: null,
+        top10SelectionMode: 'most_played',
+        heroRotationSeconds: 9,
+        heroSlideCount: 8,
+        heroSelectionMode: 'recent',
+        heroContentType: 'all',
+        heroLibraryIds: [],
         approvedGoogleAccounts: [],
         serverUsers: [],
         showcaseItems: [],
@@ -81,6 +95,8 @@
         config: loadJson(CACHED_CONFIG_KEY, null) || DEFAULT_CONFIG,
         googleUser: loadHouseholdSession(),
         configFresh: false,
+        configAttempted: false,
+        adminLoginExpanded: false,
         heroPaused: false,
         activeProfile: initialActiveProfile,
         legacyProfileToMigrate: legacyProfileToMigrate,
@@ -100,6 +116,8 @@
             loading: false,
             loaded: false,
             heroItems: [],
+            filteredHeroPool: [],
+            popularScores: {},
             resumeItems: [],
             nextUpItems: [],
             top10Items: [],
@@ -157,6 +175,9 @@
         check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
         info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/>',
         eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+        eyeOff: '<path d="M3 3l18 18M10.6 10.6a2.8 2.8 0 0 0 3.9 3.9M9.9 5.6A9.8 9.8 0 0 1 12 5.4c6 0 9.5 6.6 9.5 6.6a16.8 16.8 0 0 1-3.1 4.1M6.3 6.3A16.5 16.5 0 0 0 2.5 12S6 18.6 12 18.6c1.8 0 3.4-.5 4.8-1.3"/>',
+        user: '<circle cx="12" cy="8.2" r="3.8"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
+        wifi: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none"/>',
         search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
         close: '<path d="M6 6l12 12M18 6L6 18"/>',
         chevronLeft: '<path d="M14.5 5.5L8 12l6.5 6.5"/>',
@@ -1098,10 +1119,10 @@
         };
     }
 
-    /* Household session (issued by /StreamFlix/VerifyGoogle, HMAC-signed by the server) */
+    /* Household session (issued by /StreamFlix/VerifyGoogle, /Auth/StandardLogin, or /Auth/AdminLogin; HMAC-signed by the server) */
     function loadHouseholdSession() {
         var s = loadJson(GOOGLE_KEY, null);
-        if (!s || !s.token || !s.email) {
+        if (!s || !s.token || (!s.email && !s.username)) {
             return null;
         }
         if (s.expiresAt && Date.parse(s.expiresAt) < Date.now()) {
@@ -1121,9 +1142,17 @@
         saveJson(GOOGLE_KEY, null);
     }
 
+    function isOpenWithoutLogin(cfg) {
+        cfg = cfg || state.config;
+        if (!cfg) {
+            return false;
+        }
+        return cfg.requireGoogleAuth === false || Boolean(cfg.bypassLoginGateOnLan && cfg.isLocalLan);
+    }
+
     function hasHouseholdAccess() {
         var cfg = state.config;
-        if (!cfg || cfg.requireGoogleAuth === false) {
+        if (!cfg || isOpenWithoutLogin(cfg)) {
             return true;
         }
         if (cfg.hasAccess) {
@@ -1138,6 +1167,8 @@
         state.itemCache = {};
         if (state.hubData) {
             state.hubData.heroItems = [];
+            state.hubData.filteredHeroPool = [];
+            state.hubData.popularScores = {};
             state.hubData.top10Items = [];
             state.hubData.allMovies = [];
             state.hubData.allSeries = [];
@@ -1156,15 +1187,16 @@
     function handleHouseholdSessionLost() {
         var hadSession = Boolean(state.googleUser && state.googleUser.token);
         clearHouseholdSession();
+        var openAccess = isOpenWithoutLogin(state.config);
         if (state.config) {
-            state.config.hasAccess = state.config.requireGoogleAuth === false;
+            state.config.hasAccess = openAccess;
             state.config.session = null;
             state.config.isAdmin = false;
-            if (!state.config.hasAccess) {
+            if (!openAccess) {
                 clearShowcaseAndMediaCaches();
             }
         }
-        if (state.verifyingGoogle || !state.config || state.config.requireGoogleAuth === false) {
+        if (state.verifyingGoogle || !state.config || openAccess) {
             return;
         }
         state.activatingProfileId = null;
@@ -1175,37 +1207,79 @@
         if (!cfg || typeof cfg !== 'object') {
             return state.config;
         }
+        var prevCfg = state.config || DEFAULT_CONFIG;
         var rawProfiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
         var normalizedProfiles = rawProfiles.map(function (p, i) {
             return normalizeProfileModel(p, i);
         });
         var requireGoogle = cfg.requireGoogleAuth !== false;
-        var resolvedAccess = Boolean(cfg.hasAccess) || !requireGoogle;
+        var isLocalLan = Boolean(cfg.isLocalLan);
+        var bypassLan = Boolean(cfg.bypassLoginGateOnLan);
+        var resolvedAccess = Boolean(cfg.hasAccess) || !requireGoogle || (bypassLan && isLocalLan);
         var serverShowcase = [];
         if (resolvedAccess) {
             serverShowcase = Array.isArray(cfg.showcaseItems) && cfg.showcaseItems.length > 0
                 ? cfg.showcaseItems
-                : ((state.config && Array.isArray(state.config.showcaseItems)) ? state.config.showcaseItems : []);
+                : ((prevCfg && Array.isArray(prevCfg.showcaseItems)) ? prevCfg.showcaseItems : []);
             if (serverShowcase.length > 0) {
                 saveJson(SHOWCASE_ITEMS_KEY, serverShowcase);
             }
         } else {
             try { localStorage.removeItem(SHOWCASE_ITEMS_KEY); } catch (e) {}
         }
+
+        var nextHeroLibs = Array.isArray(cfg.heroLibraryIds)
+            ? cfg.heroLibraryIds.map(function (x) { return String(x || '').trim(); }).filter(Boolean)
+            : [];
+        var prevHeroLibsSig = Array.isArray(prevCfg.heroLibraryIds) ? prevCfg.heroLibraryIds.join(',') : '';
+        var nextHeroLibsSig = nextHeroLibs.join(',');
+
+        var nextTop10Mode = String(cfg.top10SelectionMode || 'most_played').toLowerCase();
+        var nextHeroRot = cfg.heroRotationSeconds !== undefined && cfg.heroRotationSeconds !== null
+            ? Math.max(0, Math.min(120, Number(cfg.heroRotationSeconds) || 0))
+            : 9;
+        var nextHeroCount = Math.max(1, Math.min(15, Number(cfg.heroSlideCount) || 8));
+        var nextHeroSel = String(cfg.heroSelectionMode || 'recent').toLowerCase();
+        var nextHeroType = String(cfg.heroContentType || 'all').toLowerCase();
+
+        var hubSettingsChanged = prevCfg.top10SelectionMode !== nextTop10Mode
+            || prevCfg.heroRotationSeconds !== nextHeroRot
+            || prevCfg.heroSlideCount !== nextHeroCount
+            || prevCfg.heroSelectionMode !== nextHeroSel
+            || prevCfg.heroContentType !== nextHeroType
+            || prevHeroLibsSig !== nextHeroLibsSig;
+
         state.configFresh = true;
+        state.configAttempted = true;
         state.config = {
             version: cfg.version || '',
-            serverId: cfg.serverId || (state.config && state.config.serverId) || '',
+            assetVersion: cfg.assetVersion || cfg.version || VERSION,
+            serverId: cfg.serverId || (prevCfg && prevCfg.serverId) || '',
             serverName: cfg.serverName || 'StreamFlix',
             customBrandName: typeof cfg.customBrandName === 'string' ? cfg.customBrandName.trim() : '',
             enableStreamFlixUi: cfg.enableStreamFlixUi !== false,
             requireGoogleAuth: requireGoogle,
+            enableGoogleSignIn: cfg.enableGoogleSignIn !== false,
+            allowStandardJellyfinLogin: Boolean(cfg.allowStandardJellyfinLogin),
+            allowAdminFallbackLogin: cfg.allowAdminFallbackLogin !== false,
+            adminFallbackLanOnly: Boolean(cfg.adminFallbackLanOnly),
+            bypassLoginGateOnLan: bypassLan,
+            isLocalLan: isLocalLan,
+            canShowAdminFallback: cfg.canShowAdminFallback !== undefined
+                ? Boolean(cfg.canShowAdminFallback)
+                : (cfg.allowAdminFallbackLogin !== false && (!cfg.adminFallbackLanOnly || isLocalLan)),
             googleClientId: cfg.googleClientId || '',
             googleConfigured: cfg.googleConfigured !== undefined ? Boolean(cfg.googleConfigured) : Boolean(cfg.googleClientId),
             hasGoogleClientSecret: Boolean(cfg.hasGoogleClientSecret),
-            hasAccess: Boolean(cfg.hasAccess) || !requireGoogle,
+            hasAccess: resolvedAccess,
             isAdmin: Boolean(cfg.isAdmin),
             session: cfg.session || null,
+            top10SelectionMode: nextTop10Mode,
+            heroRotationSeconds: nextHeroRot,
+            heroSlideCount: nextHeroCount,
+            heroSelectionMode: nextHeroSel,
+            heroContentType: nextHeroType,
+            heroLibraryIds: nextHeroLibs,
             approvedGoogleAccounts: Array.isArray(cfg.approvedGoogleAccounts) ? cfg.approvedGoogleAccounts : [],
             serverUsers: Array.isArray(cfg.serverUsers) ? cfg.serverUsers : [],
             showcaseItems: serverShowcase,
@@ -1216,10 +1290,29 @@
         if (state.googleUser && state.googleUser.token) {
             if (!cfg.session) {
                 clearHouseholdSession();
-            } else if (cfg.session.expiresAt && cfg.session.expiresAt !== state.googleUser.expiresAt) {
-                state.googleUser.expiresAt = cfg.session.expiresAt;
-                saveJson(GOOGLE_KEY, state.googleUser);
+            } else {
+                var sessionUpdated = false;
+                if (cfg.session.expiresAt && cfg.session.expiresAt !== state.googleUser.expiresAt) {
+                    state.googleUser.expiresAt = cfg.session.expiresAt;
+                    sessionUpdated = true;
+                }
+                if (cfg.session.authKind && cfg.session.authKind !== state.googleUser.authKind) {
+                    state.googleUser.authKind = cfg.session.authKind;
+                    sessionUpdated = true;
+                }
+                if (cfg.session.username && cfg.session.username !== state.googleUser.username) {
+                    state.googleUser.username = cfg.session.username;
+                    sessionUpdated = true;
+                }
+                if (sessionUpdated) {
+                    saveJson(GOOGLE_KEY, state.googleUser);
+                }
             }
+        }
+
+        if (state.config.assetVersion) {
+            clearStaleHtmlCaches(state.config.assetVersion);
+            neutralizeConflictingBrandingCss();
         }
 
         saveJson(CACHED_CONFIG_KEY, state.config);
@@ -1229,6 +1322,18 @@
         }
         replaceToolbarLogoInPlace();
         refreshNetflixBackdropWallInPlace();
+
+        if (hubSettingsChanged && state.hubData && state.hubData.loaded) {
+            if (prevHeroLibsSig !== nextHeroLibsSig) {
+                loadCinemaHubData(true);
+            } else {
+                recomputeHubDerivedLists();
+                if (document.getElementById('streamflix-cinema-hub')) {
+                    renderCinemaHubContents();
+                    restartHeroTimer();
+                }
+            }
+        }
         return state.config;
     }
 
@@ -2175,14 +2280,183 @@
     }
 
     /* ----------------------------------------------------------------------
-       3. Screen A: Google Sign-In Gate (server-verified, signed household session)
+       3. Screen A: Sign-In Gate (Google OAuth, Standard Jellyfin Login, Hybrid Mode & Admin Sign-In)
        ---------------------------------------------------------------------- */
+    function buildPasswordLoginFormHtml(opts) {
+        opts = opts || {};
+        var endpoint = opts.endpoint || '/StreamFlix/Auth/StandardLogin';
+        var btnLabel = opts.buttonLabel || 'Sign In';
+        var userLabel = opts.usernamePlaceholder || 'Jellyfin username';
+        var pwdLabel = opts.passwordPlaceholder || 'Password';
+        var adminOnly = Boolean(opts.adminOnly);
+        return ''
+            + '<form class="streamflix-login-form" id="streamflix-password-login-form" data-endpoint="' + escapeHtml(endpoint) + '" data-admin-only="' + (adminOnly ? '1' : '0') + '" novalidate>'
+            + '  <div class="streamflix-auth-alert streamflix-auth-alert-error" id="streamflix-login-form-error" style="display:none;" role="alert" aria-live="assertive"></div>'
+            + '  <div class="streamflix-login-field">'
+            + '    <input type="text" class="streamflix-login-input" id="streamflix-login-username" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="' + escapeHtml(userLabel) + '" aria-label="' + escapeHtml(userLabel) + '" required />'
+            + '  </div>'
+            + '  <div class="streamflix-login-field streamflix-login-pwd-wrap">'
+            + '    <input type="password" class="streamflix-login-input" id="streamflix-login-password" name="password" autocomplete="current-password" placeholder="' + escapeHtml(pwdLabel) + '" aria-label="' + escapeHtml(pwdLabel) + '" />'
+            + '    <button type="button" class="streamflix-pwd-toggle" id="streamflix-pwd-toggle-btn" title="Show password" aria-label="Show password">' + icon('eye') + '</button>'
+            + '  </div>'
+            + '  <button type="submit" class="streamflix-btn-primary streamflix-btn-block streamflix-login-submit" id="streamflix-password-submit-btn">'
+            + (adminOnly ? icon('shield') : '')
+            + '    <span>' + escapeHtml(btnLabel) + '</span>'
+            + '  </button>'
+            + '</form>';
+    }
+
+    function bindPasswordLoginForm(root) {
+        var form = root && root.querySelector('#streamflix-password-login-form');
+        if (!form) {
+            return;
+        }
+        var userIn = form.querySelector('#streamflix-login-username');
+        var pwdIn = form.querySelector('#streamflix-login-password');
+        var pwdToggle = form.querySelector('#streamflix-pwd-toggle-btn');
+        var submitBtn = form.querySelector('#streamflix-password-submit-btn');
+        var errBox = form.querySelector('#streamflix-login-form-error');
+        var card = form.closest ? form.closest('.streamflix-auth-card') : null;
+        var endpoint = form.getAttribute('data-endpoint') || '/StreamFlix/Auth/StandardLogin';
+        var adminOnly = form.getAttribute('data-admin-only') === '1';
+        var busy = false;
+
+        if (pwdToggle && pwdIn) {
+            pwdToggle.addEventListener('click', function () {
+                var showing = pwdIn.type === 'text';
+                pwdIn.type = showing ? 'password' : 'text';
+                pwdToggle.innerHTML = icon(showing ? 'eye' : 'eyeOff');
+                pwdToggle.title = showing ? 'Show password' : 'Hide password';
+                pwdToggle.setAttribute('aria-label', pwdToggle.title);
+                try { pwdIn.focus(); } catch (e) {}
+            });
+        }
+
+        function showFormError(msg) {
+            if (errBox) {
+                errBox.textContent = msg || 'Sign-in failed.';
+                errBox.style.display = 'flex';
+            }
+            if (card) {
+                card.classList.remove('streamflix-shake');
+                void card.offsetWidth;
+                card.classList.add('streamflix-shake');
+            }
+        }
+
+        function clearFormError() {
+            if (errBox && errBox.style.display !== 'none') {
+                errBox.style.display = 'none';
+                errBox.textContent = '';
+            }
+        }
+
+        if (userIn) {
+            userIn.addEventListener('input', clearFormError);
+        }
+        if (pwdIn) {
+            pwdIn.addEventListener('input', clearFormError);
+        }
+
+        form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            if (busy) {
+                return;
+            }
+            var username = userIn ? userIn.value.trim() : '';
+            var password = pwdIn ? pwdIn.value : '';
+            if (!username) {
+                showFormError(adminOnly ? 'Enter a Jellyfin Administrator username.' : 'Enter your Jellyfin username.');
+                if (userIn) {
+                    try { userIn.focus(); } catch (e) {}
+                }
+                return;
+            }
+
+            busy = true;
+            clearFormError();
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('streamflix-btn-loading');
+            }
+            var dev = getJellyfinDeviceInfo();
+            apiFetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    deviceId: dev.deviceId,
+                    deviceName: dev.deviceName,
+                    clientName: dev.appName,
+                    clientVersion: dev.appVersion
+                })
+            }).then(function (res) {
+                busy = false;
+                if (!res || !res.verified || !res.sessionToken) {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('streamflix-btn-loading');
+                    }
+                    showFormError((res && res.message) || 'Sign-in could not be verified.');
+                    return;
+                }
+
+                state.adminLoginExpanded = false;
+                setHouseholdSession({
+                    token: res.sessionToken,
+                    authKind: res.authKind || (adminOnly ? 'jellyfin_admin' : 'jellyfin'),
+                    email: '',
+                    username: res.username || username,
+                    userId: res.userId || '',
+                    name: res.name || res.username || username,
+                    isAdmin: Boolean(res.isAdmin || adminOnly),
+                    picture: '',
+                    expiresAt: res.expiresAt || ''
+                });
+
+                state.activeProfile = null;
+                localStorage.removeItem(PROFILE_KEY);
+
+                if (res.jellyfinAccessToken && res.userId) {
+                    applyJellyfinServerCredentials({
+                        serverId: res.serverId || (state.config && state.config.serverId),
+                        userId: res.userId,
+                        accessToken: res.jellyfinAccessToken
+                    });
+                }
+
+                return fetchPublicConfig().then(function () {
+                    renderProfilePickerGate();
+                    showToast('Signed in as ' + (res.username || username), 'success');
+                });
+            }).catch(function (err) {
+                busy = false;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('streamflix-btn-loading');
+                }
+                var code = err && err.code;
+                showFormError((err && err.message) || 'Invalid Jellyfin username or password.');
+                if (code === 'admin_only') {
+                    if (userIn) {
+                        try { userIn.focus(); userIn.select(); } catch (e1) {}
+                    }
+                } else if (pwdIn) {
+                    pwdIn.value = '';
+                    try { pwdIn.focus(); } catch (e2) {}
+                }
+            });
+        });
+    }
+
     function renderGoogleAuthGate(statusText, errorText) {
         var cfg = state.config || DEFAULT_CONFIG;
         var busy = Boolean(state.verifyingGoogle);
         var stageHtml;
+        var viewKey = 'auth';
 
-        if (!cfg.googleConfigured && !state.configFresh && !state.configAttempted) {
+        if (!state.configFresh && !state.configAttempted && !cfg.googleConfigured && !cfg.allowStandardJellyfinLogin) {
             // Server config hasn't arrived yet: show a neutral loader instead of flashing the setup card
             setGateView('loading', '', ''
                 + '<div class="streamflix-center-stage">'
@@ -2191,64 +2465,171 @@
             return;
         }
 
-        if (!cfg.googleConfigured) {
+        var googleEnabled = cfg.enableGoogleSignIn !== false && Boolean(cfg.googleConfigured);
+        var stdEnabled = Boolean(cfg.allowStandardJellyfinLogin);
+        var canAdminFallback = Boolean(cfg.canShowAdminFallback);
+
+        if (!canAdminFallback && state.adminLoginExpanded) {
+            state.adminLoginExpanded = false;
+        }
+
+        var alertsHtml = ''
+            + (statusText
+                ? '<div class="streamflix-auth-alert"><span class="streamflix-inline-spinner"></span>' + escapeHtml(statusText) + '</div>'
+                : '')
+            + (errorText
+                ? '<div class="streamflix-auth-alert streamflix-auth-alert-error">' + escapeHtml(errorText) + '</div>'
+                : '');
+
+        if (!googleEnabled && !stdEnabled) {
+            // Setup / Owner-Only Mode: inline Netflix-themed Administrator login + quick setup guide
+            viewKey = 'setup';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
                 + '  <div class="streamflix-auth-card streamflix-auth-card-setup">'
-                + '    <div class="streamflix-auth-kicker">Almost there</div>'
-                + '    <h1>Finish setting up StreamFlix</h1>'
-                + '    <p>Google Sign-In hasn\'t been configured yet. A Jellyfin administrator needs to add a Google OAuth Client ID in <strong>Dashboard → Plugins → StreamFlix</strong>.</p>'
-                + '    <ol class="streamflix-auth-steps">'
-                + '      <li>Sign in with your Jellyfin administrator account.</li>'
-                + '      <li>Open <strong>StreamFlix</strong> plugin settings and paste your OAuth Client ID.</li>'
-                + '      <li>Add this Authorized Redirect URI in Google Cloud Console:<code class="streamflix-auth-code">' + escapeHtml(getGoogleRedirectUri()) + '</code></li>'
-                + '    </ol>'
-                + (errorText ? '<div class="streamflix-auth-alert streamflix-auth-alert-error">' + escapeHtml(errorText) + '</div>' : '')
-                + '    <button type="button" class="streamflix-btn-primary streamflix-btn-block" id="streamflix-admin-login-btn">Administrator sign-in</button>'
+                + '    <div class="streamflix-auth-kicker">Administrator Access</div>'
+                + '    <h1>Sign in to ' + escapeHtml(getBrandName()) + '</h1>'
+                + '    <p>Sign in with a Jellyfin <strong>Administrator</strong> account to open profiles or configure Google Sign-In &amp; household access in <strong>Dashboard → Plugins → StreamFlix</strong>.</p>'
+                + alertsHtml
+                + buildPasswordLoginFormHtml({
+                    endpoint: '/StreamFlix/Auth/AdminLogin',
+                    buttonLabel: 'Sign in as Administrator',
+                    usernamePlaceholder: 'Administrator username',
+                    passwordPlaceholder: 'Password',
+                    adminOnly: true
+                })
+                + '    <details class="streamflix-setup-hint">'
+                + '      <summary>Setting up Google OAuth?</summary>'
+                + '      <div class="streamflix-setup-hint-body">'
+                + '        Authorized Redirect URI for Google Cloud Console:'
+                + '        <code class="streamflix-auth-code">' + escapeHtml(getGoogleRedirectUri()) + '</code>'
+                + '      </div>'
+                + '    </details>'
+                + '  </div>'
+                + '</div>';
+        } else if (googleEnabled && !stdEnabled && state.adminLoginExpanded && canAdminFallback) {
+            // Expanded Admin Sign-In fallback view on the Google Sign-In screen
+            viewKey = 'auth-admin';
+            stageHtml = ''
+                + '<div class="streamflix-center-stage">'
+                + '  <div class="streamflix-auth-card">'
+                + '    <div class="streamflix-auth-kicker">Server Owner</div>'
+                + '    <h1>Admin Sign-In</h1>'
+                + '    <p>Sign in with a Jellyfin <strong>Administrator</strong> account. Standard non-admin accounts are strictly blocked on this fallback.</p>'
+                + alertsHtml
+                + buildPasswordLoginFormHtml({
+                    endpoint: '/StreamFlix/Auth/AdminLogin',
+                    buttonLabel: 'Sign in as Administrator',
+                    usernamePlaceholder: 'Administrator username',
+                    passwordPlaceholder: 'Password',
+                    adminOnly: true
+                })
+                + '    <div class="streamflix-auth-foot">'
+                + '      <button type="button" class="streamflix-link-btn" id="streamflix-collapse-admin-login">← Back to Google Sign-In</button>'
+                + '    </div>'
+                + '  </div>'
+                + '</div>';
+        } else if (googleEnabled && stdEnabled) {
+            // Hybrid Mode: Google Sign-In + Standard Jellyfin Account Sign-In
+            viewKey = 'auth-hybrid';
+            stageHtml = ''
+                + '<div class="streamflix-center-stage">'
+                + '  <div class="streamflix-auth-card' + (busy ? ' streamflix-busy' : '') + '">'
+                + '    <h1>Sign in</h1>'
+                + '    <p>Sign in with Google or your Jellyfin account to unlock ' + escapeHtml(getBrandName()) + ' and choose who\'s watching.</p>'
+                + alertsHtml
+                + '    <button type="button" class="streamflix-google-btn" id="streamflix-google-login-btn"' + (busy ? ' disabled' : '') + '>'
+                + GOOGLE_G_SVG
+                + '      <span>' + (busy ? 'Verifying…' : 'Continue with Google') + '</span>'
+                + '    </button>'
+                + '    <div class="streamflix-auth-divider"><span>or sign in with Jellyfin</span></div>'
+                + buildPasswordLoginFormHtml({
+                    endpoint: '/StreamFlix/Auth/StandardLogin',
+                    buttonLabel: 'Sign in with Jellyfin Account',
+                    usernamePlaceholder: 'Jellyfin username',
+                    passwordPlaceholder: 'Password',
+                    adminOnly: false
+                })
+                + '  </div>'
+                + '</div>';
+        } else if (!googleEnabled && stdEnabled) {
+            // Standard Jellyfin Login Only (Themed Netflix-style form)
+            viewKey = 'auth-standard';
+            stageHtml = ''
+                + '<div class="streamflix-center-stage">'
+                + '  <div class="streamflix-auth-card">'
+                + '    <h1>Sign in</h1>'
+                + '    <p>Sign in with your Jellyfin account to unlock ' + escapeHtml(getBrandName()) + ' on this device. You\'ll choose who\'s watching next.</p>'
+                + alertsHtml
+                + buildPasswordLoginFormHtml({
+                    endpoint: '/StreamFlix/Auth/StandardLogin',
+                    buttonLabel: 'Sign In',
+                    usernamePlaceholder: 'Jellyfin username',
+                    passwordPlaceholder: 'Password',
+                    adminOnly: false
+                })
                 + '  </div>'
                 + '</div>';
         } else {
+            // Google Sign-In Only (+ optional subtle Admin Sign-In button/link)
+            viewKey = 'auth';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
                 + '  <div class="streamflix-auth-card' + (busy ? ' streamflix-busy' : '') + '">'
                 + '    <h1>Sign in</h1>'
                 + '    <p>Use your approved Google account to unlock ' + escapeHtml(getBrandName()) + ' on this device. You\'ll choose who\'s watching next.</p>'
-                + (statusText
-                    ? '<div class="streamflix-auth-alert"><span class="streamflix-inline-spinner"></span>' + escapeHtml(statusText) + '</div>'
-                    : '')
-                + (errorText
-                    ? '<div class="streamflix-auth-alert streamflix-auth-alert-error">' + escapeHtml(errorText) + '</div>'
-                    : '')
+                + alertsHtml
                 + '    <button type="button" class="streamflix-google-btn" id="streamflix-google-login-btn"' + (busy ? ' disabled' : '') + '>'
                 + GOOGLE_G_SVG
                 + '      <span>' + (busy ? 'Verifying…' : 'Continue with Google') + '</span>'
                 + '    </button>'
+                + (canAdminFallback
+                    ? '<div class="streamflix-auth-foot">'
+                      + '  <button type="button" class="streamflix-admin-fallback-link" id="streamflix-expand-admin-login">'
+                      + icon('shield') + '<span>Admin Sign-In</span>'
+                      + '  </button>'
+                      + '</div>'
+                    : '')
                 + '  </div>'
                 + '</div>';
         }
 
-        var root = setGateView(cfg.googleConfigured ? 'auth' : 'setup', '', stageHtml);
+        var root = setGateView(viewKey, '', stageHtml);
 
         var loginBtn = root.querySelector('#streamflix-google-login-btn');
         if (loginBtn) {
             loginBtn.addEventListener('click', function () {
                 startGoogleOAuthRedirect('', '');
             });
-            if (!busy) {
-                setTimeout(function () {
-                    try { loginBtn.focus(); } catch (e) {}
-                }, 60);
-            }
         }
 
-        var adminBtn = root.querySelector('#streamflix-admin-login-btn');
-        if (adminBtn) {
-            adminBtn.addEventListener('click', function () {
-                // Setup screen only (Google not configured yet): let Jellyfin's own password login through
-                // so an administrator can finish configuring the plugin.
-                closeOverlayGate();
-                window.location.hash = '#/login';
+        var expandAdminBtn = root.querySelector('#streamflix-expand-admin-login');
+        if (expandAdminBtn) {
+            expandAdminBtn.addEventListener('click', function () {
+                state.adminLoginExpanded = true;
+                renderGoogleAuthGate();
             });
+        }
+
+        var collapseAdminBtn = root.querySelector('#streamflix-collapse-admin-login');
+        if (collapseAdminBtn) {
+            collapseAdminBtn.addEventListener('click', function () {
+                state.adminLoginExpanded = false;
+                renderGoogleAuthGate();
+            });
+        }
+
+        bindPasswordLoginForm(root);
+
+        if (!busy) {
+            setTimeout(function () {
+                var focusTarget = (viewKey === 'auth' || viewKey === 'auth-hybrid')
+                    ? (loginBtn || root.querySelector('#streamflix-login-username'))
+                    : (root.querySelector('#streamflix-login-username') || loginBtn);
+                if (focusTarget) {
+                    try { focusTarget.focus(); } catch (e) {}
+                }
+            }, 60);
         }
     }
 
@@ -2347,14 +2728,29 @@
 
     function buildAccountChipHtml() {
         var g = state.googleUser;
-        if (!g || !g.email) {
-            return '';
+        if (g && g.email) {
+            var avatar = g.picture
+                ? '<img src="' + escapeHtml(g.picture) + '" alt="" referrerpolicy="no-referrer" />'
+                : '<span class="streamflix-account-chip-initial">' + escapeHtml(g.email.charAt(0).toUpperCase()) + '</span>';
+            return '<div class="streamflix-account-chip" title="Signed in with Google">' + avatar
+                + '<span class="streamflix-account-chip-email">' + escapeHtml(g.email) + '</span></div>';
         }
-        var avatar = g.picture
-            ? '<img src="' + escapeHtml(g.picture) + '" alt="" referrerpolicy="no-referrer" />'
-            : '<span class="streamflix-account-chip-initial">' + escapeHtml(g.email.charAt(0).toUpperCase()) + '</span>';
-        return '<div class="streamflix-account-chip" title="Signed in with Google">' + avatar
-            + '<span class="streamflix-account-chip-email">' + escapeHtml(g.email) + '</span></div>';
+        if (g && g.username) {
+            var isAdm = g.authKind === 'jellyfin_admin' || Boolean(g.isAdmin);
+            var label = (isAdm ? 'Admin · ' : '') + g.username;
+            var badge = isAdm
+                ? '<span class="streamflix-account-chip-initial streamflix-chip-admin">' + icon('shield') + '</span>'
+                : '<span class="streamflix-account-chip-initial">' + escapeHtml(g.username.charAt(0).toUpperCase()) + '</span>';
+            return '<div class="streamflix-account-chip" title="' + escapeHtml(isAdm ? 'Signed in as Jellyfin Administrator' : 'Signed in with Jellyfin account') + '">'
+                + badge + '<span class="streamflix-account-chip-email">' + escapeHtml(label) + '</span></div>';
+        }
+        var cfg = state.config;
+        if (cfg && cfg.bypassLoginGateOnLan && cfg.isLocalLan && cfg.requireGoogleAuth !== false) {
+            return '<div class="streamflix-account-chip streamflix-account-chip-lan" title="Connected on local network">'
+                + '<span class="streamflix-account-chip-initial streamflix-chip-lan">' + icon('wifi') + '</span>'
+                + '<span class="streamflix-account-chip-email">Local Network</span></div>';
+        }
+        return '';
     }
 
     function renderProfilePickerGate() {
@@ -2408,8 +2804,13 @@
             + '  <div class="streamflix-profile-name">Add Profile</div>'
             + '</div>';
 
+        var hasSessionToken = Boolean(state.googleUser && state.googleUser.token);
+        var canOpenPluginSettings = Boolean(isAdmin && getActiveToken());
         var actionsHtml = buildAccountChipHtml()
-            + (state.googleUser && state.googleUser.email
+            + (canOpenPluginSettings
+                ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-open-plugin-cfg-btn" title="Open StreamFlix Plugin Settings">' + icon('gear') + '<span>Plugin Settings</span></button>'
+                : '')
+            + (hasSessionToken
                 ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-google-signout-btn">Sign out</button>'
                 : '')
             + (state.activeProfile && state.activeProfile.accessToken
@@ -2453,7 +2854,7 @@
                 activate();
             });
             tile.addEventListener('keydown', function (ev) {
-                if (ev.key === 'Enter' || ev.key === ' ') {
+                if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === tile) {
                     ev.preventDefault();
                     activate();
                 }
@@ -2553,6 +2954,15 @@
             });
         }
 
+        var cfgBtn = root.querySelector('#streamflix-open-plugin-cfg-btn');
+        if (cfgBtn) {
+            cfgBtn.addEventListener('click', function () {
+                state.manageMode = false;
+                closeOverlayGate();
+                window.location.hash = '#/configurationpage?name=StreamFlix';
+            });
+        }
+
         var resumeBtn = root.querySelector('#streamflix-resume-session-btn');
         if (resumeBtn) {
             resumeBtn.addEventListener('click', function () {
@@ -2562,11 +2972,17 @@
             });
         }
 
-        if (isTvOrDpadActive()) {
-            var initialTile = root.querySelector('.streamflix-profile-tile:not(.streamflix-tile-locked)[data-profile-id]') || root.querySelector('.streamflix-profile-tile');
+        // Auto-focus the active or first unlocked profile tile on open so Arrow keys + Enter work immediately on TV, HTPC & desktop
+        if (!document.querySelector('.streamflix-modal-backdrop')) {
+            var activePid = state.activeProfile && state.activeProfile.id;
+            var initialTile = (activePid ? root.querySelector('.streamflix-profile-tile[data-profile-id="' + activePid.replace(/"/g, '') + '"]') : null)
+                || root.querySelector('.streamflix-profile-tile:not(.streamflix-tile-locked)[data-profile-id]')
+                || root.querySelector('.streamflix-profile-tile');
             if (initialTile) {
                 setTimeout(function () {
-                    try { initialTile.focus({ preventScroll: true }); } catch (e) {}
+                    if (!document.querySelector('.streamflix-modal-backdrop') && !isEditableTarget(document.activeElement)) {
+                        try { initialTile.focus({ preventScroll: true }); } catch (e) {}
+                    }
                 }, 40);
             }
         }
@@ -2593,7 +3009,7 @@
     }
 
     function signOutHousehold() {
-        var token = state.activeProfile && state.activeProfile.accessToken;
+        var token = getActiveToken();
         if (token) {
             // Best effort: revoke this device's Jellyfin token so a shared device doesn't keep a live session
             try {
@@ -2608,14 +3024,41 @@
         state.activeProfile = null;
         state.legacyProfileToMigrate = null;
         state.manageMode = false;
+        state.adminLoginExpanded = false;
         localStorage.removeItem(PROFILE_KEY);
         localStorage.removeItem(LEGACY_PROFILE_KEY);
+        try {
+            var rawCreds = localStorage.getItem('jellyfin_credentials');
+            if (rawCreds) {
+                var creds = JSON.parse(rawCreds);
+                if (creds && Array.isArray(creds.Servers)) {
+                    for (var sIdx = 0; sIdx < creds.Servers.length; sIdx++) {
+                        delete creds.Servers[sIdx].AccessToken;
+                        delete creds.Servers[sIdx].UserId;
+                    }
+                    localStorage.setItem('jellyfin_credentials', JSON.stringify(creds));
+                }
+            }
+            if (window.ApiClient) {
+                if (typeof window.ApiClient.clearAuthenticationInfo === 'function') {
+                    window.ApiClient.clearAuthenticationInfo();
+                } else if (typeof window.ApiClient.setAuthenticationInfo === 'function') {
+                    window.ApiClient.setAuthenticationInfo(null, null);
+                }
+                if (window.ApiClient._sdk && typeof window.ApiClient._sdk.update === 'function') {
+                    window.ApiClient._sdk.update({ accessToken: '' });
+                }
+            }
+        } catch (eCreds) {}
+
+        var openAccess = isOpenWithoutLogin(state.config);
         if (state.config) {
-            state.config.hasAccess = state.config.requireGoogleAuth === false;
+            state.config.hasAccess = openAccess;
+            state.config.session = null;
             state.config.isAdmin = false;
             state.config.serverUsers = [];
             state.config.approvedGoogleAccounts = [];
-            if (!state.config.hasAccess) {
+            if (!openAccess) {
                 state.config.profiles = [];
                 clearShowcaseAndMediaCaches();
             }
@@ -2623,9 +3066,10 @@
         }
         closeAccountDropdown();
         ensureHeaderWidgets();
-        if (state.config && state.config.requireGoogleAuth !== false) {
+        if (!openAccess) {
             renderGoogleAuthGate();
         } else {
+            fetchPublicConfig().then(rerenderPickerIfOpen).catch(function () {});
             renderProfilePickerGate();
         }
         showToast('Signed out of ' + getBrandName() + ' on this device.', 'info');
@@ -3307,17 +3751,19 @@
                 }
             }
 
-            // 2. Ensure our stylesheet is present and placed at the end of <head> so it wins the CSS cascade
-            if (document.head && !document.getElementById('streamflix-live-styles-v7')) {
+            // 2. Ensure our stylesheet is present, cache-busted by assetVersion, and placed at the end of <head> so it wins the CSS cascade
+            var assetVer = (state.config && state.config.assetVersion) || VERSION;
+            var wantedLinkId = 'streamflix-live-styles-' + String(assetVer).replace(/[^a-zA-Z0-9_.-]/g, '_');
+            if (document.head && !document.getElementById(wantedLinkId)) {
                 Array.prototype.forEach.call(document.querySelectorAll('link[id^="streamflix-live-styles-"]'), function (oldLink) {
                     if (oldLink.parentNode) {
                         oldLink.parentNode.removeChild(oldLink);
                     }
                 });
                 var liveLink = document.createElement('link');
-                liveLink.id = 'streamflix-live-styles-v7';
+                liveLink.id = wantedLinkId;
                 liveLink.rel = 'stylesheet';
-                liveLink.href = '/StreamFlix/ClientStyles?v=' + encodeURIComponent(VERSION);
+                liveLink.href = '/StreamFlix/ClientStyles?v=' + encodeURIComponent(assetVer);
                 document.head.appendChild(liveLink);
             }
         } catch (e) {}
@@ -3652,6 +4098,11 @@
         var profiles = getProfiles();
         var isAdmin = isHouseholdAdmin() || Boolean(active.isAdmin);
         var googleEmail = state.googleUser && state.googleUser.email;
+        var sessionUsername = state.googleUser && state.googleUser.username;
+        var accountSubLabel = googleEmail
+            || (sessionUsername ? ((state.googleUser.authKind === 'jellyfin_admin' ? 'Admin · ' : 'Signed in as ') + sessionUsername) : '')
+            || (state.config && state.config.bypassLoginGateOnLan && state.config.isLocalLan ? ('Local Network · ' + (active.jellyfinUsername || active.name)) : '')
+            || ('Jellyfin user: ' + (active.jellyfinUsername || active.name));
 
         var otherProfiles = profiles.filter(function (p) { return p.id !== active.id; });
         var quickProfilesHtml = otherProfiles.map(function (p) {
@@ -3697,7 +4148,7 @@
             + '      <span>' + escapeHtml(active.name) + '</span>'
             + (active.isAdmin ? '<span class="streamflix-dd-admin-pill">Admin</span>' : '')
             + '    </div>'
-            + '    <div class="streamflix-dd-active-sub">' + escapeHtml(googleEmail || ('Jellyfin user: ' + (active.jellyfinUsername || active.name))) + '</div>'
+            + '    <div class="streamflix-dd-active-sub">' + escapeHtml(accountSubLabel) + '</div>'
             + '  </div>'
             + '  <button type="button" class="bfx-dd-close" id="streamflix-dd-close" title="Close" aria-label="Close menu">' + icon('chevronDown') + '</button>'
             + '</div>'
@@ -3765,9 +4216,12 @@
             window.location.hash = '#/dashboard';
         });
         bind('streamflix-dd-signout', function () {
+            var signoutMsg = isOpenWithoutLogin(state.config) && !(state.googleUser && state.googleUser.token)
+                ? 'You\'ll exit this profile and return to Who\'s Watching.'
+                : 'You\'ll need to sign in again on this device.';
             confirmDialog({
                 title: 'Sign out of ' + getBrandName() + '?',
-                message: 'You\'ll need to sign in with Google again on this device.',
+                message: signoutMsg,
                 confirmText: 'Sign Out'
             }).then(function (ok) {
                 if (ok) {
@@ -5908,6 +6362,286 @@
         }
     }
 
+    var TOP10_SESSION_SEED_KEY = 'streamflix_top10_session_seed';
+
+    function getSessionRandomSeed() {
+        if (state.sessionRandomSeed) {
+            return state.sessionRandomSeed;
+        }
+        try {
+            var existing = sessionStorage.getItem(TOP10_SESSION_SEED_KEY);
+            if (existing) {
+                state.sessionRandomSeed = existing;
+                return existing;
+            }
+            var created = String(Date.now()) + '_' + String(Math.floor(Math.random() * 1000000000));
+            sessionStorage.setItem(TOP10_SESSION_SEED_KEY, created);
+            state.sessionRandomSeed = created;
+            return created;
+        } catch (e) {
+            state.sessionRandomSeed = String(Date.now());
+            return state.sessionRandomSeed;
+        }
+    }
+
+    function hashSeedString(str) {
+        var h = 2166136261 >>> 0;
+        var s = String(str || 'streamflix');
+        for (var i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul ? Math.imul(h, 16777619) : ((h * 16777619) >>> 0);
+        }
+        return h >>> 0;
+    }
+
+    function seededShuffle(items, seedStr) {
+        var arr = (items || []).slice().sort(function (a, b) {
+            var ka = normalizeGuid(a && a.Id);
+            var kb = normalizeGuid(b && b.Id);
+            return ka < kb ? -1 : (ka > kb ? 1 : 0);
+        });
+        var a = hashSeedString(seedStr) || 1;
+        var nextRand = function () {
+            a = (a + 0x6D2B79F5) | 0;
+            var t = Math.imul ? Math.imul(a ^ (a >>> 15), 1 | a) : ((a ^ (a >>> 15)) * (1 | a));
+            t = (t + (Math.imul ? Math.imul(t ^ (t >>> 7), 61 | t) : ((t ^ (t >>> 7)) * (61 | t)))) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(nextRand() * (i + 1));
+            var tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+        }
+        return arr;
+    }
+
+    function dedupeMediaItems(list) {
+        var out = [];
+        var seen = {};
+        (list || []).forEach(function (it) {
+            if (!it || !it.Id) {
+                return;
+            }
+            var key = normalizeGuid(it.Id);
+            if (!key || seen[key]) {
+                return;
+            }
+            seen[key] = true;
+            out.push(it);
+        });
+        return out;
+    }
+
+    function hasBackdropArt(it) {
+        return Boolean(it && ((Array.isArray(it.BackdropImageTags) && it.BackdropImageTags.length > 0)
+            || (Array.isArray(it.ParentBackdropImageTags) && it.ParentBackdropImageTags.length > 0)));
+    }
+
+    function computeTop10Items(movies, series, popularScores, mode) {
+        var pool = dedupeMediaItems([].concat(movies || [], series || []));
+        if (!pool.length) {
+            return [];
+        }
+        var selMode = String(mode || (state.config && state.config.top10SelectionMode) || 'most_played').toLowerCase();
+        var scores = popularScores || {};
+
+        if (selMode === 'daily_random' || selMode === 'session_random') {
+            var now = new Date();
+            var seedBase = selMode === 'daily_random'
+                ? ('daily:' + now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate())
+                : ('session:' + getSessionRandomSeed());
+            var serverSalt = (state.config && state.config.serverId) || '';
+            var withPoster = pool.filter(function (it) {
+                return (it.ImageTags && it.ImageTags.Primary) || hasBackdropArt(it);
+            });
+            var candidatePool = withPoster.length >= 10 ? withPoster : pool;
+            return seededShuffle(candidatePool, seedBase + ':' + serverSalt).slice(0, 10);
+        }
+
+        if (selMode === 'recently_added') {
+            return pool.slice().sort(function (a, b) {
+                var da = Date.parse(a.DateCreated || '') || 0;
+                var db = Date.parse(b.DateCreated || '') || 0;
+                if (db !== da) {
+                    return db - da;
+                }
+                return (Number(b.CommunityRating) || 0) - (Number(a.CommunityRating) || 0);
+            }).slice(0, 10);
+        }
+
+        if (selMode === 'community_rating') {
+            return pool.slice().sort(function (a, b) {
+                var ra = Number(a.CommunityRating) || 0;
+                var rb = Number(b.CommunityRating) || 0;
+                if (rb !== ra) {
+                    return rb - ra;
+                }
+                var da = Date.parse(a.DateCreated || '') || 0;
+                var db = Date.parse(b.DateCreated || '') || 0;
+                return db - da;
+            }).slice(0, 10);
+        }
+
+        // Default: 'most_played' (server-wide engagement score across all Jellyfin users, falling back cleanly to user plays + rating + recency)
+        return pool.slice().sort(function (a, b) {
+            var sa = Number(scores[normalizeGuid(a.Id)]) || 0;
+            var sb = Number(scores[normalizeGuid(b.Id)]) || 0;
+            if (sb !== sa) {
+                return sb - sa;
+            }
+            var ua = ((a.UserData && Number(a.UserData.PlayCount)) || 0) * 3
+                + (a.UserData && a.UserData.Played ? 2 : 0)
+                + (a.UserData && a.UserData.IsFavorite ? 1.5 : 0);
+            var ub = ((b.UserData && Number(b.UserData.PlayCount)) || 0) * 3
+                + (b.UserData && b.UserData.Played ? 2 : 0)
+                + (b.UserData && b.UserData.IsFavorite ? 1.5 : 0);
+            if (ub !== ua) {
+                return ub - ua;
+            }
+            var ra = Number(a.CommunityRating) || 0;
+            var rb = Number(b.CommunityRating) || 0;
+            if (rb !== ra) {
+                return rb - ra;
+            }
+            return (Date.parse(b.DateCreated || '') || 0) - (Date.parse(a.DateCreated || '') || 0);
+        }).slice(0, 10);
+    }
+
+    function getTop10RowTitle() {
+        var mode = String((state.config && state.config.top10SelectionMode) || 'most_played').toLowerCase();
+        if (mode === 'community_rating') {
+            return 'Top 10 Highest Rated';
+        }
+        if (mode === 'recently_added') {
+            return 'Top 10 Recently Added';
+        }
+        if (mode === 'daily_random') {
+            return 'Top 10 Daily Spotlight';
+        }
+        if (mode === 'session_random') {
+            return 'Top 10 Spotlight Picks';
+        }
+        return 'Top 10 in ' + getBrandName() + ' Today';
+    }
+
+    function getTop10Rank(itemId) {
+        if (!itemId || !state.hubData || !state.hubData.top10RankMap) {
+            return 0;
+        }
+        return state.hubData.top10RankMap[normalizeGuid(itemId)] || 0;
+    }
+
+    function getHeroSlideLimit() {
+        var n = state.config && state.config.heroSlideCount !== undefined
+            ? Number(state.config.heroSlideCount)
+            : 8;
+        return Math.max(1, Math.min(15, n || 8));
+    }
+
+    function getHeroIntervalMs() {
+        if (state.config && state.config.heroRotationSeconds !== undefined && state.config.heroRotationSeconds !== null) {
+            var sec = Number(state.config.heroRotationSeconds);
+            if (!isNaN(sec) && sec <= 0) {
+                return 0;
+            }
+            if (!isNaN(sec)) {
+                return Math.max(3, Math.min(120, sec)) * 1000;
+            }
+        }
+        return 9000;
+    }
+
+    function computeHeroItems(d) {
+        d = d || state.hubData || {};
+        var limit = getHeroSlideLimit();
+        var cfg = state.config || {};
+        var heroLibs = Array.isArray(cfg.heroLibraryIds) ? cfg.heroLibraryIds : [];
+        var contentType = String(cfg.heroContentType || 'all').toLowerCase();
+        var selMode = String(cfg.heroSelectionMode || 'recent').toLowerCase();
+
+        var fullPool = dedupeMediaItems([].concat(d.allMovies || [], d.allSeries || []));
+        var basePool = (heroLibs.length > 0 && Array.isArray(d.filteredHeroPool) && d.filteredHeroPool.length > 0)
+            ? dedupeMediaItems(d.filteredHeroPool)
+            : fullPool;
+
+        var typeFiltered = basePool;
+        if (contentType === 'movies') {
+            typeFiltered = basePool.filter(function (it) { return it.Type === 'Movie'; });
+        } else if (contentType === 'series') {
+            typeFiltered = basePool.filter(function (it) { return it.Type === 'Series'; });
+        }
+        if (!typeFiltered.length) {
+            typeFiltered = basePool.length ? basePool : dedupeMediaItems(d.rawHeroItems || []);
+        }
+
+        var artPool = typeFiltered.filter(hasBackdropArt);
+        var candidates = artPool.length >= Math.min(limit, 3) ? artPool : typeFiltered;
+        var ordered = [];
+
+        if (selMode === 'top10') {
+            var candById = {};
+            candidates.forEach(function (it) { candById[normalizeGuid(it.Id)] = it; });
+            (d.top10Items || []).forEach(function (t) {
+                var hit = candById[normalizeGuid(t.Id)];
+                if (hit) {
+                    ordered.push(hit);
+                }
+            });
+            if (ordered.length < limit) {
+                var used = {};
+                ordered.forEach(function (it) { used[normalizeGuid(it.Id)] = true; });
+                candidates.slice().sort(smartByRating).forEach(function (it) {
+                    if (ordered.length < limit && !used[normalizeGuid(it.Id)]) {
+                        used[normalizeGuid(it.Id)] = true;
+                        ordered.push(it);
+                    }
+                });
+            }
+        } else if (selMode === 'top_rated') {
+            ordered = candidates.slice().sort(function (a, b) {
+                var diff = (Number(b.CommunityRating) || 0) - (Number(a.CommunityRating) || 0);
+                if (diff !== 0) {
+                    return diff;
+                }
+                return (Date.parse(b.DateCreated || '') || 0) - (Date.parse(a.DateCreated || '') || 0);
+            });
+        } else if (selMode === 'random') {
+            ordered = seededShuffle(candidates, 'hero:' + getSessionRandomSeed() + ':' + ((cfg && cfg.serverId) || ''));
+        } else {
+            ordered = candidates.slice().sort(function (a, b) {
+                return (Date.parse(b.DateCreated || '') || 0) - (Date.parse(a.DateCreated || '') || 0);
+            });
+        }
+
+        return ordered.slice(0, limit);
+    }
+
+    function recomputeHubDerivedLists() {
+        var d = state.hubData;
+        if (!d) {
+            return;
+        }
+        var topList = computeTop10Items(d.allMovies, d.allSeries, d.popularScores, state.config && state.config.top10SelectionMode);
+        if (!topList.length && Array.isArray(d.rawTop10Items) && d.rawTop10Items.length) {
+            topList = d.rawTop10Items.slice(0, 10);
+        }
+        d.top10Items = topList;
+        var rankMap = {};
+        topList.forEach(function (it, idx) {
+            if (it && it.Id) {
+                rankMap[normalizeGuid(it.Id)] = idx + 1;
+            }
+        });
+        d.top10RankMap = rankMap;
+
+        var computedHero = computeHeroItems(d);
+        d.heroItems = computedHero.length ? computedHero : (d.rawHeroItems || []).slice(0, getHeroSlideLimit());
+        if (state.heroIndex >= d.heroItems.length) {
+            state.heroIndex = 0;
+        }
+    }
+
     function loadCinemaHubData(silentRefresh) {
         var auth = getJellyfinAuthContext();
         if (!auth.userId || !auth.token) {
@@ -5921,21 +6655,22 @@
         // Only pass valid C# ItemFields enum names
         var fields = 'Overview,Genres,PrimaryImageAspectRatio,DateCreated';
 
-        var pHero = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=8&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
+        var pHero = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=15&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
         var pResume = fetchResumeItems(uid, fields);
         var pNextUp = apiFetch('/Shows/NextUp?userId=' + uid + '&Limit=12&Fields=' + fields).catch(function () { return { Items: [] }; });
-        var pTop10 = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=10&SortBy=CommunityRating,DateCreated&SortOrder=Descending&Fields=' + fields);
+        var pTop10 = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=15&SortBy=CommunityRating,DateCreated&SortOrder=Descending&Fields=' + fields);
         var pFavs = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series,Episode,BoxSet&Recursive=true&Filters=IsFavorite&Limit=48&Fields=' + fields);
-        var pMovies = fetchUserItems(uid, 'IncludeItemTypes=Movie&Recursive=true&Limit=100&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
-        var pSeries = fetchUserItems(uid, 'IncludeItemTypes=Series&Recursive=true&Limit=100&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields + ',ChildCount');
+        var pMovies = fetchUserItems(uid, 'IncludeItemTypes=Movie&Recursive=true&Limit=120&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
+        var pSeries = fetchUserItems(uid, 'IncludeItemTypes=Series&Recursive=true&Limit=120&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields + ',ChildCount');
         var pCollections = fetchUserItems(uid, 'IncludeItemTypes=BoxSet&Recursive=true&Limit=100&SortBy=SortName&SortOrder=Ascending&Fields=' + fields);
         var pViews = fetchUserViews(uid);
+        var pPopular = apiFetch('/StreamFlix/PopularScores').catch(function () { return { scores: {} }; });
 
-        Promise.all([pHero, pResume, pNextUp, pTop10, pFavs, pMovies, pSeries, pCollections, pViews]).then(function (results) {
-            state.hubData.heroItems = (results[0] && results[0].Items) || [];
+        Promise.all([pHero, pResume, pNextUp, pTop10, pFavs, pMovies, pSeries, pCollections, pViews, pPopular]).then(function (results) {
+            state.hubData.rawHeroItems = (results[0] && results[0].Items) || [];
             state.hubData.resumeItems = (results[1] && results[1].Items) || [];
             state.hubData.nextUpItems = (results[2] && results[2].Items) || [];
-            state.hubData.top10Items = (results[3] && results[3].Items) || [];
+            state.hubData.rawTop10Items = (results[3] && results[3].Items) || [];
             state.hubData.favoriteItems = (results[4] && results[4].Items) || [];
             state.hubData.allMovies = (results[5] && results[5].Items) || [];
             state.hubData.allSeries = (results[6] && results[6].Items) || [];
@@ -5943,8 +6678,27 @@
             state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
             state.hubData.collectionsItems = (results[7] && results[7].Items) || [];
             state.hubData.views = (results[8] && results[8].Items) || [];
+            state.hubData.popularScores = (results[9] && results[9].scores) || {};
+            state.hubData.filteredHeroPool = [];
 
             var extraPromises = [];
+
+            var heroLibs = (state.config && Array.isArray(state.config.heroLibraryIds)) ? state.config.heroLibraryIds : [];
+            if (heroLibs.length > 0) {
+                var libPromises = heroLibs.map(function (libId) {
+                    return fetchUserItems(uid, 'ParentId=' + encodeURIComponent(libId) + '&Recursive=true&IncludeItemTypes=Movie,Series&Limit=60&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields)
+                        .catch(function () { return { Items: [] }; });
+                });
+                extraPromises.push(
+                    Promise.all(libPromises).then(function (libResults) {
+                        var combinedHeroPool = [];
+                        libResults.forEach(function (lr) {
+                            combinedHeroPool = combinedHeroPool.concat((lr && lr.Items) || []);
+                        });
+                        state.hubData.filteredHeroPool = dedupeMediaItems(combinedHeroPool);
+                    })
+                );
+            }
 
             // Also query any Collections/BoxSets library view by ParentId if present
             var boxsetViews = state.hubData.views.filter(function (v) {
@@ -5996,19 +6750,13 @@
                         });
                         state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
                         state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
-                        var combined = state.hubData.recentMovies.concat(state.hubData.recentSeries);
-                        if (state.hubData.heroItems.length === 0 && combined.length > 0) {
-                            state.hubData.heroItems = combined.slice(0, 8);
-                        }
-                        if (state.hubData.top10Items.length === 0 && combined.length > 0) {
-                            state.hubData.top10Items = combined.slice(0, 10);
-                        }
                     })
                 );
             }
 
             return Promise.all(extraPromises);
         }).then(function () {
+            recomputeHubDerivedLists();
             state.hubData.loading = false;
             state.hubData.loaded = true;
             try {
@@ -6086,13 +6834,16 @@
         var isPlayed = item.UserData && item.UserData.Played;
         var genres = Array.isArray(item.Genres) ? item.Genres.slice(0, 2).join(' · ') : '';
         var rating = item.CommunityRating ? Number(item.CommunityRating).toFixed(1) : '';
+        var topRank = getTop10Rank(item && item.Id);
 
         return ''
-            + '<div class="streamflix-poster-card" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml(item.Name) + '">'
+            + '<div class="streamflix-poster-card" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml((topRank ? '#' + topRank + ' ' : '') + item.Name) + '">'
             + '  <div class="streamflix-poster-img-wrap">'
             + '    <div class="streamflix-card-fallback">' + escapeHtml(item.Name) + '</div>'
             + '    <img class="streamflix-poster-img" loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" onload="this.classList.add(\'is-loaded\')" onerror="this.classList.add(\'is-broken\')" />'
-            + (isRecentlyAdded(item) ? '<span class="streamflix-card-flag">New</span>' : '')
+            + (topRank
+                ? '<span class="streamflix-top10-rank-badge" title="Ranked #' + topRank + ' in Top 10">#' + topRank + '</span>'
+                : (isRecentlyAdded(item) ? '<span class="streamflix-card-flag">New</span>' : ''))
             + (isPlayed ? '<span class="streamflix-card-watched" title="Watched">' + icon('check') + '</span>' : '')
             + '    <div class="streamflix-card-hover-overlay">'
             + '      <div class="streamflix-card-info">'
@@ -6152,6 +6903,7 @@
             + '  <div class="streamflix-top10-poster">'
             + '    <div class="streamflix-card-fallback">' + escapeHtml(item.Name) + '</div>'
             + '    <img loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" onload="this.classList.add(\'is-loaded\')" onerror="this.classList.add(\'is-broken\')" />'
+            + '    <span class="streamflix-top10-rank-badge" aria-hidden="true">#' + rank + '</span>'
             + '    <div class="streamflix-card-hover-overlay">'
             + '      <div class="streamflix-card-info"><div class="streamflix-card-title">' + escapeHtml(item.Name) + '</div></div>'
             + buildCardQuickButtons(item, false)
@@ -6436,20 +7188,21 @@
 
     function getActiveHeroItems() {
         var d = state.hubData;
+        var limit = getHeroSlideLimit();
         var cat = state.activeCategory || 'all';
         if (cat === 'movies') {
-            return (d.recentMovies && d.recentMovies.length) ? d.recentMovies.slice(0, 8) : (d.heroItems || []);
+            return (d.recentMovies && d.recentMovies.length) ? d.recentMovies.slice(0, limit) : (d.heroItems || []).slice(0, limit);
         }
         if (cat === 'series') {
-            return (d.recentSeries && d.recentSeries.length) ? d.recentSeries.slice(0, 8) : (d.heroItems || []);
+            return (d.recentSeries && d.recentSeries.length) ? d.recentSeries.slice(0, limit) : (d.heroItems || []).slice(0, limit);
         }
         if (cat === 'collections' || cat === 'mylist' || cat === 'top10') {
             return [];
         }
         if (d.heroItems && d.heroItems.length) {
-            return d.heroItems;
+            return d.heroItems.slice(0, limit);
         }
-        return (d.recentMovies || []).concat(d.recentSeries || []).slice(0, 8);
+        return (d.recentMovies || []).concat(d.recentSeries || []).slice(0, limit);
     }
 
     function renderCinemaHubContents() {
@@ -6537,8 +7290,8 @@
             }
         } else if (cat === 'top10') {
             if (d.top10Items.length > 0) {
-                rowsHtml += buildRowHtml('top10', rowTitle('Top 10 Today'), top10Cards(), { className: 'streamflix-row-top10' });
-                rowsHtml += buildGridSectionHtml('top10-grid', rowTitle('Highest Rated'), d.top10Items);
+                rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10' });
+                rowsHtml += buildGridSectionHtml('top10-grid', rowTitle('Top 10 Lineup', d.top10Items.length), d.top10Items);
             }
         } else {
             if (d.resumeItems.length > 0) {
@@ -6556,7 +7309,7 @@
             }
             rowsHtml += becauseRow(pr.because[0], 0);
             if (d.top10Items.length > 0) {
-                rowsHtml += buildRowHtml('top10', rowTitle('Top 10 Today'), top10Cards(), { className: 'streamflix-row-top10', link: 'top10' });
+                rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10', link: 'top10' });
             }
             if (d.favoriteItems.length > 0) {
                 rowsHtml += buildRowHtml('mylist', rowTitle('My List'), d.favoriteItems.map(buildPosterCardHtml).join(''), { link: 'mylist' });
@@ -6705,6 +7458,16 @@
         bindInteractiveCardsInContainer(hub, null, null);
     }
 
+    function stepHeroSlide(delta) {
+        var slides = getActiveHeroItems();
+        if (!slides || slides.length <= 1) {
+            return;
+        }
+        state.heroIndex = (state.heroIndex + delta + slides.length * 10) % slides.length;
+        renderHeroSlide();
+        restartHeroTimer();
+    }
+
     function renderHeroSlide() {
         var hero = document.getElementById('streamflix-hero-billboard');
         var heroItems = getActiveHeroItems();
@@ -6717,11 +7480,44 @@
         hero.style.display = 'flex';
         hero.style.backgroundImage = 'none';
 
-        // Persistent layers: background stack (crossfades), content slot and dots
+        var prevFocusKey = '';
+        var curActive = document.activeElement;
+        if (curActive && hero.contains(curActive)) {
+            if (curActive.id === 'streamflix-hero-play-btn') {
+                prevFocusKey = 'play';
+            } else if (curActive.id === 'streamflix-hero-info-btn') {
+                prevFocusKey = 'info';
+            } else if (curActive.id === 'streamflix-hero-fav-btn') {
+                prevFocusKey = 'fav';
+            } else if (curActive.classList && curActive.classList.contains('prev')) {
+                prevFocusKey = 'prev';
+            } else if (curActive.classList && curActive.classList.contains('next')) {
+                prevFocusKey = 'next';
+            } else if (curActive.classList && curActive.classList.contains('streamflix-hero-dot')) {
+                prevFocusKey = 'dot';
+            }
+        }
+
+        // Persistent layers: background stack (crossfades), content slot and slide navigation
         var bgStack = hero.querySelector('.streamflix-hero-bg-stack');
         if (!bgStack) {
-            hero.innerHTML = '<div class="streamflix-hero-bg-stack" aria-hidden="true"></div><div class="streamflix-hero-content-slot"></div><div class="streamflix-hero-dots"></div>';
+            hero.innerHTML = ''
+                + '<div class="streamflix-hero-bg-stack" aria-hidden="true"></div>'
+                + '<div class="streamflix-hero-content-slot"></div>'
+                + '<div class="streamflix-hero-nav">'
+                + '  <button type="button" class="streamflix-hero-arrow prev" aria-label="Previous featured title" title="Previous featured title">' + icon('chevronLeft') + '</button>'
+                + '  <div class="streamflix-hero-dots"></div>'
+                + '  <button type="button" class="streamflix-hero-arrow next" aria-label="Next featured title" title="Next featured title">' + icon('chevronRight') + '</button>'
+                + '</div>';
             bgStack = hero.querySelector('.streamflix-hero-bg-stack');
+            var prevBtn = hero.querySelector('.streamflix-hero-arrow.prev');
+            var nextBtn = hero.querySelector('.streamflix-hero-arrow.next');
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function () { stepHeroSlide(-1); });
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function () { stepHeroSlide(1); });
+            }
             hero.addEventListener('mouseenter', function () { state.heroPaused = true; });
             hero.addEventListener('mouseleave', function () { state.heroPaused = false; });
             hero.addEventListener('focusin', function () { state.heroPaused = true; });
@@ -6752,14 +7548,16 @@
                 var dy = ev.changedTouches[0].clientY - touchStartY;
                 var slides = getActiveHeroItems();
                 if (slides.length > 1 && Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-                    state.heroIndex = (state.heroIndex + (dx < 0 ? 1 : slides.length - 1)) % slides.length;
-                    renderHeroSlide();
-                    restartHeroTimer();
+                    stepHeroSlide(dx < 0 ? 1 : -1);
                 }
             }, { passive: true });
         }
         var slot = hero.querySelector('.streamflix-hero-content-slot');
+        var navEl = hero.querySelector('.streamflix-hero-nav');
         var dotsEl = hero.querySelector('.streamflix-hero-dots');
+        if (navEl) {
+            navEl.style.display = heroItems.length > 1 ? 'flex' : 'none';
+        }
 
         var slideIdx = state.heroIndex % heroItems.length;
         var item = heroItems[slideIdx];
@@ -6810,7 +7608,9 @@
         var resumePct = hasResume && item.RunTimeTicks ? Math.min(100, Math.max(2, Math.round(item.UserData.PlaybackPositionTicks / item.RunTimeTicks * 100))) : 0;
         var logoUrl = getItemLogoUrl(item, 800);
         var kicker = item.Type === 'Series' ? 'Series' : (item.Type === 'BoxSet' ? 'Collection' : 'Film');
-        var slotSig = item.Id + ':' + (isFav ? 1 : 0) + ':' + (item.UserData ? item.UserData.PlaybackPositionTicks || 0 : 0);
+        var heroRank = getTop10Rank(item && item.Id);
+        var brandInitial = getBrandLogoText().charAt(0) || 'S';
+        var slotSig = item.Id + ':' + (isFav ? 1 : 0) + ':' + heroRank + ':' + brandInitial + ':' + (item.UserData ? item.UserData.PlaybackPositionTicks || 0 : 0);
         var slotFresh = slot.getAttribute('data-sig') !== slotSig || !slot.firstChild;
         slot.setAttribute('data-sig', slotSig);
 
@@ -6821,36 +7621,38 @@
             : '<h1 class="streamflix-hero-title">' + escapeHtml(item.Name) + '</h1>';
 
         if (slotFresh) {
-        slot.innerHTML = ''
-            + '<div class="streamflix-hero-content' + (itemChanged ? ' streamflix-hero-swap' : '') + '">'
-            + '  <div class="streamflix-hero-brand-row">'
-            + '    <span class="streamflix-n-badge">S</span>'
-            + '    <span class="streamflix-hero-series-tag">' + escapeHtml(kicker) + '</span>'
-            + (isRecentlyAdded(item) ? '<span class="streamflix-hero-new">Recently added</span>' : '')
-            + '  </div>'
-            + titleHtml
-            + '  <div class="streamflix-hero-meta-row">'
-            + (community ? '<span class="streamflix-hero-rating">' + icon('star') + escapeHtml(community) + '</span>' : '')
-            + (year ? '<span>' + escapeHtml(year) + '</span>' : '')
-            + (rating ? '<span class="streamflix-maturity-pill">' + escapeHtml(rating) + '</span>' : '')
-            + (runtime ? '<span>' + escapeHtml(runtime.trim()) + '</span>' : '')
-            + (genres.length ? '<span class="streamflix-hero-genres">' + genres.map(escapeHtml).join('<i></i>') + '</span>' : '')
-            + '  </div>'
-            + (item.Overview ? '<p class="streamflix-hero-overview">' + escapeHtml(item.Overview) + '</p>' : '')
-            + (resumePct
-                ? '<div class="streamflix-hero-progress"><div class="streamflix-hero-progress-bar"><span style="width:' + resumePct + '%;"></span></div><span>' + escapeHtml(formatTimeLeft(item)) + '</span></div>'
-                : '')
-            + '  <div class="streamflix-hero-actions">'
-            + '    <button type="button" class="streamflix-hero-play" id="streamflix-hero-play-btn">' + iconLabel('play', hasResume ? 'Resume' : 'Play') + '</button>'
-            + '    <button type="button" class="streamflix-hero-secondary" id="streamflix-hero-info-btn">' + iconLabel('info', 'More Info') + '</button>'
-            + '    <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-hero-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="' + (isFav ? 'Remove from My List' : 'Add to My List') + '">' + icon(isFav ? 'check' : 'plus') + '</button>'
-            + '  </div>'
-            + '</div>';
+            slot.innerHTML = ''
+                + '<div class="streamflix-hero-content' + (itemChanged ? ' streamflix-hero-swap' : '') + '">'
+                + '  <div class="streamflix-hero-brand-row">'
+                + '    <span class="streamflix-n-badge">' + escapeHtml(brandInitial) + '</span>'
+                + '    <span class="streamflix-hero-series-tag">' + escapeHtml(kicker) + '</span>'
+                + (heroRank
+                    ? '<span class="streamflix-hero-top10-pill"><b>TOP 10</b><span>#' + heroRank + ' Today</span></span>'
+                    : (isRecentlyAdded(item) ? '<span class="streamflix-hero-new">Recently added</span>' : ''))
+                + '  </div>'
+                + titleHtml
+                + '  <div class="streamflix-hero-meta-row">'
+                + (community ? '<span class="streamflix-hero-rating">' + icon('star') + escapeHtml(community) + '</span>' : '')
+                + (year ? '<span>' + escapeHtml(year) + '</span>' : '')
+                + (rating ? '<span class="streamflix-maturity-pill">' + escapeHtml(rating) + '</span>' : '')
+                + (runtime ? '<span>' + escapeHtml(runtime.trim()) + '</span>' : '')
+                + (genres.length ? '<span class="streamflix-hero-genres">' + genres.map(escapeHtml).join('<i></i>') + '</span>' : '')
+                + '  </div>'
+                + (item.Overview ? '<p class="streamflix-hero-overview">' + escapeHtml(item.Overview) + '</p>' : '')
+                + (resumePct
+                    ? '<div class="streamflix-hero-progress"><div class="streamflix-hero-progress-bar"><span style="width:' + resumePct + '%;"></span></div><span>' + escapeHtml(formatTimeLeft(item)) + '</span></div>'
+                    : '')
+                + '  <div class="streamflix-hero-actions">'
+                + '    <button type="button" class="streamflix-hero-play" id="streamflix-hero-play-btn">' + iconLabel('play', hasResume ? 'Resume' : 'Play') + '</button>'
+                + '    <button type="button" class="streamflix-hero-secondary" id="streamflix-hero-info-btn">' + iconLabel('info', 'More Info') + '</button>'
+                + '    <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-hero-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="' + (isFav ? 'Remove from My List' : 'Add to My List') + '">' + icon(isFav ? 'check' : 'plus') + '</button>'
+                + '  </div>'
+                + '</div>';
         }
 
         dotsEl.innerHTML = heroItems.length > 1
             ? heroItems.map(function (_, idx) {
-                return '<button type="button" class="streamflix-hero-dot' + (idx === slideIdx ? ' active' : '') + (idx < slideIdx ? ' done' : '') + '" data-slide-idx="' + idx + '" aria-label="Show title ' + (idx + 1) + '"><span class="streamflix-hero-dot-fill"></span></button>';
+                return '<button type="button" class="streamflix-hero-dot' + (idx === slideIdx ? ' active' : '') + (idx < slideIdx ? ' done' : '') + '" data-slide-idx="' + idx + '" aria-label="Show title ' + (idx + 1) + ' of ' + heroItems.length + '"><span class="streamflix-hero-dot-fill"></span></button>';
             }).join('')
             : '';
 
@@ -6874,46 +7676,81 @@
                 restartHeroTimer();
             });
         });
+
+        if (prevFocusKey) {
+            var focusTarget = null;
+            if (prevFocusKey === 'play') {
+                focusTarget = document.getElementById('streamflix-hero-play-btn');
+            } else if (prevFocusKey === 'info') {
+                focusTarget = document.getElementById('streamflix-hero-info-btn');
+            } else if (prevFocusKey === 'fav') {
+                focusTarget = document.getElementById('streamflix-hero-fav-btn');
+            } else if (prevFocusKey === 'prev') {
+                focusTarget = hero.querySelector('.streamflix-hero-arrow.prev');
+            } else if (prevFocusKey === 'next') {
+                focusTarget = hero.querySelector('.streamflix-hero-arrow.next');
+            } else if (prevFocusKey === 'dot') {
+                focusTarget = dotsEl.querySelector('.streamflix-hero-dot.active') || dotsEl.querySelector('.streamflix-hero-dot');
+            }
+            if (focusTarget && document.activeElement !== focusTarget) {
+                try { focusTarget.focus({ preventScroll: true }); } catch (eFoc) { try { focusTarget.focus(); } catch (e2) {} }
+            }
+        }
         paintHeroProgress();
     }
 
-    var HERO_INTERVAL_MS = 9000;
     var HERO_TICK_MS = 200;
 
     function paintHeroProgress() {
         var fill = document.querySelector('#streamflix-hero-billboard .streamflix-hero-dot.active .streamflix-hero-dot-fill');
         if (fill) {
-            var frac = (state.heroElapsed || 0) / HERO_INTERVAL_MS;
+            var intervalMs = getHeroIntervalMs();
+            if (intervalMs <= 0) {
+                fill.style.transform = 'scaleX(1)';
+                return;
+            }
+            var frac = (state.heroElapsed || 0) / intervalMs;
             fill.style.transform = 'scaleX(' + Math.min(1, Math.max(0, frac)).toFixed(3) + ')';
         }
     }
 
-    // Story-style hero timer: pauses on hover/focus, hidden tabs, open modals and search; indicators fill in sync.
+    // Story-style hero timer: pauses on hover/focus, hidden tabs, open modals and search; honors admin rotation interval (0 = off).
     function restartHeroTimer() {
         if (state.heroTimer) {
             clearInterval(state.heroTimer);
             state.heroTimer = null;
         }
         state.heroElapsed = 0;
+        var heroRoot = document.getElementById('streamflix-hero-billboard');
+        var intervalMs = getHeroIntervalMs();
+        if (heroRoot) {
+            heroRoot.classList.toggle('is-static-rotation', intervalMs <= 0);
+        }
         paintHeroProgress();
-        if (prefersReducedMotion()) {
+        if (intervalMs <= 0 || prefersReducedMotion()) {
             return;
         }
         state.heroTimer = setInterval(function () {
             var heroEl = document.getElementById('streamflix-hero-billboard');
             var curHero = getActiveHeroItems();
-            if (!heroEl) {
+            var curInterval = getHeroIntervalMs();
+            if (!heroEl || curInterval <= 0) {
                 clearInterval(state.heroTimer);
                 state.heroTimer = null;
+                if (heroEl && curInterval <= 0) {
+                    heroEl.classList.add('is-static-rotation');
+                    paintHeroProgress();
+                }
                 return;
             }
+            heroEl.classList.remove('is-static-rotation');
             var paused = heroHardPaused() || state.heroPaused || curHero.length <= 1;
             heroEl.classList.toggle('is-paused', Boolean(paused));
             if (paused) {
                 return;
             }
             state.heroElapsed = (state.heroElapsed || 0) + HERO_TICK_MS;
-            if (state.heroElapsed >= HERO_INTERVAL_MS) {
+            if (state.heroElapsed >= curInterval) {
                 state.heroElapsed = 0;
                 state.heroIndex = (state.heroIndex + 1) % curHero.length;
                 renderHeroSlide();
@@ -8377,6 +9214,7 @@
             applyConfigFromServerResponse(cfg);
             return state.config;
         }).catch(function () {
+            state.configAttempted = true;
             if (!state.config) {
                 state.config = DEFAULT_CONFIG;
             }
@@ -8451,23 +9289,21 @@
         ensureHeaderWidgets();
 
         if (isAdminConfigRoute()) {
+            if (isGateOpen() && hasHouseholdAccess() && getActiveToken()) {
+                closeOverlayGate();
+            }
             return;
         }
 
         var onJellyfinLoginPage = isOnJellyfinLoginPage();
 
         if (!hasHouseholdAccess()) {
-            // Jellyfin's own password login is only reachable while Google Sign-In is not configured yet (first-time setup).
-            // Once Google is configured there is no way around the Google gate from the sign-in screen.
-            if (onJellyfinLoginPage && !state.config.googleConfigured) {
-                if (isGateOpen()) {
-                    closeOverlayGate();
-                }
-                return;
-            }
             var stage = document.getElementById('streamflix-stage');
-            var view = stage && stage.getAttribute('data-view');
-            if (!isGateOpen() || (view !== 'auth' && view !== 'setup')) {
+            var view = stage ? String(stage.getAttribute('data-view') || '') : '';
+            var validAuthView = !state.configAttempted
+                ? (view === 'loading')
+                : (view.indexOf('auth') === 0 || view === 'setup');
+            if (!isGateOpen() || !validAuthView) {
                 renderGoogleAuthGate();
             }
             return;
@@ -8714,6 +9550,41 @@
                 }
                 return;
             }
+            if (isGateOpen() && !document.querySelector('.streamflix-modal-backdrop:not(.streamflix-modal-leave)')) {
+                var gateStage = document.getElementById('streamflix-stage');
+                var gateView = gateStage ? String(gateStage.getAttribute('data-view') || '') : '';
+                if (isRemoteBackEvent(ev)) {
+                    if (gateView === 'auth-admin' && state.adminLoginExpanded) {
+                        ev.preventDefault();
+                        state.adminLoginExpanded = false;
+                        renderGoogleAuthGate();
+                        return;
+                    }
+                    if (gateView === 'picker-manage' && state.manageMode) {
+                        ev.preventDefault();
+                        state.manageMode = false;
+                        renderProfilePickerGate();
+                        return;
+                    }
+                    if (gateView === 'picker' && state.activeProfile && state.activeProfile.id && state.activeProfile.accessToken && !isOnJellyfinLoginPage()) {
+                        ev.preventDefault();
+                        closeOverlayGate();
+                        scheduleLifecycleTick(0);
+                        return;
+                    }
+                }
+                if (gateView === 'picker' && !state.manageMode && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !isEditableTarget(ev.target)) {
+                    if (/^[1-9]$/.test(ev.key || '')) {
+                        var quickIdx = parseInt(ev.key, 10) - 1;
+                        var quickList = getProfiles();
+                        if (quickList[quickIdx]) {
+                            ev.preventDefault();
+                            handleSelectProfile(quickList[quickIdx]);
+                            return;
+                        }
+                    }
+                }
+            }
             if (handleDpadArrowKey(ev)) {
                 return;
             }
@@ -8845,10 +9716,12 @@
         if (el.classList.contains('streamflix-paddle') || el.classList.contains('bfx-osd-hide')) {
             return false;
         }
-        // Keep 1-press-per-card navigation: skip nested quick-action micro-buttons inside cards
+        // Keep 1-press-per-card navigation: skip nested quick-action micro-buttons inside cards (except reorder/edit buttons in Manage Profiles mode)
         var parentCard = el.closest ? el.closest('.streamflix-poster-card, .streamflix-wide-card, .streamflix-top10-card, .streamflix-profile-tile') : null;
         if (parentCard && parentCard !== el) {
-            return false;
+            if (!(state.manageMode && parentCard.classList.contains('streamflix-profile-tile') && el.classList.contains('streamflix-reorder-btn'))) {
+                return false;
+            }
         }
         var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
         if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) {
@@ -9054,6 +9927,8 @@
             if (scope.kind === 'gate') {
                 initial = scope.roots[0].querySelector('.streamflix-profile-tile:not(.streamflix-tile-locked)[data-profile-id]')
                     || scope.roots[0].querySelector('#streamflix-google-login-btn')
+                    || scope.roots[0].querySelector('#streamflix-login-username')
+                    || scope.roots[0].querySelector('#streamflix-password-submit-btn')
                     || scope.roots[0].querySelector('.streamflix-profile-tile');
             } else if (scope.kind === 'modal') {
                 initial = scope.roots[0].querySelector('#streamflix-modal-play-btn')
@@ -9078,6 +9953,49 @@
                 return true;
             }
             return false;
+        }
+
+        // Deterministic D-pad / Arrow-key navigation inside the Hero Billboard across 1080p & 4K TVs
+        var heroBillboard = scope.kind === 'hub' ? document.getElementById('streamflix-hero-billboard') : null;
+        if (heroBillboard && heroBillboard.contains(active) && heroBillboard.offsetParent !== null) {
+            var heroControls = [
+                document.getElementById('streamflix-hero-play-btn'),
+                document.getElementById('streamflix-hero-info-btn'),
+                document.getElementById('streamflix-hero-fav-btn'),
+                heroBillboard.querySelector('.streamflix-hero-arrow.prev'),
+                heroBillboard.querySelector('.streamflix-hero-dot.active') || heroBillboard.querySelector('.streamflix-hero-dot'),
+                heroBillboard.querySelector('.streamflix-hero-arrow.next')
+            ].filter(isFocusableVisible);
+            var hIdx = heroControls.indexOf(active);
+            if (active.classList && active.classList.contains('streamflix-hero-dot') && hIdx === -1) {
+                hIdx = heroControls.indexOf(heroBillboard.querySelector('.streamflix-hero-dot.active'));
+            }
+            if (dir === 'left' || dir === 'right') {
+                ev.preventDefault();
+                var nextHeroIdx = dir === 'right' ? hIdx + 1 : hIdx - 1;
+                if (hIdx !== -1 && heroControls[nextHeroIdx]) {
+                    focusSpatialTarget(heroControls[nextHeroIdx]);
+                }
+                return true;
+            }
+            if (dir === 'down') {
+                var firstRowCard = document.querySelector('#streamflix-cinema-hub .streamflix-row [data-item-id]');
+                if (firstRowCard && isFocusableVisible(firstRowCard)) {
+                    ev.preventDefault();
+                    focusSpatialTarget(firstRowCard);
+                    return true;
+                }
+            }
+            if (dir === 'up') {
+                var subPill = document.querySelector('#streamflix-cinema-hub .streamflix-pill.active, #streamflix-cinema-hub .streamflix-pill');
+                var profBtn = document.getElementById('streamflix-header-profile-btn');
+                var upHeroTarget = (subPill && isFocusableVisible(subPill)) ? subPill : profBtn;
+                if (upHeroTarget && isFocusableVisible(upHeroTarget)) {
+                    ev.preventDefault();
+                    focusSpatialTarget(upHeroTarget);
+                    return true;
+                }
+            }
         }
 
         // Row-aware fast-path for horizontal card carousels on Home / Movies / Shows / Collections
@@ -9155,18 +10073,25 @@
         return false;
     }
 
-    function clearStaleHtmlCaches() {
+    function clearStaleHtmlCaches(targetVersion) {
         try {
-            if (window.caches && typeof window.caches.keys === 'function') {
-                window.caches.keys().then(function (names) {
-                    names.forEach(function (n) { window.caches.delete(n); });
-                }).catch(function () {});
+            var verKey = 'streamflix_asset_ver';
+            var desiredVer = String(targetVersion || (state.config && state.config.assetVersion) || VERSION);
+            var prevVer = localStorage.getItem(verKey) || '';
+            var versionChanged = prevVer !== desiredVer;
+            if (versionChanged) {
+                localStorage.setItem(verKey, desiredVer);
+                if (window.caches && typeof window.caches.keys === 'function') {
+                    window.caches.keys().then(function (names) {
+                        names.forEach(function (n) { window.caches.delete(n); });
+                    }).catch(function () {});
+                }
             }
             if (navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === 'function') {
                 var swCleaned = localStorage.getItem('streamflix_sw_cleaned_v7');
                 navigator.serviceWorker.getRegistrations().then(function (regs) {
                     regs.forEach(function (reg) {
-                        if (!swCleaned && typeof reg.unregister === 'function') {
+                        if ((!swCleaned || versionChanged) && typeof reg.unregister === 'function') {
                             reg.unregister();
                         } else if (typeof reg.update === 'function') {
                             reg.update();

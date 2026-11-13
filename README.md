@@ -4,7 +4,7 @@
 
 **A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
 
-[![Version](https://img.shields.io/badge/version-0.5.5-E50914?style=flat-square)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.6-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=flat-square)](Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
@@ -43,21 +43,21 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 
 ## Highlights
 
-### Household Google Sign-In & Security
-- **Sign in once per device.** Google ID tokens are verified on the Jellyfin server, which issues an HMAC-signed, revocable household session (30 days by default).
-- **Strict allowlist.** Only Google accounts on your **Approved Google Accounts** list (or accounts locked to a profile) can unlock StreamFlix. No library artwork or metadata is exposed before signing in.
-- **Profile-level locks.** Protect any profile with a **4–8 digit PIN** (server-checked with brute-force lockout) and/or lock it to a **specific Google email**.
+### Flexible Household Sign-In & Security
+- **Google OAuth, Standard Login, or Hybrid Mode.** Require server-verified Google Sign-In (with one-click **Test OAuth Config** validation), enable a Netflix-themed **Standard Jellyfin Account** sign-in form alongside or instead of Google, or bypass the login gate automatically on trusted **Local LAN** connections.
+- **Strict Admin Sign-In fallback.** Optional **Admin Sign-In** link on the Google gate strictly enforces `IsAdministrator` on the backend (rejecting non-admin Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
+- **Profile-level locks & persistent config.** Protect any profile with a **4–8 digit PIN** and/or lock it to a **specific Google email**. Plugin configuration is automatically mirrored to persistent Jellyfin data storage so updates never reset your profiles or OAuth settings.
 - **Admin-only user linking.** Only Jellyfin administrators can view server accounts, edit admin-linked profiles, or change which Jellyfin user backs a profile.
 
 ### Real Multi-User Profiles
 - **Separate history for everyone.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, and parental controls** completely independent.
-- **Customizable avatars & accents.** Choose from 64 categorized icons and 14 accent colors (with one-click Shuffle); the active profile's color themes the interface.
+- **Customizable branding, avatars & accents.** Customize the upper-left corner brand wordmark, choose from 64 categorized icons and 14 accent colors (with one-click Shuffle), and reorder profiles freely.
 - **Quick Connect & Cast built in.** Pair Smart TVs and other Jellyfin apps straight from the profile menu via **Quick Connect** — signing that device in as the active profile's Jellyfin user — or launch **Cast** in one click.
 
-### Cinematic Home & Smart Collections
-- **Living billboard & frosted navigation.** Edge-to-edge hero with title logos, ratings, ambient artwork color, and a header that transitions to frosted glass on scroll (`Home`, `Shows`, `Movies`, `Top 10`, `My List`, and `/` to search).
-- **Rich hover previews.** Hover over any title for quick Play/Resume, My List, Watched, runtime/progress, and one-click **Remove from Continue Watching (`×`)** with a 5-second Undo toast.
-- **Personalized & automatic rows.** Builds *Top Picks for You*, *Because You Watched…*, and *Watch It Again* per profile alongside curated rows like *Critically Acclaimed*, *Hidden Gems*, *Under 90 Minutes*, *Family Night*, *Binge-Worthy Series*, and decade picks.
+### Cinematic Home, Top 10 & Configurable Billboard
+- **Configurable Hero Billboard & frosted navigation.** Edge-to-edge hero with configurable slide count, auto-rotation interval (`0` to pause), content type, and library source filtering, paired with a header that transitions to frosted glass on scroll (`Home`, `Shows`, `Movies`, `Top 10`, `My List`, and `/` to search).
+- **Dynamic Top 10 with `#1`–`#10` badges.** Choose server-wide most played, highest community rating, recently added, daily spotlight, or per-session randomized picks — complete with bold Netflix-style `#1`–`#10` rank badges.
+- **Rich hover previews & personalized rows.** Hover over any title for quick Play/Resume, My List, Watched, runtime/progress, and one-click **Remove from Continue Watching (`×`)** with Undo, alongside *Top Picks*, *Because You Watched…*, and smart genre/decade collections.
 
 ### Netflix-Style Video Player
 - **Streamlined controls.** Slim red scrubber, centered title, 10s/30s skip buttons, play/pause pulse feedback, and a *"You're watching"* pause screen.
@@ -105,7 +105,7 @@ The plugin repository manifest includes builds for all supported Jellyfin releas
 > If you link a profile to your Jellyfin administrator account, protect it with a **PIN** or **Google account lock** so other household members cannot switch into it.
 
 > [!NOTE]
-> Once a Google Client ID is saved, the login screen exclusively uses Google Sign-In (standard password login is only shown during initial setup). If you ever lock yourself out, stop Jellyfin, remove the StreamFlix plugin folder from your server's `plugins` directory, and restart.
+> Don't use Google OAuth or running a local-only server? Enable **Standard Jellyfin Login** (or **Bypass Login Gate on Local Network**) in **Dashboard → Plugins → StreamFlix** to go straight to the Netflix-style UI and *"Who's watching?"* profile picker without Google Sign-In. Server owners can also keep the **Admin Sign-In** button enabled on the Google gate as a direct administrator fallback.
 
 ---
 

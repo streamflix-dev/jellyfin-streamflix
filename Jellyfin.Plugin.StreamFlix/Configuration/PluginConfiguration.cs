@@ -54,6 +54,11 @@ public class PluginConfiguration : BasePluginConfiguration
         EnableStreamFlixUi = true;
         CustomBrandName = string.Empty;
         RequireGoogleAuth = true;
+        EnableGoogleSignIn = true;
+        AllowStandardJellyfinLogin = false;
+        AllowAdminFallbackLogin = true;
+        AdminFallbackLanOnly = false;
+        BypassLoginGateOnLan = false;
         AutoProvisionJellyfinUsers = true;
         ProfilesSeeded = false;
         GoogleClientId = string.Empty;
@@ -64,6 +69,12 @@ public class PluginConfiguration : BasePluginConfiguration
         SessionSigningKey = string.Empty;
         SessionVersion = 1;
         SessionLifetimeDays = 30;
+        Top10SelectionMode = "most_played";
+        HeroRotationSeconds = 9;
+        HeroSlideCount = 8;
+        HeroSelectionMode = "recent";
+        HeroContentType = "all";
+        HeroLibraryIds = new List<string>();
         MigratedV7 = false;
     }
 
@@ -75,7 +86,38 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string CustomBrandName { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the household sign-in gate is required before "Who's watching?".
+    /// </summary>
     public bool RequireGoogleAuth { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether "Continue with Google" is shown on the sign-in screen when configured.
+    /// </summary>
+    public bool EnableGoogleSignIn { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether standard Jellyfin username/password login is allowed to unlock
+    /// the "Who's watching?" screen (either alongside Google Sign-In in Hybrid Mode or instead of Google Sign-In).
+    /// </summary>
+    public bool AllowStandardJellyfinLogin { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether an optional "Admin Sign-In" link is shown on the Google Sign-In screen
+    /// allowing Jellyfin Administrator accounts to authenticate directly with their Jellyfin password.
+    /// </summary>
+    public bool AllowAdminFallbackLogin { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the "Admin Sign-In" fallback is restricted to local LAN IP addresses.
+    /// </summary>
+    public bool AdminFallbackLanOnly { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether clients connecting from local LAN IP addresses bypass the login gate
+    /// and jump straight to the "Who's watching?" profile picker.
+    /// </summary>
+    public bool BypassLoginGateOnLan { get; set; }
 
     public bool AutoProvisionJellyfinUsers { get; set; }
 
@@ -92,7 +134,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public List<string> DeletedProfileIds { get; set; }
 
     /// <summary>
-    /// Gets or sets the server-only HMAC key used to sign StreamFlix household sessions issued after Google sign-in.
+    /// Gets or sets the server-only HMAC key used to sign StreamFlix household sessions.
     /// Generated automatically on first use. Never sent to browsers.
     /// </summary>
     public string SessionSigningKey { get; set; }
@@ -103,9 +145,41 @@ public class PluginConfiguration : BasePluginConfiguration
     public int SessionVersion { get; set; }
 
     /// <summary>
-    /// Gets or sets how many days a Google sign-in stays valid on a device before the user must sign in again.
+    /// Gets or sets how many days a household sign-in stays valid on a device before the user must sign in again.
     /// </summary>
     public int SessionLifetimeDays { get; set; }
+
+    /// <summary>
+    /// Gets or sets how the "Top 10" row selects and ranks items:
+    /// <c>most_played</c>, <c>community_rating</c>, <c>recently_added</c>, <c>daily_random</c>, or <c>session_random</c>.
+    /// </summary>
+    public string Top10SelectionMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets the hero billboard auto-rotation interval in seconds (<c>0</c> disables auto-rotation).
+    /// </summary>
+    public int HeroRotationSeconds { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum number of featured slides shown in the hero billboard (1–15).
+    /// </summary>
+    public int HeroSlideCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets how hero billboard featured titles are chosen:
+    /// <c>recent</c>, <c>random</c>, <c>top_rated</c>, or <c>top10</c>.
+    /// </summary>
+    public string HeroSelectionMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets which media types appear in the Home hero billboard: <c>all</c>, <c>movies</c>, or <c>series</c>.
+    /// </summary>
+    public string HeroContentType { get; set; }
+
+    /// <summary>
+    /// Gets or sets optional Jellyfin Library/View IDs allowed in the hero billboard. Empty means all libraries.
+    /// </summary>
+    public List<string> HeroLibraryIds { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the one-time v7 configuration migration has run.

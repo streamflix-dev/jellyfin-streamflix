@@ -42,6 +42,15 @@ public class StreamFlixStartupTask : IScheduledTask
     private static readonly Lazy<PropertyInfo?> UsersProperty = new(() =>
         typeof(IUserManager).GetProperty("Users", BindingFlags.Public | BindingFlags.Instance));
 
+    // Compatibility shim for IUserManager.AuthenticateUser:
+    // Jellyfin 10.11 / 12.x -> AuthenticateUser(string username, string password, string remoteEndPoint, bool isUserSession)
+    // Jellyfin 10.9 / 10.10 -> AuthenticateUser(string username, string password, string passwordSha1, string remoteEndPoint, bool isUserSession)
+    private static readonly Lazy<MethodInfo?> AuthUser4Method = new(() =>
+        typeof(IUserManager).GetMethod("AuthenticateUser", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(string), typeof(string), typeof(bool) }, null));
+
+    private static readonly Lazy<MethodInfo?> AuthUser5Method = new(() =>
+        typeof(IUserManager).GetMethod("AuthenticateUser", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(bool) }, null));
+
     private static readonly object ExtSetPermLock = new();
     private static MethodInfo? _cachedExtSetPermMethod;
     private static bool _extSetPermSearched;
@@ -107,6 +116,79 @@ public class StreamFlixStartupTask : IScheduledTask
         }
 
         return Array.Empty<JUser>();
+    }
+
+    /// <summary>
+    /// Verifies a Jellyfin username and password across Jellyfin 10.9/10.10 (5-arg overload) and Jellyfin 10.11/12.x
+    /// (4-arg overload) without minting a session token, returning null on invalid credentials or disabled accounts.
+    /// </summary>
+    public static async Task<JUser?> AuthenticateUserCompatAsync(
+        IUserManager userManager,
+        string username,
+        string password,
+        string remoteEndPoint,
+        ILogger? logger = null)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        try
+        {
+            var cleanUser = username.Trim();
+            var pwd = password ?? string.Empty;
+            var ep = string.IsNullOrWhiteSpace(remoteEndPoint) ? "127.0.0.1" : remoteEndPoint;
+
+            Task? invokeTask = null;
+            var m4 = AuthUser4Method.Value
+                ?? userManager.GetType().GetMethod("AuthenticateUser", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(string), typeof(string), typeof(bool) }, null);
+            if (m4 != null)
+            {
+                invokeTask = m4.Invoke(userManager, new object[] { cleanUser, pwd, ep, true }) as Task;
+            }
+            else
+            {
+                var m5 = AuthUser5Method.Value
+                    ?? userManager.GetType().GetMethod("AuthenticateUser", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(bool) }, null);
+                if (m5 != null)
+                {
+                    var sha1Hex = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(pwd))).ToLowerInvariant();
+                    invokeTask = m5.Invoke(userManager, new object[] { cleanUser, pwd, sha1Hex, ep, true }) as Task;
+                }
+            }
+
+            if (invokeTask == null)
+            {
+                return null;
+            }
+
+            await invokeTask.ConfigureAwait(false);
+            var resultProp = invokeTask.GetType().GetProperty("Result", BindingFlags.Public | BindingFlags.Instance);
+            var user = resultProp?.GetValue(invokeTask) as JUser;
+            if (user == null)
+            {
+                return null;
+            }
+
+            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (HasUserPermissionCompat(user, permsProp, "IsDisabled"))
+            {
+                return null;
+            }
+
+            return user;
+        }
+        catch (TargetInvocationException tie)
+        {
+            logger?.LogDebug(tie.InnerException ?? tie, "StreamFlix: Jellyfin credential verification failed for '{Username}'.", username);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "StreamFlix: Jellyfin credential verification failed for '{Username}'.", username);
+            return null;
+        }
     }
 
     /// <summary>

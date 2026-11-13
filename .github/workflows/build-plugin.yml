@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.5.5.0"
+  PLUGIN_VERSION: "0.5.6.0"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
-  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks."
-  PLUGIN_CHANGELOG: "- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels"
+  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), optional themed Standard/Hybrid Jellyfin login & strict Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users."
+  PLUGIN_CHANGELOG: "- Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass\n- Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting\n- Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix"
 
 jobs:
   build-and-publish:

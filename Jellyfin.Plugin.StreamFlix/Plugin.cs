@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Xml.Linq;
 using Jellyfin.Plugin.StreamFlix.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
@@ -16,8 +19,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.StreamFlix;
 
 /// <summary>
-/// StreamFlix Plugin for Jellyfin — transforms Jellyfin Web into a Netflix UI with Google OAuth 2.0
-/// allowlist authentication and real Jellyfin Server User profiles with independent watch history.
+/// StreamFlix Plugin for Jellyfin — transforms Jellyfin Web into a Netflix UI with flexible authentication
+/// (Google OAuth 2.0, Standard Jellyfin Login, Admin Fallback, LAN Bypass) and real Jellyfin Server User profiles.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
@@ -25,6 +28,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public const string EndComment = "<!-- END StreamFlix Plugin -->";
 
     private static readonly object DiskIndexLock = new();
+    private static readonly object ConfigPersistLock = new();
+    private static readonly JsonSerializerOptions BackupJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+    };
+
     private static long _lastInjectTicks;
 
     private readonly IApplicationPaths _appPaths;
@@ -40,6 +50,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         _appPaths = applicationPaths;
         _logger = logger;
 
+        // Snapshot any pre-existing XML before BasePlugin lazy-loads Configuration (BasePlugin overwrites XML on parse error)
+        SnapshotExistingXmlBeforeLoad();
+        EnsureConfigurationRecoveredOnStartup();
         RunV7MigrationIfNeeded();
 
         // Immediately inject into index.html on disk if writable at plugin startup
@@ -47,16 +60,29 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     }
 
     /// <summary>
-    /// Gets the plugin version as a short string (e.g. <c>7.0.0</c>), used for cache-busting the injected assets.
+    /// Gets the plugin version as a short string (e.g. <c>0.5.6</c>) for UI display.
     /// </summary>
     public static string VersionString
     {
         get
         {
             var v = typeof(Plugin).Assembly.GetName().Version;
-            return v == null ? "0.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+            if (v == null)
+            {
+                return "0.0.0";
+            }
+
+            return v.Revision > 0
+                ? $"{v.Major}.{v.Minor}.{v.Build}.{v.Revision}"
+                : $"{v.Major}.{v.Minor}.{v.Build}";
         }
     }
+
+    /// <summary>
+    /// Gets the cache-busting version token appended to injected JS/CSS URLs (<c>?v=...</c>) so browsers
+    /// automatically load updated Web UI assets immediately after any plugin update without a hard refresh.
+    /// </summary>
+    public static string AssetCacheVersion => AssetVersionCache.Value;
 
     public static Plugin? Instance { get; private set; }
 
@@ -64,15 +90,101 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public override Guid Id => Guid.Parse("7cc1a505-91f6-4661-b4f9-7eee8be33b19");
 
+    public override string ConfigurationFileName => "Jellyfin.Plugin.StreamFlix.xml";
+
     public override string Description =>
-        "Transforms Jellyfin Web into StreamFlix with a Netflix UI, Google OAuth 2.0 allowlist sign-in, and real Jellyfin Server User profiles with separate watch history.";
+        "Transforms Jellyfin Web into StreamFlix with a Netflix UI, flexible Google OAuth / Jellyfin sign-in, and real Jellyfin Server User profiles with separate watch history.";
 
     public string IndexHtmlPath => Path.Combine(_appPaths.WebPath, "index.html");
 
+    private string PersistentBackupJsonPath => Path.Combine(_appPaths.DataPath, "StreamFlix", "config-backup.json");
+
+    private string XmlBackupFilePath => ConfigurationFilePath + ".bak";
+
     public static string BuildInjectionBlock()
     {
-        var v = VersionString;
+        var v = Uri.EscapeDataString(AssetCacheVersion);
         return $"{StartComment}\n<link rel=\"stylesheet\" href=\"/StreamFlix/ClientStyles?v={v}\" />\n<script src=\"/StreamFlix/ClientScript?v={v}\" defer></script>\n{EndComment}";
+    }
+
+    /// <inheritdoc />
+    public override void SaveConfiguration(PluginConfiguration config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        lock (ConfigPersistLock)
+        {
+            try
+            {
+                var configPath = ConfigurationFilePath;
+                var configDir = Path.GetDirectoryName(configPath);
+                if (!string.IsNullOrEmpty(configDir))
+                {
+                    Directory.CreateDirectory(configDir);
+                }
+
+                // Write to a temporary sibling file first, then atomically replace the live XML file so a server
+                // restart during a plugin update can never leave a truncated XML file that Jellyfin wipes on boot.
+                var tmpXmlPath = configPath + ".tmp";
+                XmlSerializer.SerializeToFile(config, tmpXmlPath);
+                File.Move(tmpXmlPath, configPath, overwrite: true);
+            }
+            catch
+            {
+                base.SaveConfiguration(config);
+            }
+
+            if (HasMeaningfulUserConfig(config))
+            {
+                WriteShadowBackupsSafe(config);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public override void UpdateConfiguration(BasePluginConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (configuration is PluginConfiguration incoming)
+        {
+            var existing = Configuration;
+            if (existing != null)
+            {
+                // Guard against partial/stale configuration posts wiping profiles or session signing keys
+                if ((incoming.Profiles == null || incoming.Profiles.Count == 0)
+                    && existing.Profiles != null
+                    && existing.Profiles.Count > 0)
+                {
+                    incoming.Profiles = existing.Profiles;
+                    incoming.ProfilesSeeded = existing.ProfilesSeeded;
+                }
+
+                if ((incoming.DeletedProfileIds == null || incoming.DeletedProfileIds.Count == 0)
+                    && existing.DeletedProfileIds != null
+                    && existing.DeletedProfileIds.Count > 0)
+                {
+                    incoming.DeletedProfileIds = existing.DeletedProfileIds;
+                }
+
+                if (string.IsNullOrWhiteSpace(incoming.SessionSigningKey) && !string.IsNullOrWhiteSpace(existing.SessionSigningKey))
+                {
+                    incoming.SessionSigningKey = existing.SessionSigningKey;
+                }
+
+                if (incoming.SessionVersion <= 1 && existing.SessionVersion > 1)
+                {
+                    incoming.SessionVersion = existing.SessionVersion;
+                }
+
+                if (!incoming.MigratedV7 && existing.MigratedV7)
+                {
+                    incoming.MigratedV7 = true;
+                }
+            }
+        }
+
+        base.UpdateConfiguration(configuration);
     }
 
     /// <summary>
@@ -94,34 +206,358 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
     }
 
+    private static bool HasMeaningfulUserConfig(PluginConfiguration? cfg)
+    {
+        if (cfg == null)
+        {
+            return false;
+        }
+
+        return (cfg.Profiles != null && cfg.Profiles.Count > 0)
+            || !string.IsNullOrWhiteSpace(cfg.GoogleClientId)
+            || !string.IsNullOrWhiteSpace(cfg.GoogleClientSecret)
+            || (cfg.ApprovedGoogleAccounts != null && cfg.ApprovedGoogleAccounts.Count > 0)
+            || !string.IsNullOrWhiteSpace(cfg.CustomBrandName)
+            || !string.IsNullOrWhiteSpace(cfg.SessionSigningKey)
+            || cfg.AllowStandardJellyfinLogin
+            || cfg.BypassLoginGateOnLan;
+    }
+
+    private void SnapshotExistingXmlBeforeLoad()
+    {
+        try
+        {
+            var xmlPath = ConfigurationFilePath;
+            if (!File.Exists(xmlPath))
+            {
+                return;
+            }
+
+            var xmlText = File.ReadAllText(xmlPath, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(xmlText))
+            {
+                return;
+            }
+
+            // Only snapshot non-blank XML that has already been migrated or populated with user settings/profiles
+            if (xmlText.Contains("<StreamFlixProfileConfig>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<SessionSigningKey>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<GoogleClientId>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<MigratedV7>true</MigratedV7>", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(XmlBackupFilePath, xmlText, Encoding.UTF8);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "StreamFlix: pre-load XML snapshot skipped.");
+        }
+    }
+
+    private void EnsureConfigurationRecoveredOnStartup()
+    {
+        try
+        {
+            var current = Configuration;
+            if (HasMeaningfulUserConfig(current))
+            {
+                // Keep persistent shadow backup synced on startup for existing installations upgrading to this build
+                WriteShadowBackupsSafe(current);
+                return;
+            }
+
+            // Current loaded config appears blank/fresh — check if a persistent backup exists from before a plugin update
+            PluginConfiguration? recovered = TryLoadJsonShadowBackup() ?? TryRecoverFromXmlBackup();
+            if (recovered != null && HasMeaningfulUserConfig(recovered))
+            {
+                Configuration = recovered;
+                SaveConfiguration(recovered);
+                _logger.LogInformation("StreamFlix: recovered plugin configuration ({ProfileCount} profiles) from backup after plugin update.", recovered.Profiles?.Count ?? 0);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: configuration recovery check encountered a non-fatal error.");
+        }
+    }
+
+    private void WriteShadowBackupsSafe(PluginConfiguration config)
+    {
+        try
+        {
+            var jsonPath = PersistentBackupJsonPath;
+            var jsonDir = Path.GetDirectoryName(jsonPath);
+            if (!string.IsNullOrEmpty(jsonDir))
+            {
+                Directory.CreateDirectory(jsonDir);
+            }
+
+            var tmpJson = jsonPath + ".tmp";
+            File.WriteAllText(tmpJson, JsonSerializer.Serialize(config, BackupJsonOptions), Encoding.UTF8);
+            File.Move(tmpJson, jsonPath, overwrite: true);
+
+            if (File.Exists(ConfigurationFilePath))
+            {
+                File.Copy(ConfigurationFilePath, XmlBackupFilePath, overwrite: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "StreamFlix: could not write configuration shadow backup.");
+        }
+    }
+
+    private PluginConfiguration? TryLoadJsonShadowBackup()
+    {
+        try
+        {
+            var jsonPath = PersistentBackupJsonPath;
+            if (!File.Exists(jsonPath))
+            {
+                return null;
+            }
+
+            var raw = File.ReadAllText(jsonPath, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            return JsonSerializer.Deserialize<PluginConfiguration>(raw, BackupJsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private PluginConfiguration? TryRecoverFromXmlBackup()
+    {
+        try
+        {
+            var bakPath = XmlBackupFilePath;
+            if (!File.Exists(bakPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                if (XmlSerializer.DeserializeFromFile(typeof(PluginConfiguration), bakPath) is PluginConfiguration deserialized
+                    && HasMeaningfulUserConfig(deserialized))
+                {
+                    return deserialized;
+                }
+            }
+            catch
+            {
+                // Fall through to tolerant XDocument element-by-element recovery
+            }
+
+            var doc = XDocument.Load(bakPath);
+            var root = doc.Root;
+            if (root == null)
+            {
+                return null;
+            }
+
+            static string? Val(XElement parent, string name) =>
+                parent.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, name, StringComparison.OrdinalIgnoreCase))?.Value;
+
+            static bool BoolVal(XElement parent, string name, bool fallback) =>
+                bool.TryParse(Val(parent, name), out var b) ? b : fallback;
+
+            static int IntVal(XElement parent, string name, int fallback) =>
+                int.TryParse(Val(parent, name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : fallback;
+
+            var cfg = new PluginConfiguration
+            {
+                EnableStreamFlixUi = BoolVal(root, nameof(PluginConfiguration.EnableStreamFlixUi), true),
+                CustomBrandName = Val(root, nameof(PluginConfiguration.CustomBrandName)) ?? string.Empty,
+                RequireGoogleAuth = BoolVal(root, nameof(PluginConfiguration.RequireGoogleAuth), true),
+                EnableGoogleSignIn = BoolVal(root, nameof(PluginConfiguration.EnableGoogleSignIn), true),
+                AllowStandardJellyfinLogin = BoolVal(root, nameof(PluginConfiguration.AllowStandardJellyfinLogin), false),
+                AllowAdminFallbackLogin = BoolVal(root, nameof(PluginConfiguration.AllowAdminFallbackLogin), true),
+                AdminFallbackLanOnly = BoolVal(root, nameof(PluginConfiguration.AdminFallbackLanOnly), false),
+                BypassLoginGateOnLan = BoolVal(root, nameof(PluginConfiguration.BypassLoginGateOnLan), false),
+                AutoProvisionJellyfinUsers = BoolVal(root, nameof(PluginConfiguration.AutoProvisionJellyfinUsers), true),
+                ProfilesSeeded = BoolVal(root, nameof(PluginConfiguration.ProfilesSeeded), false),
+                GoogleClientId = Val(root, nameof(PluginConfiguration.GoogleClientId)) ?? string.Empty,
+                GoogleClientSecret = Val(root, nameof(PluginConfiguration.GoogleClientSecret)) ?? string.Empty,
+                SessionSigningKey = Val(root, nameof(PluginConfiguration.SessionSigningKey)) ?? string.Empty,
+                SessionVersion = IntVal(root, nameof(PluginConfiguration.SessionVersion), 1),
+                SessionLifetimeDays = IntVal(root, nameof(PluginConfiguration.SessionLifetimeDays), 30),
+                Top10SelectionMode = Val(root, nameof(PluginConfiguration.Top10SelectionMode)) ?? "most_played",
+                HeroRotationSeconds = IntVal(root, nameof(PluginConfiguration.HeroRotationSeconds), 9),
+                HeroSlideCount = IntVal(root, nameof(PluginConfiguration.HeroSlideCount), 8),
+                HeroSelectionMode = Val(root, nameof(PluginConfiguration.HeroSelectionMode)) ?? "recent",
+                HeroContentType = Val(root, nameof(PluginConfiguration.HeroContentType)) ?? "all",
+                MigratedV7 = BoolVal(root, nameof(PluginConfiguration.MigratedV7), true),
+            };
+
+            var approvedEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.ApprovedGoogleAccounts), StringComparison.OrdinalIgnoreCase));
+            if (approvedEl != null)
+            {
+                cfg.ApprovedGoogleAccounts = approvedEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
+            var heroLibsEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.HeroLibraryIds), StringComparison.OrdinalIgnoreCase));
+            if (heroLibsEl != null)
+            {
+                cfg.HeroLibraryIds = heroLibsEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
+            var deletedEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.DeletedProfileIds), StringComparison.OrdinalIgnoreCase));
+            if (deletedEl != null)
+            {
+                cfg.DeletedProfileIds = deletedEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
+            var profilesEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.Profiles), StringComparison.OrdinalIgnoreCase));
+            if (profilesEl != null)
+            {
+                foreach (var pEl in profilesEl.Elements())
+                {
+                    var pName = Val(pEl, nameof(StreamFlixProfileConfig.Name)) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(pName))
+                    {
+                        continue;
+                    }
+
+                    cfg.Profiles.Add(new StreamFlixProfileConfig
+                    {
+                        Id = Val(pEl, nameof(StreamFlixProfileConfig.Id)) ?? string.Empty,
+                        Name = pName,
+                        AvatarColorIndex = IntVal(pEl, nameof(StreamFlixProfileConfig.AvatarColorIndex), 0),
+                        AvatarIconIndex = IntVal(pEl, nameof(StreamFlixProfileConfig.AvatarIconIndex), 0),
+                        AvatarEmoji = Val(pEl, nameof(StreamFlixProfileConfig.AvatarEmoji)) ?? "🎬",
+                        AvatarColorHex = Val(pEl, nameof(StreamFlixProfileConfig.AvatarColorHex)) ?? "#E50914",
+                        IsKids = BoolVal(pEl, nameof(StreamFlixProfileConfig.IsKids), false),
+                        MaturityRating = Val(pEl, nameof(StreamFlixProfileConfig.MaturityRating)) ?? "TV-MA / R (All Maturity Levels)",
+                        PinCode = Val(pEl, nameof(StreamFlixProfileConfig.PinCode)),
+                        GoogleAccountEmail = Val(pEl, nameof(StreamFlixProfileConfig.GoogleAccountEmail)),
+                        AutoplayNextEpisode = BoolVal(pEl, nameof(StreamFlixProfileConfig.AutoplayNextEpisode), true),
+                        AutoplayPreviews = BoolVal(pEl, nameof(StreamFlixProfileConfig.AutoplayPreviews), true),
+                        JellyfinUserId = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUserId)),
+                        JellyfinUsername = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUsername)),
+                    });
+                }
+            }
+
+            return cfg;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private void RunV7MigrationIfNeeded()
     {
         try
         {
             var cfg = Configuration;
-            if (cfg.MigratedV7)
-            {
-                return;
-            }
+            var dirty = false;
 
             if (cfg.SessionVersion <= 0)
             {
                 cfg.SessionVersion = 1;
+                dirty = true;
             }
 
             if (cfg.SessionLifetimeDays <= 0)
             {
                 cfg.SessionLifetimeDays = 30;
+                dirty = true;
             }
 
-            cfg.MigratedV7 = true;
-            SaveConfiguration();
+            if (cfg.HeroRotationSeconds < 0)
+            {
+                cfg.HeroRotationSeconds = 9;
+                dirty = true;
+            }
+
+            if (cfg.HeroSlideCount <= 0)
+            {
+                cfg.HeroSlideCount = 8;
+                dirty = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(cfg.Top10SelectionMode))
+            {
+                cfg.Top10SelectionMode = "most_played";
+                dirty = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(cfg.HeroSelectionMode))
+            {
+                cfg.HeroSelectionMode = "recent";
+                dirty = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(cfg.HeroContentType))
+            {
+                cfg.HeroContentType = "all";
+                dirty = true;
+            }
+
+            if (!cfg.MigratedV7)
+            {
+                cfg.MigratedV7 = true;
+                dirty = true;
+            }
+
+            if (dirty)
+            {
+                SaveConfiguration();
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "StreamFlix: v7 configuration migration failed (non-fatal).");
+            _logger.LogWarning(ex, "StreamFlix: configuration migration failed (non-fatal).");
         }
     }
+
+    private static readonly Lazy<string> AssetVersionCache = new(() =>
+    {
+        var v = typeof(Plugin).Assembly.GetName().Version;
+        var fullVer = v == null ? "0.0.0.0" : $"{v.Major}.{v.Minor}.{v.Build}.{Math.Max(0, v.Revision)}";
+        try
+        {
+            var asm = typeof(Plugin).Assembly;
+            using var sha = SHA256.Create();
+            foreach (var resName in new[] { "Jellyfin.Plugin.StreamFlix.Web.streamflix.css", "Jellyfin.Plugin.StreamFlix.Web.streamflix.js" })
+            {
+                using var s = asm.GetManifestResourceStream(resName);
+                if (s != null)
+                {
+                    var buf = new byte[8192];
+                    int read;
+                    while ((read = s.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        sha.TransformBlock(buf, 0, read, null, 0);
+                    }
+                }
+            }
+
+            sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            var shortHash = Convert.ToHexString(sha.Hash ?? Array.Empty<byte>(), 0, 4).ToLowerInvariant();
+            return string.IsNullOrEmpty(shortHash) ? fullVer : $"{fullVer}-{shortHash}";
+        }
+        catch
+        {
+            return fullVer;
+        }
+    });
 
     private static readonly Lazy<(string Text, byte[] Bytes, string ETag)> EmbeddedStylesheet = new(() =>
     {
@@ -242,7 +678,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 {
                     content = content.Substring(0, idx) + injectionBlock + "\n" + content.Substring(idx);
                     File.WriteAllText(indexPath, content);
-                    _logger.LogInformation("StreamFlix: injected client bundle into {Path}", indexPath);
+                    _logger.LogInformation("StreamFlix: injected client bundle ({AssetVersion}) into {Path}", AssetCacheVersion, indexPath);
                     return true;
                 }
             }
@@ -257,6 +693,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public override void OnUninstalling()
     {
+        // Note: Intentionally never touch ConfigurationFilePath or PersistentBackupJsonPath so plugin updates
+        // or reinstalls never lose the administrator's StreamFlix configuration or household profiles.
         try
         {
             var indexPath = IndexHtmlPath;
