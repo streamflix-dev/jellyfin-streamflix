@@ -13,24 +13,24 @@
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Unified Sign-In Methods List: move Custom OpenID Connect (OIDC) directly into the Sign-In Methods card stack alongside Google Sign-In, Jellyfin Password, Admin Fallback, and Local LAN Bypass with progressive-disclosure expansion\n- Mandatory Household Sign-In Security: remove the option to completely disable household authentication before 'Who's watching?' across the Settings UI, client gate, and backend API (explicit private-network LAN Bypass remains available)",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.1_12.0.0.zip",
-        "checksum": "1e5748127d0479d217c49b358f23ba59",
-        "timestamp": "2026-11-13T22:13:13Z"
+        "checksum": "a17e7b0969de8e0b9c412ef7921c1748",
+        "timestamp": "2026-11-13T22:13:43Z"
       },
       {
         "version": "0.7.5.1",
         "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Unified Sign-In Methods List: move Custom OpenID Connect (OIDC) directly into the Sign-In Methods card stack alongside Google Sign-In, Jellyfin Password, Admin Fallback, and Local LAN Bypass with progressive-disclosure expansion\n- Mandatory Household Sign-In Security: remove the option to completely disable household authentication before 'Who's watching?' across the Settings UI, client gate, and backend API (explicit private-network LAN Bypass remains available)",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.1_10.11.0.zip",
-        "checksum": "bffa140430ac7b91fd616a4231d68a27",
-        "timestamp": "2026-11-13T22:13:13Z"
+        "checksum": "a0dc3adb21dbeacc774982eb981f8cbc",
+        "timestamp": "2026-11-13T22:13:43Z"
       },
       {
         "version": "0.7.5.1",
         "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Unified Sign-In Methods List: move Custom OpenID Connect (OIDC) directly into the Sign-In Methods card stack alongside Google Sign-In, Jellyfin Password, Admin Fallback, and Local LAN Bypass with progressive-disclosure expansion\n- Mandatory Household Sign-In Security: remove the option to completely disable household authentication before 'Who's watching?' across the Settings UI, client gate, and backend API (explicit private-network LAN Bypass remains available)",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.1_10.9.0.zip",
-        "checksum": "20e5e89f478b3837e879cab81ab5f660",
-        "timestamp": "2026-11-13T22:13:13Z"
+        "checksum": "f135e7a60a9a8e54ef62f41cd20db7b1",
+        "timestamp": "2026-11-13T22:13:43Z"
       },
       {
         "version": "0.7.5.0",
