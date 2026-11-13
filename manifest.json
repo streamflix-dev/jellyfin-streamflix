@@ -6,38 +6,39 @@
     "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks.",
     "owner": "StreamFlix",
     "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
-        "version": "0.5.2.0",
-        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "version": "0.5.3.0",
+        "changelog": "v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_12.0.0.zip",
-        "checksum": "4ebdc7eb25b0eeef9e0a51ff80204b8d",
-        "timestamp": "2026-11-12T23:53:24Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_12.0.0.zip",
+        "checksum": "c632fba92805b5268821a85a7a4d472e",
+        "timestamp": "2026-11-13T00:06:06Z"
       },
       {
-        "version": "0.5.2.0",
-        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "version": "0.5.3.0",
+        "changelog": "v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.11.0.zip",
-        "checksum": "da44225b5a51d53cb6ef6fde4d0dbbce",
-        "timestamp": "2026-11-12T23:53:24Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_10.11.0.zip",
+        "checksum": "1511d06423b36d670b4df7333952a8f3",
+        "timestamp": "2026-11-13T00:06:06Z"
       },
       {
-        "version": "0.5.2.0",
-        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "version": "0.5.3.0",
+        "changelog": "v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.9.0.zip",
-        "checksum": "6e81ea986c2fdeed925dbaea53b6d349",
-        "timestamp": "2026-11-12T23:53:24Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_10.9.0.zip",
+        "checksum": "d2d83b5f7bc9f4c84649dfca902a517c",
+        "timestamp": "2026-11-13T00:06:06Z"
       },
       {
-        "version": "0.5.2.0",
-        "changelog": "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "version": "0.5.3.0",
+        "changelog": "v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
         "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.9.0.zip",
-        "checksum": "6e81ea986c2fdeed925dbaea53b6d349",
-        "timestamp": "2026-11-12T23:53:24Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_10.9.0.zip",
+        "checksum": "d2d83b5f7bc9f4c84649dfca902a517c",
+        "timestamp": "2026-11-13T00:06:06Z"
       }
     ]
   }
