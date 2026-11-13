@@ -56,9 +56,10 @@ public class PluginConfiguration : BasePluginConfiguration
         RequireGoogleAuth = true;
         EnableGoogleSignIn = true;
         AllowStandardJellyfinLogin = false;
-        AllowAdminFallbackLogin = true;
+        AllowAdminFallbackLogin = false;
         AdminFallbackLanOnly = false;
         BypassLoginGateOnLan = false;
+        FirstGoogleAccountClaimed = false;
         AutoProvisionJellyfinUsers = true;
         ProfilesSeeded = false;
         GoogleClientId = string.Empty;
@@ -103,10 +104,16 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool AllowStandardJellyfinLogin { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether an optional "Admin Sign-In" link is shown on the Google Sign-In screen
-    /// allowing Jellyfin Administrator accounts to authenticate directly with their Jellyfin password.
+    /// Gets or sets a value indicating whether an opt-in "Admin Sign-In" link (disabled by default) is shown on the
+    /// Google Sign-In screen allowing Jellyfin Administrator accounts to authenticate directly with their Jellyfin password.
     /// </summary>
     public bool AllowAdminFallbackLogin { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether at least one Google account has ever been claimed or configured,
+    /// preventing first-run auto-claim from re-triggering if an administrator later empties the allowlist.
+    /// </summary>
+    public bool FirstGoogleAccountClaimed { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the "Admin Sign-In" fallback is restricted to local LAN IP addresses.

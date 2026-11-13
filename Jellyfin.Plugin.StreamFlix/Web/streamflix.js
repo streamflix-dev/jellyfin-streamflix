@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.5.6';
+    var VERSION = '0.5.7';
     // Household session issued by the server ({ token, authKind, email, username, userId, name, picture, isAdmin, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -63,11 +63,11 @@
         requireGoogleAuth: true,
         enableGoogleSignIn: true,
         allowStandardJellyfinLogin: false,
-        allowAdminFallbackLogin: true,
+        allowAdminFallbackLogin: false,
         adminFallbackLanOnly: false,
         bypassLoginGateOnLan: false,
         isLocalLan: false,
-        canShowAdminFallback: true,
+        canShowAdminFallback: false,
         googleClientId: '',
         googleConfigured: false,
         hasGoogleClientSecret: false,
@@ -1091,11 +1091,16 @@
         } catch (e) {}
     }
 
+    function sanitizeHexColor(raw, fallback) {
+        var s = String(raw == null ? '' : raw).trim();
+        return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : (fallback || '#E50914');
+    }
+
     function normalizeProfileModel(p, index) {
         p = p || {};
         var idx = typeof index === 'number' ? index : 0;
-        var color = p.avatarColorHex || p.color || AVATAR_COLORS[idx % AVATAR_COLORS.length];
-        var icon = p.avatarEmoji || p.icon || (p.isKids ? '🦊' : AVATAR_ICONS[idx % AVATAR_ICONS.length]);
+        var color = sanitizeHexColor(p.avatarColorHex || p.color, AVATAR_COLORS[idx % AVATAR_COLORS.length]);
+        var icon = String(p.avatarEmoji || p.icon || (p.isKids ? '🦊' : AVATAR_ICONS[idx % AVATAR_ICONS.length])).slice(0, 16);
         var googleLocked = Boolean(p.googleLocked || p.googleAccountEmail);
         return {
             id: p.id || ('streamflix_profile_' + idx),
@@ -1261,13 +1266,13 @@
             requireGoogleAuth: requireGoogle,
             enableGoogleSignIn: cfg.enableGoogleSignIn !== false,
             allowStandardJellyfinLogin: Boolean(cfg.allowStandardJellyfinLogin),
-            allowAdminFallbackLogin: cfg.allowAdminFallbackLogin !== false,
+            allowAdminFallbackLogin: Boolean(cfg.allowAdminFallbackLogin),
             adminFallbackLanOnly: Boolean(cfg.adminFallbackLanOnly),
             bypassLoginGateOnLan: bypassLan,
             isLocalLan: isLocalLan,
             canShowAdminFallback: cfg.canShowAdminFallback !== undefined
                 ? Boolean(cfg.canShowAdminFallback)
-                : (cfg.allowAdminFallbackLogin !== false && (!cfg.adminFallbackLanOnly || isLocalLan)),
+                : (Boolean(cfg.allowAdminFallbackLogin) && (!cfg.adminFallbackLanOnly || isLocalLan)),
             googleClientId: cfg.googleClientId || '',
             googleConfigured: cfg.googleConfigured !== undefined ? Boolean(cfg.googleConfigured) : Boolean(cfg.googleClientId),
             hasGoogleClientSecret: Boolean(cfg.hasGoogleClientSecret),
@@ -2729,8 +2734,9 @@
     function buildAccountChipHtml() {
         var g = state.googleUser;
         if (g && g.email) {
-            var avatar = g.picture
-                ? '<img src="' + escapeHtml(g.picture) + '" alt="" referrerpolicy="no-referrer" />'
+            var safePic = typeof g.picture === 'string' && /^https?:\/\//i.test(g.picture.trim()) ? g.picture.trim() : '';
+            var avatar = safePic
+                ? '<img src="' + escapeHtml(safePic) + '" alt="" referrerpolicy="no-referrer" />'
                 : '<span class="streamflix-account-chip-initial">' + escapeHtml(g.email.charAt(0).toUpperCase()) + '</span>';
             return '<div class="streamflix-account-chip" title="Signed in with Google">' + avatar
                 + '<span class="streamflix-account-chip-email">' + escapeHtml(g.email) + '</span></div>';
@@ -6648,6 +6654,7 @@
             return;
         }
 
+        var reqSeq = (state.hubLoadSeq = (state.hubLoadSeq || 0) + 1);
         state.hubData.loading = true;
         state.hubData.userId = auth.userId;
 
@@ -6667,6 +6674,9 @@
         var pPopular = apiFetch('/StreamFlix/PopularScores').catch(function () { return { scores: {} }; });
 
         Promise.all([pHero, pResume, pNextUp, pTop10, pFavs, pMovies, pSeries, pCollections, pViews, pPopular]).then(function (results) {
+            if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return null;
+            }
             state.hubData.rawHeroItems = (results[0] && results[0].Items) || [];
             state.hubData.resumeItems = (results[1] && results[1].Items) || [];
             state.hubData.nextUpItems = (results[2] && results[2].Items) || [];
@@ -6756,6 +6766,9 @@
 
             return Promise.all(extraPromises);
         }).then(function () {
+            if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return;
+            }
             recomputeHubDerivedLists();
             state.hubData.loading = false;
             state.hubData.loaded = true;
@@ -6772,7 +6785,9 @@
             enhanceLibraryListPages();
             loadPersonalRows(false);
         }).catch(function () {
-            state.hubData.loading = false;
+            if (state.hubLoadSeq === reqSeq) {
+                state.hubData.loading = false;
+            }
         });
     }
 
@@ -7521,7 +7536,9 @@
             hero.addEventListener('mouseenter', function () { state.heroPaused = true; });
             hero.addEventListener('mouseleave', function () { state.heroPaused = false; });
             hero.addEventListener('focusin', function () { state.heroPaused = true; });
-            hero.addEventListener('focusout', function () { state.heroPaused = false; });
+            hero.addEventListener('focusout', function (ev) {
+                state.heroPaused = Boolean(ev && ev.relatedTarget && hero.contains(ev.relatedTarget));
+            });
             // Touch swipe left/right on phones & tablets to flip hero slides
             var touchStartX = 0;
             var touchStartY = 0;
@@ -8110,7 +8127,7 @@
             + '  <img class="bfx-pv-img" src="' + escapeHtml(getItemBackdropUrl(item, 780)) + '" alt="" onload="this.classList.add(\'is-loaded\')" onerror="this.style.visibility=\'hidden\'" />'
             + '  <div class="bfx-pv-scrim"></div>'
             + (logo
-                ? '<img class="bfx-pv-logo" src="' + escapeHtml(logo) + '" alt="' + escapeHtml(title) + '" onerror="this.outerHTML=\'<div class=&quot;bfx-pv-title&quot;>' + escapeHtml(escapeHtml(title)).replace(/'/g, '&#39;') + '</div>\'" />'
+                ? '<img class="bfx-pv-logo" src="' + escapeHtml(logo) + '" alt="' + escapeHtml(title) + '" onerror="var d=document.createElement(\'div\');d.className=\'bfx-pv-title\';d.textContent=this.alt;if(this.parentNode)this.parentNode.replaceChild(d,this);" />'
                 : '<div class="bfx-pv-title">' + escapeHtml(title) + '</div>')
             + (pct ? '<div class="bfx-pv-bar"><span style="width:' + pct + '%;"></span></div>' : '')
             + '</div>'

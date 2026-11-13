@@ -171,8 +171,7 @@ public class StreamFlixStartupTask : IScheduledTask
                 return null;
             }
 
-            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
-            if (HasUserPermissionCompat(user, permsProp, "IsDisabled"))
+            if (IsUserDisabledCompat(user))
             {
                 return null;
             }
@@ -242,6 +241,45 @@ public class StreamFlixStartupTask : IScheduledTask
                             return true;
                         }
                     }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks whether a Jellyfin user entity has <c>PermissionKind.IsDisabled</c> enabled.
+    /// </summary>
+    public static bool IsUserDisabledCompat(object? user)
+    {
+        if (user == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (HasUserPermissionCompat(user, permsProp, "IsDisabled"))
+            {
+                return true;
+            }
+
+            var hasPermMethod = user.GetType().GetMethod("HasPermission", BindingFlags.Public | BindingFlags.Instance);
+            if (hasPermMethod != null)
+            {
+                var ps = hasPermMethod.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType.IsEnum
+                    && Enum.TryParse(ps[0].ParameterType, "IsDisabled", ignoreCase: true, out var disabledEnum)
+                    && disabledEnum != null
+                    && hasPermMethod.Invoke(user, new[] { disabledEnum }) is bool isDisabled
+                    && isDisabled)
+                {
+                    return true;
                 }
             }
         }

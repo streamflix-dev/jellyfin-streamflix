@@ -4,7 +4,7 @@
 
 **A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
 
-[![Version](https://img.shields.io/badge/version-0.5.6-E50914?style=flat-square)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.7-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=flat-square)](Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
@@ -45,7 +45,7 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 
 ### Flexible Household Sign-In & Security
 - **Google OAuth, Standard Login, or Hybrid Mode.** Require server-verified Google Sign-In (with one-click **Test OAuth Config** validation), enable a Netflix-themed **Standard Jellyfin Account** sign-in form alongside or instead of Google, or bypass the login gate automatically on trusted **Local LAN** connections.
-- **Strict Admin Sign-In fallback.** Optional **Admin Sign-In** link on the Google gate strictly enforces `IsAdministrator` on the backend (rejecting non-admin Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
+- **Opt-in Admin Sign-In fallback (off by default).** Server owners can optionally enable an **Admin Sign-In** link on the Google gate in plugin settings. It strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
 - **Profile-level locks & persistent config.** Protect any profile with a **4–8 digit PIN** and/or lock it to a **specific Google email**. Plugin configuration is automatically mirrored to persistent Jellyfin data storage so updates never reset your profiles or OAuth settings.
 - **Admin-only user linking.** Only Jellyfin administrators can view server accounts, edit admin-linked profiles, or change which Jellyfin user backs a profile.
 
@@ -105,7 +105,7 @@ The plugin repository manifest includes builds for all supported Jellyfin releas
 > If you link a profile to your Jellyfin administrator account, protect it with a **PIN** or **Google account lock** so other household members cannot switch into it.
 
 > [!NOTE]
-> Don't use Google OAuth or running a local-only server? Enable **Standard Jellyfin Login** (or **Bypass Login Gate on Local Network**) in **Dashboard → Plugins → StreamFlix** to go straight to the Netflix-style UI and *"Who's watching?"* profile picker without Google Sign-In. Server owners can also keep the **Admin Sign-In** button enabled on the Google gate as a direct administrator fallback.
+> Don't use Google OAuth or running a local-only server? Enable **Standard Jellyfin Login** (or **Bypass Login Gate on Local Network**) in **Dashboard → Plugins → StreamFlix** to go straight to the Netflix-style UI and *"Who's watching?"* profile picker without Google Sign-In. Server owners can also opt in to showing an **Admin Sign-In** link on the Google gate (disabled by default) as a direct administrator fallback.
 
 ---
 

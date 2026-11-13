@@ -181,10 +181,27 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 {
                     incoming.MigratedV7 = true;
                 }
+
+                if (!incoming.FirstGoogleAccountClaimed && (existing.FirstGoogleAccountClaimed || (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)))
+                {
+                    incoming.FirstGoogleAccountClaimed = true;
+                }
+            }
+            else if (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)
+            {
+                incoming.FirstGoogleAccountClaimed = true;
             }
         }
 
         base.UpdateConfiguration(configuration);
+
+        if (configuration is PluginConfiguration savedCfg)
+        {
+            lock (ConfigPersistLock)
+            {
+                WriteShadowBackupsSafe(savedCfg);
+            }
+        }
     }
 
     /// <summary>
@@ -220,7 +237,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !string.IsNullOrWhiteSpace(cfg.CustomBrandName)
             || !string.IsNullOrWhiteSpace(cfg.SessionSigningKey)
             || cfg.AllowStandardJellyfinLogin
-            || cfg.BypassLoginGateOnLan;
+            || cfg.AllowAdminFallbackLogin
+            || cfg.AdminFallbackLanOnly
+            || cfg.BypassLoginGateOnLan
+            || !cfg.RequireGoogleAuth
+            || !cfg.EnableGoogleSignIn
+            || !cfg.EnableStreamFlixUi;
     }
 
     private void SnapshotExistingXmlBeforeLoad()
@@ -377,9 +399,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 RequireGoogleAuth = BoolVal(root, nameof(PluginConfiguration.RequireGoogleAuth), true),
                 EnableGoogleSignIn = BoolVal(root, nameof(PluginConfiguration.EnableGoogleSignIn), true),
                 AllowStandardJellyfinLogin = BoolVal(root, nameof(PluginConfiguration.AllowStandardJellyfinLogin), false),
-                AllowAdminFallbackLogin = BoolVal(root, nameof(PluginConfiguration.AllowAdminFallbackLogin), true),
+                AllowAdminFallbackLogin = BoolVal(root, nameof(PluginConfiguration.AllowAdminFallbackLogin), false),
                 AdminFallbackLanOnly = BoolVal(root, nameof(PluginConfiguration.AdminFallbackLanOnly), false),
                 BypassLoginGateOnLan = BoolVal(root, nameof(PluginConfiguration.BypassLoginGateOnLan), false),
+                FirstGoogleAccountClaimed = BoolVal(root, nameof(PluginConfiguration.FirstGoogleAccountClaimed), false),
                 AutoProvisionJellyfinUsers = BoolVal(root, nameof(PluginConfiguration.AutoProvisionJellyfinUsers), true),
                 ProfilesSeeded = BoolVal(root, nameof(PluginConfiguration.ProfilesSeeded), false),
                 GoogleClientId = Val(root, nameof(PluginConfiguration.GoogleClientId)) ?? string.Empty,

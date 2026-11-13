@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.5.6.0"
+version: "0.5.7.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -9,7 +9,7 @@ overview: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles b
 description: >
   Transforms Jellyfin Web into StreamFlix with a Netflix #141414 dark cinema UI,
   flexible authentication (server-verified Google Sign-In, themed Standard/Hybrid Jellyfin
-  login, strict Administrator-only fallback, and optional Local LAN bypass), and Netflix
+  login, opt-in Administrator-only fallback, and optional Local LAN bypass), and Netflix
   "Who's watching?" profiles backed by real Jellyfin Server Users with independent Watch
   History, Continue Watching, Next Up, Favorites, PINs, and per-profile Google locks.
 category: "General"
@@ -17,6 +17,6 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass
-  - Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting
-  - Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix
+  - Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup
+  - Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization
+  - Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save

@@ -186,7 +186,7 @@
                                     <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
                                     <span>Show "Admin Sign-In" fallback link on the Google Sign-In screen</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">Shows a subtle <em>Admin Sign-In</em> link so server owners can log in without Google OAuth. Strictly verified on the backend — non-administrator Jellyfin accounts are rejected.</div>
+                                <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, shows a subtle <em>Admin Sign-In</em> link on the Google Sign-In screen so server owners can log in without Google OAuth. Strictly verified on the backend — non-administrator Jellyfin accounts are rejected.</div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription">
@@ -378,6 +378,11 @@
                         .replace(/>/g, '&gt;')
                         .replace(/"/g, '&quot;')
                         .replace(/'/g, '&#39;');
+                }
+
+                function safeHexColor(value) {
+                    var s = String(value == null ? '' : value).trim();
+                    return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : '#E50914';
                 }
 
                 function toast(message) {
@@ -662,7 +667,7 @@
                             + (!p.jellyfinUserId ? '<span class="bfx-badge red">NOT LINKED</span>' : '');
                         return ''
                             + '<div class="bfx-prof" data-id="' + esc(p.id) + '">'
-                            + '  <div class="bfx-avatar" style="background:' + esc(p.avatarColorHex || '#E50914') + ';">' + esc(p.avatarEmoji || '🎬') + '</div>'
+                            + '  <div class="bfx-avatar" style="background:' + safeHexColor(p.avatarColorHex) + ';">' + esc(p.avatarEmoji || '🎬') + '</div>'
                             + '  <div class="bfx-prof-main">'
                             + '    <div class="bfx-prof-name">' + esc(p.name || 'Profile') + '</div>'
                             + '    <div class="bfx-prof-meta">Jellyfin user: ' + esc(p.jellyfinUsername || '—') + '</div>'
@@ -887,7 +892,7 @@
                         $('#RequireGoogleAuth').checked = config.RequireGoogleAuth !== false;
                         $('#EnableGoogleSignIn').checked = config.EnableGoogleSignIn !== false;
                         $('#AllowStandardJellyfinLogin').checked = Boolean(config.AllowStandardJellyfinLogin);
-                        $('#AllowAdminFallbackLogin').checked = config.AllowAdminFallbackLogin !== false;
+                        $('#AllowAdminFallbackLogin').checked = Boolean(config.AllowAdminFallbackLogin);
                         $('#AdminFallbackLanOnly').checked = Boolean(config.AdminFallbackLanOnly);
                         $('#BypassLoginGateOnLan').checked = Boolean(config.BypassLoginGateOnLan);
                         $('#AutoProvisionJellyfinUsers').checked = config.AutoProvisionJellyfinUsers !== false;

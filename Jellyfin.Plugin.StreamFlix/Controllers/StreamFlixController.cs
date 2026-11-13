@@ -185,9 +185,13 @@ public class StreamFlixController : ControllerBase
 
     private static readonly Regex PinRegex = new(@"^\d{4,8}$", RegexOptions.Compiled);
 
+    private static readonly Regex HexColorRegex = new(@"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$", RegexOptions.Compiled);
+
     private static readonly Regex GoogleClientIdRegex = new(@"^[0-9]{6,}-[a-zA-Z0-9_-]{8,}\.apps\.googleusercontent\.com$", RegexOptions.Compiled);
 
     private static readonly object PopularCacheLock = new();
+
+    private static readonly object ShowcaseCacheLock = new();
 
     private static DateTime _lastSyncUtc = DateTime.MinValue;
 
@@ -256,8 +260,13 @@ public class StreamFlixController : ControllerBase
     [HttpPost("SetupSecrets")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> SetupSecrets([FromBody] SetupSecretsRequest request)
+    public async Task<ActionResult<object>> SetupSecrets([FromBody] SetupSecretsRequest? request)
     {
+        if (request == null)
+        {
+            return BadRequest(new { message = "Missing request payload." });
+        }
+
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!caller.IsAdmin)
@@ -287,6 +296,10 @@ public class StreamFlixController : ControllerBase
                 .Where(e => EmailRegex.IsMatch(e))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            if (config.ApprovedGoogleAccounts.Count > 0)
+            {
+                config.FirstGoogleAccountClaimed = true;
+            }
         }
 
         Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
@@ -299,9 +312,9 @@ public class StreamFlixController : ControllerBase
     [HttpPost("VerifyGoogle")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> VerifyGoogle([FromBody] VerifyGoogleRequest request)
+    public async Task<ActionResult<object>> VerifyGoogle([FromBody] VerifyGoogleRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(request.AccessToken))
+        if (string.IsNullOrWhiteSpace(request?.AccessToken))
         {
             return BadRequest(new { verified = false, message = "Missing Google OAuth access token." });
         }
@@ -312,13 +325,18 @@ public class StreamFlixController : ControllerBase
             return StatusCode(403, new { verified = false, code = "google_disabled", message = "Google Sign-In is currently disabled in StreamFlix settings." });
         }
 
-        var accessToken = request.AccessToken.Trim();
+        var configuredClientId = (config.GoogleClientId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(configuredClientId))
+        {
+            return StatusCode(403, new { verified = false, code = "google_not_configured", message = "Google OAuth Client ID is not configured on this server yet." });
+        }
+
+        var accessToken = request!.AccessToken!.Trim();
 
         try
         {
             // 1. Make sure the token was minted for *this* server's OAuth client (prevents token substitution
             //    from other Google apps the user has signed into).
-            var configuredClientId = (config.GoogleClientId ?? string.Empty).Trim();
             using (var infoResp = await HttpClient.GetAsync("https://oauth2.googleapis.com/tokeninfo?access_token=" + Uri.EscapeDataString(accessToken)).ConfigureAwait(false))
             {
                 if (!infoResp.IsSuccessStatusCode)
@@ -326,21 +344,18 @@ public class StreamFlixController : ControllerBase
                     return StatusCode(401, new { verified = false, message = "Google rejected this sign-in. Please try again." });
                 }
 
-                if (!string.IsNullOrEmpty(configuredClientId))
+                using var infoDoc = JsonDocument.Parse(await infoResp.Content.ReadAsStringAsync().ConfigureAwait(false));
+                var infoRoot = infoDoc.RootElement;
+                var aud = infoRoot.TryGetProperty("aud", out var audProp) ? audProp.GetString() : null;
+                var azp = infoRoot.TryGetProperty("azp", out var azpProp) ? azpProp.GetString() : null;
+                var issuedTo = infoRoot.TryGetProperty("issued_to", out var itProp) ? itProp.GetString() : null;
+                var audience = infoRoot.TryGetProperty("audience", out var auProp) ? auProp.GetString() : null;
+                if (!string.Equals(aud, configuredClientId, StringComparison.Ordinal)
+                    && !string.Equals(azp, configuredClientId, StringComparison.Ordinal)
+                    && !string.Equals(issuedTo, configuredClientId, StringComparison.Ordinal)
+                    && !string.Equals(audience, configuredClientId, StringComparison.Ordinal))
                 {
-                    using var infoDoc = JsonDocument.Parse(await infoResp.Content.ReadAsStringAsync().ConfigureAwait(false));
-                    var infoRoot = infoDoc.RootElement;
-                    var aud = infoRoot.TryGetProperty("aud", out var audProp) ? audProp.GetString() : null;
-                    var azp = infoRoot.TryGetProperty("azp", out var azpProp) ? azpProp.GetString() : null;
-                    var issuedTo = infoRoot.TryGetProperty("issued_to", out var itProp) ? itProp.GetString() : null;
-                    var audience = infoRoot.TryGetProperty("audience", out var auProp) ? auProp.GetString() : null;
-                    if (!string.Equals(aud, configuredClientId, StringComparison.Ordinal)
-                        && !string.Equals(azp, configuredClientId, StringComparison.Ordinal)
-                        && !string.Equals(issuedTo, configuredClientId, StringComparison.Ordinal)
-                        && !string.Equals(audience, configuredClientId, StringComparison.Ordinal))
-                    {
-                        return StatusCode(401, new { verified = false, message = "This Google token was issued for a different app." });
-                    }
+                    return StatusCode(401, new { verified = false, message = "This Google token was issued for a different app." });
                 }
             }
 
@@ -359,24 +374,24 @@ public class StreamFlixController : ControllerBase
             var email = root.TryGetProperty("email", out var emailProp) ? (emailProp.GetString() ?? string.Empty).Trim().ToLowerInvariant() : string.Empty;
             var name = root.TryGetProperty("name", out var nameProp) ? (nameProp.GetString() ?? string.Empty) : email;
             var picture = root.TryGetProperty("picture", out var picProp) ? (picProp.GetString() ?? string.Empty) : string.Empty;
-            var emailVerified = !root.TryGetProperty("email_verified", out var evProp)
-                || evProp.ValueKind == JsonValueKind.True
-                || (evProp.ValueKind == JsonValueKind.String && string.Equals(evProp.GetString(), "true", StringComparison.OrdinalIgnoreCase));
+            var emailVerified = root.TryGetProperty("email_verified", out var evProp)
+                && (evProp.ValueKind == JsonValueKind.True
+                    || (evProp.ValueKind == JsonValueKind.String && string.Equals(evProp.GetString(), "true", StringComparison.OrdinalIgnoreCase)));
 
             if (string.IsNullOrEmpty(email) || !emailVerified)
             {
                 return StatusCode(401, new { verified = false, message = "Your Google account needs a verified email address." });
             }
 
-            // 3. First-run claim: on a brand-new install (no approved accounts and no session ever issued), the first
-            //    verified Google account becomes the owner. Once any session exists this never happens again, so an
-            //    emptied allowlist can't be claimed by a stranger.
+            // 3. First-run claim: on a brand-new install (no approved accounts and no Google account ever claimed),
+            //    the first verified Google account becomes approved. Once claimed, an emptied allowlist can't be claimed by a stranger.
             var nobodyApproved = (config.ApprovedGoogleAccounts == null || config.ApprovedGoogleAccounts.Count == 0)
                 && !(config.Profiles ?? new()).Any(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail))
-                && string.IsNullOrWhiteSpace(config.SessionSigningKey);
+                && !config.FirstGoogleAccountClaimed;
             if (nobodyApproved)
             {
                 config.ApprovedGoogleAccounts = new List<string> { email };
+                config.FirstGoogleAccountClaimed = true;
                 Plugin.Instance?.SaveConfiguration();
                 _logger.LogInformation("StreamFlix: first sign-in claimed by {Email}; added to Approved Google Accounts.", email);
             }
@@ -390,6 +405,12 @@ public class StreamFlixController : ControllerBase
                     email,
                     message = $"{email} isn't approved for this StreamFlix server. Ask the owner to add it in Dashboard → Plugins → StreamFlix.",
                 });
+            }
+
+            if (!config.FirstGoogleAccountClaimed)
+            {
+                config.FirstGoogleAccountClaimed = true;
+                Plugin.Instance?.SaveConfiguration();
             }
 
             var session = StreamFlixSessionService.Issue(config, email, out var sessionToken);
@@ -414,7 +435,7 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Auth/StandardLogin")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> StandardLogin([FromBody] PasswordLoginRequest request)
+    public async Task<ActionResult<object>> StandardLogin([FromBody] PasswordLoginRequest? request)
     {
         var config = Config;
         if (!config.AllowStandardJellyfinLogin)
@@ -434,7 +455,7 @@ public class StreamFlixController : ControllerBase
         }
 
         var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-        var lockKey = "std|" + remoteIp;
+        var lockKey = "std|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
         if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
@@ -502,7 +523,7 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Auth/AdminLogin")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> AdminLogin([FromBody] PasswordLoginRequest request)
+    public async Task<ActionResult<object>> AdminLogin([FromBody] PasswordLoginRequest? request)
     {
         var config = Config;
         var isUnconfiguredGate = IsGateUnconfigured(config);
@@ -534,7 +555,7 @@ public class StreamFlixController : ControllerBase
         }
 
         var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-        var lockKey = "adm|" + remoteIp;
+        var lockKey = "adm|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
         if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
@@ -848,18 +869,18 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Profiles/Activate")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> ActivateProfile([FromBody] ActivateProfileRequest request)
+    public async Task<ActionResult<object>> ActivateProfile([FromBody] ActivateProfileRequest? request)
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
-            return GoogleRequired();
+            return GoogleRequired(config);
         }
 
         await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
 
-        var profile = FindProfile(config, request.ProfileId);
+        var profile = FindProfile(config, request?.ProfileId);
         if (profile == null)
         {
             return NotFound(new { code = "profile_not_found", message = "That profile no longer exists." });
@@ -871,7 +892,7 @@ public class StreamFlixController : ControllerBase
             return lockResult;
         }
 
-        var suppliedPin = (!string.IsNullOrWhiteSpace(request.Pin) ? request.Pin : request.PinCode) ?? string.Empty;
+        var suppliedPin = (!string.IsNullOrWhiteSpace(request?.Pin) ? request!.Pin : request?.PinCode) ?? string.Empty;
         var pinResult = CheckPin(profile, suppliedPin);
         if (pinResult != null)
         {
@@ -922,6 +943,11 @@ public class StreamFlixController : ControllerBase
             return StatusCode(409, new { code = "profile_unlinked", message = $"\"{profile.Name}\" isn't linked to a Jellyfin user yet. Edit the profile and choose an account." });
         }
 
+        if (StreamFlixStartupTask.IsUserDisabledCompat(user))
+        {
+            return StatusCode(403, new { code = "user_disabled", message = $"The Jellyfin user \"{user.Username}\" is currently disabled in Server Dashboard → Users." });
+        }
+
         var isAdminUser = (primaryAdmin != null && user.Id == primaryAdmin.Id) || StreamFlixStartupTask.IsUserAdminCompat(user);
         var needsUserUpdate = false;
         if (isAdminUser)
@@ -958,10 +984,10 @@ public class StreamFlixController : ControllerBase
             Plugin.Instance?.SaveConfiguration();
         }
 
-        var appName = !string.IsNullOrWhiteSpace(request.AppName) ? request.AppName.Trim() : "Jellyfin Web";
-        var appVersion = !string.IsNullOrWhiteSpace(request.AppVersion) ? request.AppVersion.Trim() : "10.11.0";
-        var deviceId = !string.IsNullOrWhiteSpace(request.DeviceId) ? request.DeviceId.Trim() : $"streamflix-profile-{profile.Id}";
-        var deviceName = !string.IsNullOrWhiteSpace(request.DeviceName) ? request.DeviceName.Trim() : $"StreamFlix ({profile.Name})";
+        var appName = !string.IsNullOrWhiteSpace(request?.AppName) ? request!.AppName!.Trim() : "Jellyfin Web";
+        var appVersion = !string.IsNullOrWhiteSpace(request?.AppVersion) ? request!.AppVersion!.Trim() : "10.11.0";
+        var deviceId = !string.IsNullOrWhiteSpace(request?.DeviceId) ? request!.DeviceId!.Trim() : $"streamflix-profile-{profile.Id}";
+        var deviceName = !string.IsNullOrWhiteSpace(request?.DeviceName) ? request!.DeviceName!.Trim() : $"StreamFlix ({profile.Name})";
 
         var authRequest = new AuthenticationRequest
         {
@@ -1002,34 +1028,45 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Profiles/VerifyPin")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> VerifyPin([FromBody] VerifyPinRequest request)
+    public async Task<ActionResult<object>> VerifyPin([FromBody] VerifyPinRequest? request)
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
-            return GoogleRequired();
+            return GoogleRequired(config);
         }
 
-        var profile = FindProfile(config, request.ProfileId);
+        var profile = FindProfile(config, request?.ProfileId);
         if (profile == null)
         {
             return NotFound(new { code = "profile_not_found", message = "That profile no longer exists." });
         }
 
-        return CheckPin(profile, request.Pin ?? string.Empty) ?? Ok(new { ok = true });
+        var lockResult = CheckGoogleLock(profile, caller);
+        if (lockResult != null)
+        {
+            return lockResult;
+        }
+
+        return CheckPin(profile, request?.Pin ?? string.Empty) ?? Ok(new { ok = true });
     }
 
     [HttpPost("Profiles/Save")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> SaveProfile([FromBody] SaveProfileRequest request)
+    public async Task<ActionResult<object>> SaveProfile([FromBody] SaveProfileRequest? request)
     {
+        if (request == null)
+        {
+            return BadRequest(new { message = "Missing profile payload." });
+        }
+
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
-            return GoogleRequired();
+            return GoogleRequired(config);
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -1193,17 +1230,17 @@ public class StreamFlixController : ControllerBase
             }
 
             existing.Name = cleanName;
-            existing.AvatarColorIndex = request.AvatarColorIndex;
-            existing.AvatarIconIndex = request.AvatarIconIndex;
-            existing.AvatarEmoji = !string.IsNullOrWhiteSpace(request.AvatarEmoji)
-                ? request.AvatarEmoji!
+            existing.AvatarColorIndex = Math.Clamp(request.AvatarColorIndex, 0, 64);
+            existing.AvatarIconIndex = Math.Clamp(request.AvatarIconIndex, 0, 128);
+            var trimmedEmoji = request.AvatarEmoji?.Trim();
+            existing.AvatarEmoji = !string.IsNullOrEmpty(trimmedEmoji)
+                ? (trimmedEmoji.Length > 16 ? trimmedEmoji.Substring(0, 16) : trimmedEmoji)
                 : (request.IsKids ? "🦊" : "🎬");
-            existing.AvatarColorHex = !string.IsNullOrWhiteSpace(request.AvatarColorHex)
-                ? request.AvatarColorHex!
-                : "#E50914";
+            existing.AvatarColorHex = SanitizeHexColor(request.AvatarColorHex);
             existing.IsKids = request.IsKids;
-            existing.MaturityRating = !string.IsNullOrWhiteSpace(request.MaturityRating)
-                ? request.MaturityRating!
+            var trimmedMaturity = request.MaturityRating?.Trim();
+            existing.MaturityRating = !string.IsNullOrEmpty(trimmedMaturity)
+                ? (trimmedMaturity.Length > 60 ? trimmedMaturity.Substring(0, 60) : trimmedMaturity)
                 : (request.IsKids ? "Older Kids (TV-Y7 / PG)" : "TV-MA / R (All Maturity Levels)");
             existing.GoogleAccountEmail = newLock;
 
@@ -1240,16 +1277,16 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Profiles/Reorder")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> ReorderProfiles([FromBody] ReorderProfilesRequest request)
+    public async Task<ActionResult<object>> ReorderProfiles([FromBody] ReorderProfilesRequest? request)
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
-            return GoogleRequired();
+            return GoogleRequired(config);
         }
 
-        if (request.ProfileIds != null && request.ProfileIds.Count > 0 && config.Profiles.Count > 1)
+        if (request?.ProfileIds != null && request.ProfileIds.Count > 0 && config.Profiles.Count > 1)
         {
             await SyncLock.WaitAsync().ConfigureAwait(false);
             try
@@ -1292,13 +1329,13 @@ public class StreamFlixController : ControllerBase
     [HttpPost("Profiles/Delete")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> DeleteProfile([FromBody] DeleteProfileRequest request)
+    public async Task<ActionResult<object>> DeleteProfile([FromBody] DeleteProfileRequest? request)
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
-            return GoogleRequired();
+            return GoogleRequired(config);
         }
 
         if (config.Profiles.Count <= 1)
@@ -1306,7 +1343,7 @@ public class StreamFlixController : ControllerBase
             return BadRequest(new { message = "You can't delete the last remaining profile." });
         }
 
-        var target = FindProfile(config, request.ProfileId);
+        var target = FindProfile(config, request?.ProfileId);
         if (target == null)
         {
             return NotFound(new { code = "profile_not_found", message = "Profile not found." });
@@ -1320,7 +1357,7 @@ public class StreamFlixController : ControllerBase
                 return lockResult;
             }
 
-            var pinResult = CheckPin(target, request.CurrentPin ?? string.Empty);
+            var pinResult = CheckPin(target, request?.CurrentPin ?? string.Empty);
             if (pinResult != null)
             {
                 return pinResult;
@@ -1351,7 +1388,7 @@ public class StreamFlixController : ControllerBase
 
             config.Profiles.Remove(target);
             deletedUserId = target.JellyfinUserId;
-            shouldDeleteUser = request.DeleteJellyfinUser
+            shouldDeleteUser = request?.DeleteJellyfinUser == true
                 && caller.IsAdmin
                 && !string.IsNullOrWhiteSpace(deletedUserId)
                 && !config.Profiles.Any(p => string.Equals(p.JellyfinUserId, deletedUserId, StringComparison.OrdinalIgnoreCase));
@@ -1495,7 +1532,7 @@ public class StreamFlixController : ControllerBase
             return null;
         }
 
-        var lockKey = (HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown") + "|" + profile.Id;
+        var lockKey = StreamFlixSessionService.GetRateLimitClientKey(HttpContext) + "|" + profile.Id;
         if (StreamFlixSessionService.IsPinLockedOut(lockKey, out var retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
@@ -1543,7 +1580,7 @@ public class StreamFlixController : ControllerBase
                 else
                 {
                     var u = _userManager.GetUserById(adminUid);
-                    if (u == null || !StreamFlixStartupTask.IsUserAdminCompat(u))
+                    if (u == null || StreamFlixStartupTask.IsUserDisabledCompat(u) || !StreamFlixStartupTask.IsUserAdminCompat(u))
                     {
                         session = null;
                     }
@@ -1566,7 +1603,7 @@ public class StreamFlixController : ControllerBase
                 else
                 {
                     var u = _userManager.GetUserById(jfUid);
-                    if (u == null)
+                    if (u == null || StreamFlixStartupTask.IsUserDisabledCompat(u))
                     {
                         session = null;
                     }
@@ -1583,7 +1620,7 @@ public class StreamFlixController : ControllerBase
         try
         {
             var info = await _authContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
-            if (info != null && info.IsAuthenticated)
+            if (info != null && info.IsAuthenticated && (info.IsApiKey || !StreamFlixStartupTask.IsUserDisabledCompat(info.User)))
             {
                 isAuthenticated = true;
                 isAdmin = isAdmin || info.IsApiKey || StreamFlixStartupTask.IsUserAdminCompat(info.User);
@@ -1706,7 +1743,7 @@ public class StreamFlixController : ControllerBase
             bypassLoginGateOnLan = config.BypassLoginGateOnLan,
             isLocalLan = caller.IsLocalLan,
             canShowAdminFallback,
-            googleClientId = config.GoogleClientId,
+            googleClientId = caller.IsAdmin || config.EnableGoogleSignIn ? config.GoogleClientId : string.Empty,
             googleConfigured = !string.IsNullOrWhiteSpace(config.GoogleClientId),
             hasGoogleClientSecret = !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
             hasAccess,
@@ -2020,16 +2057,37 @@ public class StreamFlixController : ControllerBase
         public double RecencyBonus { get; set; }
     }
 
+    private static string SanitizeHexColor(string? raw)
+    {
+        if (!string.IsNullOrWhiteSpace(raw))
+        {
+            var trimmed = raw.Trim();
+            if (HexColorRegex.IsMatch(trimmed))
+            {
+                return trimmed;
+            }
+        }
+
+        return "#E50914";
+    }
+
     private static List<object> GetShowcaseItemsCached(ILibraryManager libraryManager)
     {
-        if (DateTime.UtcNow - _showcaseCachedAtUtc < TimeSpan.FromMinutes(10) && _showcaseCache.Count > 0)
+        lock (ShowcaseCacheLock)
         {
-            return _showcaseCache;
+            if (DateTime.UtcNow - _showcaseCachedAtUtc < TimeSpan.FromMinutes(10) && _showcaseCache.Count > 0)
+            {
+                return _showcaseCache;
+            }
         }
 
         var fresh = GetShowcaseItemsCompat(libraryManager);
-        _showcaseCache = fresh;
-        _showcaseCachedAtUtc = DateTime.UtcNow;
+        lock (ShowcaseCacheLock)
+        {
+            _showcaseCache = fresh;
+            _showcaseCachedAtUtc = DateTime.UtcNow;
+        }
+
         return fresh;
     }
 
@@ -2137,7 +2195,7 @@ public class StreamFlixController : ControllerBase
             avatarColorIndex = p.AvatarColorIndex,
             avatarIconIndex = p.AvatarIconIndex,
             avatarEmoji = p.AvatarEmoji,
-            avatarColorHex = string.IsNullOrWhiteSpace(p.AvatarColorHex) ? "#E50914" : p.AvatarColorHex,
+            avatarColorHex = SanitizeHexColor(p.AvatarColorHex),
             isKids = p.IsKids,
             isAdmin,
             isOwner = StreamFlixStartupTask.IsOwnerProfile(p),

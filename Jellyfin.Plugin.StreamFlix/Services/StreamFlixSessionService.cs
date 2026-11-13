@@ -201,7 +201,8 @@ public static class StreamFlixSessionService
     /// <summary>
     /// Determines whether an incoming HTTP request originates from a private/loopback local LAN IP address.
     /// Rejects external WAN clients even if they spoof forwarded headers, and detects reverse-proxied WAN clients
-    /// when a local proxy forwards an external <c>X-Forwarded-For</c>, <c>X-Real-IP</c>, or <c>CF-Connecting-IP</c>.
+    /// when a local proxy forwards an external <c>Forwarded</c> (RFC 7239), <c>X-Forwarded-For</c>, <c>X-Real-IP</c>,
+    /// <c>CF-Connecting-IP</c>, <c>True-Client-IP</c>, or <c>X-Client-IP</c> header.
     /// </summary>
     public static bool IsLocalLanRequest(HttpContext? httpContext)
     {
@@ -212,7 +213,7 @@ public static class StreamFlixSessionService
         }
 
         var headers = httpContext!.Request.Headers;
-        foreach (var headerName in new[] { "CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP" })
+        foreach (var headerName in new[] { "CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Real-IP", "X-Forwarded-For" })
         {
             var raw = headers[headerName].ToString();
             if (string.IsNullOrWhiteSpace(raw))
@@ -230,7 +231,75 @@ public static class StreamFlixSessionService
             }
         }
 
+        var rfcForwarded = headers["Forwarded"].ToString();
+        if (!string.IsNullOrWhiteSpace(rfcForwarded))
+        {
+            var sawForToken = false;
+            foreach (var entry in rfcForwarded.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                foreach (var param in entry.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (!param.StartsWith("for=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    sawForToken = true;
+                    var rawVal = param.Substring(4).Trim().Trim('"');
+                    var candidate = StripOptionalPort(rawVal);
+                    if (!IPAddress.TryParse(candidate, out var forwardedIp) || !IsPrivateOrLoopbackIp(forwardedIp))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (!sawForToken)
+            {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    /// <summary>
+    /// Builds a spoof-resistant rate-limit key for PIN and password login attempts: keys directly on the socket IP
+    /// for non-loopback connections (preventing header spoofing), and sub-keys on the first valid forwarded client IP
+    /// when Jellyfin sits behind a localhost reverse proxy (<c>127.0.0.1</c> / <c>::1</c>).
+    /// </summary>
+    public static string GetRateLimitClientKey(HttpContext? httpContext)
+    {
+        var remoteIp = httpContext?.Connection?.RemoteIpAddress;
+        if (remoteIp == null)
+        {
+            return "unknown";
+        }
+
+        var normalizedRemote = remoteIp.IsIPv4MappedToIPv6 ? remoteIp.MapToIPv4() : remoteIp;
+        if (!IPAddress.IsLoopback(normalizedRemote))
+        {
+            return normalizedRemote.ToString();
+        }
+
+        var headers = httpContext!.Request.Headers;
+        foreach (var headerName in new[] { "CF-Connecting-IP", "True-Client-IP", "X-Real-IP", "X-Forwarded-For" })
+        {
+            var raw = headers[headerName].ToString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var first = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (first.Length > 0 && IPAddress.TryParse(StripOptionalPort(first[0]), out var fwdIp))
+            {
+                var normFwd = fwdIp.IsIPv4MappedToIPv6 ? fwdIp.MapToIPv4() : fwdIp;
+                return normalizedRemote + "|" + normFwd;
+            }
+        }
+
+        return normalizedRemote.ToString();
     }
 
     public static bool IsPrivateOrLoopbackIp(IPAddress ip)
@@ -380,18 +449,26 @@ public static class StreamFlixSessionService
 
     private static string StripOptionalPort(string raw)
     {
-        var s = raw.Trim();
+        var s = raw.Trim().Trim('"');
         if (s.StartsWith('[') && s.Contains(']'))
         {
             var close = s.IndexOf(']');
-            return s.Substring(1, close - 1);
+            s = s.Substring(1, close - 1);
+        }
+        else
+        {
+            var firstColon = s.IndexOf(':');
+            var lastColon = s.LastIndexOf(':');
+            if (firstColon > 0 && firstColon == lastColon)
+            {
+                s = s.Substring(0, firstColon);
+            }
         }
 
-        var firstColon = s.IndexOf(':');
-        var lastColon = s.LastIndexOf(':');
-        if (firstColon > 0 && firstColon == lastColon)
+        var zoneIdx = s.IndexOf('%');
+        if (zoneIdx > 0)
         {
-            return s.Substring(0, firstColon);
+            s = s.Substring(0, zoneIdx);
         }
 
         return s;
