@@ -4,7 +4,7 @@
 
 **A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
 
-[![Version](https://img.shields.io/badge/version-0.5.3-E50914?style=flat-square)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.4-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=flat-square)](Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
@@ -34,7 +34,7 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
     <td colspan="2" align="center">
       <img src="docs/screenshots/home-and-account-menu.png" alt="StreamFlix Home and Account Menu" />
       <br />
-      <sub><b>3. StreamFlix Home &amp; Account Menu</b> — Segmented navigation, Cast, Quick Connect, StreamFlix Home &amp; Auto-skip Intros</sub>
+      <sub><b>3. StreamFlix Home &amp; Account Menu</b> — Segmented navigation, Cast, Quick Connect &amp; StreamFlix Home</sub>
     </td>
   </tr>
 </table>
@@ -62,7 +62,7 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 ### Netflix-Style Video Player
 - **Streamlined controls.** Slim red scrubber, centered title, 10s/30s skip buttons, play/pause pulse feedback, and a *"You're watching"* pause screen.
 - **In-player drawers & popovers.** Switch episodes instantly from the slide-in **Episodes & Seasons** drawer and change tracks live in the unified two-column **Audio & Subtitles** popover.
-- **Seamless binge watching.** End-of-episode **Next Episode** countdown card (*Play Next* / *Watch Credits*) plus a per-profile **Auto-skip intros** toggle in the account menu.
+- **Seamless binge watching.** End-of-episode **Next Episode** countdown card (*Play Next* / *Watch Credits*) so multi-episode sessions keep flowing automatically.
 
 ### Desktop, Phone & Smart TV Ready
 - **Mobile-tuned.** Single-row category bar with tap-to-expand search, touch-swipe hero billboard, 3-up snap-scrolling poster rows, bottom-sheet modals, and a collision-free landscape player.

@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.5.3';
+    var VERSION = '0.5.4';
     // Household session issued by the server after Google verification ({ token, email, name, picture, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -20,11 +20,10 @@
     var CACHED_CONFIG_KEY = 'streamflix_cached_config_v7';
     var CINEMA_HUB_PREF_KEY = 'streamflix_cinema_hub_enabled_v1';
     var SHOWCASE_ITEMS_KEY = 'streamflix_showcase_items_v1';
-    var AUTOSKIP_INTRO_KEY = 'streamflix_autoskip_intro_v1';
 
     // Pre-v7 storage: unsigned client-side Google flag and caches with hard-coded defaults
     try {
-        ['streamflix_google_auth_v1', 'streamflix_cached_config_v64', 'streamflix_cached_config_v6'].forEach(function (k) {
+        ['streamflix_google_auth_v1', 'streamflix_cached_config_v64', 'streamflix_cached_config_v6', 'streamflix_autoskip_intro_v1'].forEach(function (k) {
             localStorage.removeItem(k);
         });
     } catch (e) {}
@@ -195,29 +194,6 @@
 
     function iconLabel(name, text) {
         return icon(name) + '<span>' + escapeHtml(text) + '</span>';
-    }
-
-    function getAutoSkipProfileKey(profile) {
-        var p = profile || state.activeProfile;
-        return (p && (p.id || p.jellyfinUserId)) || getActiveUserId() || 'default';
-    }
-
-    function isAutoSkipIntroEnabled(profile) {
-        var map = loadJson(AUTOSKIP_INTRO_KEY, null);
-        if (!map || typeof map !== 'object') {
-            return false;
-        }
-        return Boolean(map[getAutoSkipProfileKey(profile)]);
-    }
-
-    function setAutoSkipIntroEnabled(enabled, profile) {
-        var map = loadJson(AUTOSKIP_INTRO_KEY, null);
-        if (!map || typeof map !== 'object') {
-            map = {};
-        }
-        map[getAutoSkipProfileKey(profile)] = Boolean(enabled);
-        saveJson(AUTOSKIP_INTRO_KEY, map);
-        return Boolean(enabled);
     }
 
     function isRecentlyAdded(item) {
@@ -3715,8 +3691,6 @@
             + ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>')
             + ddItem('streamflix-dd-toggle-hub', 'home', 'StreamFlix Home', '', 'bfx-dd-switch-row',
                 '<span class="bfx-switch' + (state.cinemaHubEnabled ? ' on' : '') + '" aria-hidden="true"><i></i></span>')
-            + ddItem('streamflix-dd-toggle-autoskip', 'skipForward', 'Auto-skip intros', '', 'bfx-dd-switch-row',
-                '<span class="bfx-switch' + (isAutoSkipIntroEnabled(active) ? ' on' : '') + '" aria-hidden="true"><i></i></span>')
             + (isAdmin ? ddItem('streamflix-dd-dashboard', 'gear', 'Dashboard', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
             + '<div class="streamflix-dd-divider"></div>'
             + ddItem('streamflix-dd-signout', 'logout', 'Sign out', '', 'danger');
@@ -3766,18 +3740,6 @@
             }
             showToast('StreamFlix Home ' + (state.cinemaHubEnabled ? 'enabled' : 'disabled') + '.', 'info');
         });
-        var autoSkipBtn = document.getElementById('streamflix-dd-toggle-autoskip');
-        if (autoSkipBtn) {
-            autoSkipBtn.addEventListener('click', function (ev) {
-                ev.stopPropagation();
-                var nextVal = setAutoSkipIntroEnabled(!isAutoSkipIntroEnabled(active), active);
-                var sw = autoSkipBtn.querySelector('.bfx-switch');
-                if (sw) {
-                    sw.classList.toggle('on', nextVal);
-                }
-                showToast('Auto-skip intros ' + (nextVal ? 'on' : 'off') + ' for ' + (active.name || 'this profile') + '.', 'info');
-            });
-        }
         bind('streamflix-dd-user-prefs', function () {
             window.location.hash = '#/mypreferencesmenu';
         });
@@ -3983,9 +3945,7 @@
         upNextDismissedForId: '',
         upNextCountdown: 0,
         upNextTotal: 10,
-        upNextTimer: null,
-        introSkippedForId: '',
-        introSkipAt: 0
+        upNextTimer: null
     };
 
     function osdSkipSeconds(kind) {
@@ -4120,7 +4080,6 @@
             }
             paintOsdTitle();
             syncOsdExtraButtons();
-            checkOsdAutoSkipIntro();
             checkOsdUpNext();
         }).catch(function () {
             osdState.fetching = false;
@@ -4253,7 +4212,6 @@
                 armOsdPaused();
             },
             timeupdate: function () {
-                checkOsdAutoSkipIntro();
                 checkOsdUpNext();
             },
             seeked: function () {
@@ -4316,7 +4274,6 @@
         refreshOsdInfo(false);
         paintOsdTitle();
         syncOsdExtraButtons();
-        checkOsdAutoSkipIntro();
     }
 
     // Jellyfin 12 draws the player's top bar with React (MUI). Drop its title (the bottom bar already shows it)
@@ -4877,60 +4834,6 @@
                 try { firstOpt.focus({ preventScroll: true }); } catch (e) {}
             }
         }
-    }
-
-    function checkOsdAutoSkipIntro() {
-        if (!isAutoSkipIntroEnabled() || !isVideoPlayerActive()) {
-            return false;
-        }
-        var now = Date.now();
-        if (osdState.introSkipAt && now - osdState.introSkipAt < 5000) {
-            return false;
-        }
-        var curId = (osdState.info && osdState.info.Id) ? normalizeGuid(osdState.info.Id) : (String(document.title || '') || 'playing');
-        if (osdState.introSkippedForId && osdState.introSkippedForId === curId) {
-            return false;
-        }
-
-        // 1. Native Jellyfin / Intro-Skipper button when visible and labeled "Skip Intro"
-        var skipBtns = document.querySelectorAll('.skip-button:not(.hide), .skipIntroButton:not(.hide), button[data-skip="intro"]:not(.hide)');
-        for (var i = 0; i < skipBtns.length; i++) {
-            var b = skipBtns[i];
-            var cs = window.getComputedStyle ? window.getComputedStyle(b) : null;
-            if (cs && (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0')) {
-                continue;
-            }
-            var txt = String(b.textContent || b.getAttribute('aria-label') || '').trim();
-            if (/skip\s*intro/i.test(txt)) {
-                osdState.introSkippedForId = curId;
-                osdState.introSkipAt = now;
-                try { b.click(); } catch (e) {}
-                showToast('Intro skipped', 'info', 2200);
-                return true;
-            }
-        }
-
-        // 2. Chapter marker fallback (when Chapters has an "Intro" / "Opening" segment)
-        var v = osdState.video;
-        var chapters = osdState.info && Array.isArray(osdState.info.Chapters) ? osdState.info.Chapters : [];
-        if (v && chapters.length >= 2 && typeof v.currentTime === 'number') {
-            for (var c = 0; c < chapters.length - 1; c++) {
-                var ch = chapters[c];
-                var nextCh = chapters[c + 1];
-                if (ch && nextCh && /^(intro|opening|opening credits|theme)$/i.test(String(ch.Name || '').trim())) {
-                    var startSec = (Number(ch.StartPositionTicks) || 0) / 10000000;
-                    var endSec = (Number(nextCh.StartPositionTicks) || 0) / 10000000;
-                    if (endSec > startSec + 5 && endSec - startSec <= 240 && v.currentTime >= startSec + 0.5 && v.currentTime < endSec - 1.5) {
-                        osdState.introSkippedForId = curId;
-                        osdState.introSkipAt = now;
-                        try { v.currentTime = endSec; } catch (eSeek) {}
-                        showToast('Intro skipped', 'info', 2200);
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     function hideOsdUpNextCard() {
