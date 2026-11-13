@@ -20,7 +20,7 @@ env:
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks."
-  PLUGIN_CHANGELOG: "v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop | v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release."
+  PLUGIN_CHANGELOG: "- Remove non-working Auto-skip intros toggle from the account menu and video player check loop"
 
 jobs:
   build-and-publish:
@@ -43,7 +43,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          rm -f dist/*.zip
           TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "TIMESTAMP=${TIMESTAMP}" >> "$GITHUB_ENV"
 
@@ -77,36 +76,73 @@ jobs:
           build_target jf1011 "10.11.0.0" "10.11.0"
           build_target jf109  "10.9.0.0"  "10.9.0"
 
-      - name: Generate Jellyfin Repository manifest.json
+      - name: Update Jellyfin Repository manifest.json (Preserve Revision History)
         run: |
-          set -euo pipefail
-          entry() {
-            local abi="$1" suffix="$2"
-            local zip="dist/Jellyfin.Plugin.StreamFlix_${PLUGIN_VERSION}_${suffix}.zip"
-            jq -n \
-              --arg version "$PLUGIN_VERSION" --arg changelog "$PLUGIN_CHANGELOG" \
-              --arg targetAbi "$abi" \
-              --arg sourceUrl "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${zip}" \
-              --arg checksum "$(md5sum "$zip" | awk '{print $1}')" \
-              --arg timestamp "$TIMESTAMP" \
-              '{version:$version,changelog:$changelog,targetAbi:$targetAbi,sourceUrl:$sourceUrl,checksum:$checksum,timestamp:$timestamp}'
-          }
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
 
-          # Highest ABI first: Jellyfin picks the first compatible entry for equal versions.
-          VERSIONS="$(jq -s '.' \
-            <(entry "12.0.0.0"  "12.0.0") \
-            <(entry "10.11.0.0" "10.11.0") \
-            <(entry "10.10.0.0" "10.9.0") \
-            <(entry "10.9.0.0"  "10.9.0"))"
+          repo = os.environ["GITHUB_REPOSITORY"]
+          version = os.environ["PLUGIN_VERSION"]
+          changelog = os.environ["PLUGIN_CHANGELOG"].strip()
+          timestamp = os.environ["TIMESTAMP"]
+          guid = os.environ["PLUGIN_GUID"]
+          name = os.environ["PLUGIN_NAME"]
+          overview = os.environ["PLUGIN_OVERVIEW"]
+          description = os.environ["PLUGIN_DESCRIPTION"]
 
-          jq -n \
-            --arg guid "$PLUGIN_GUID" --arg name "$PLUGIN_NAME" \
-            --arg overview "$PLUGIN_OVERVIEW" --arg description "$PLUGIN_DESCRIPTION" \
-            --arg imageUrl "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/Jellyfin.Plugin.StreamFlix/thumb.png" \
-            --argjson versions "$VERSIONS" \
-            '[{guid:$guid,name:$name,overview:$overview,description:$description,owner:"StreamFlix",category:"General",imageUrl:$imageUrl,versions:$versions}]' \
-            > manifest.json
-          cat manifest.json
+          manifest_path = pathlib.Path("manifest.json")
+          existing_versions = []
+          if manifest_path.exists():
+              try:
+                  data = json.loads(manifest_path.read_text(encoding="utf-8"))
+                  if isinstance(data, list) and data and isinstance(data[0].get("versions"), list):
+                      existing_versions = [
+                          v for v in data[0]["versions"]
+                          if v.get("version") != version
+                      ]
+              except Exception:
+                  existing_versions = []
+
+          targets = [
+              ("12.0.0.0",  "12.0.0",  "Build for Jellyfin 12.x (.NET 10)."),
+              ("10.11.0.0", "10.11.0", "Build for Jellyfin 10.11.x (.NET 9)."),
+              ("10.9.0.0",  "10.9.0",  "Build for Jellyfin 10.9 - 10.10 (.NET 8)."),
+          ]
+
+          new_entries = []
+          for abi, suffix, label in targets:
+              zip_rel = f"dist/Jellyfin.Plugin.StreamFlix_{version}_{suffix}.zip"
+              md5 = hashlib.md5(pathlib.Path(zip_rel).read_bytes()).hexdigest()
+              new_entries.append({
+                  "version": version,
+                  "changelog": f"{label}\n\n{changelog}",
+                  "targetAbi": abi,
+                  "sourceUrl": f"https://raw.githubusercontent.com/{repo}/main/{zip_rel}",
+                  "checksum": md5,
+                  "timestamp": timestamp,
+              })
+
+          abi_rank = {"12.0.0.0": 3, "10.11.0.0": 2, "10.10.0.0": 1, "10.9.0.0": 0}
+          def sort_key(entry):
+              ver_parts = tuple(int(x) for x in str(entry.get("version", "0.0.0.0")).split("."))
+              return (ver_parts, abi_rank.get(entry.get("targetAbi", ""), -1))
+
+          merged = sorted(new_entries + existing_versions, key=sort_key, reverse=True)
+
+          manifest = [{
+              "guid": guid,
+              "name": name,
+              "overview": overview,
+              "description": description,
+              "owner": "StreamFlix",
+              "category": "General",
+              "imageUrl": f"https://raw.githubusercontent.com/{repo}/main/Jellyfin.Plugin.StreamFlix/thumb.png",
+              "versions": merged,
+          }]
+
+          manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          print(f"Updated manifest.json with {len(merged)} entries (latest: {version}).")
+          PY
 
       - name: Commit Packaged Plugin Zips & Updated manifest.json
         run: |

@@ -10,7 +10,7 @@
     "versions": [
       {
         "version": "0.5.4.0",
-        "changelog": "v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop | v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Remove non-working Auto-skip intros toggle from the account menu and video player check loop",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.4.0_12.0.0.zip",
         "checksum": "edcbc8eca76aa7c16a0b598fb60c6f81",
@@ -18,7 +18,7 @@
       },
       {
         "version": "0.5.4.0",
-        "changelog": "v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop | v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Remove non-working Auto-skip intros toggle from the account menu and video player check loop",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.4.0_10.11.0.zip",
         "checksum": "7822c15d61ec9951c1bcb933df4a7915",
@@ -26,19 +26,107 @@
       },
       {
         "version": "0.5.4.0",
-        "changelog": "v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop | v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
-        "targetAbi": "10.10.0.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Remove non-working Auto-skip intros toggle from the account menu and video player check loop",
+        "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.4.0_10.9.0.zip",
         "checksum": "c4e1c21e3c1ef60433bd50f36b084af3",
         "timestamp": "2026-11-13T00:12:37Z"
       },
       {
-        "version": "0.5.4.0",
-        "changelog": "v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop | v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release.",
+        "version": "0.5.3.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_12.0.0.zip",
+        "checksum": "c632fba92805b5268821a85a7a4d472e",
+        "timestamp": "2026-11-13T00:06:06Z"
+      },
+      {
+        "version": "0.5.3.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_10.11.0.zip",
+        "checksum": "1511d06423b36d670b4df7333952a8f3",
+        "timestamp": "2026-11-13T00:06:06Z"
+      },
+      {
+        "version": "0.5.3.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog",
         "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.4.0_10.9.0.zip",
-        "checksum": "c4e1c21e3c1ef60433bd50f36b084af3",
-        "timestamp": "2026-11-13T00:12:37Z"
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.3.0_10.9.0.zip",
+        "checksum": "d2d83b5f7bc9f4c84649dfca902a517c",
+        "timestamp": "2026-11-13T00:06:06Z"
+      },
+      {
+        "version": "0.5.2.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add thread-safe lock around on-disk index.html and branding.xml injection\n- Support both aud and issued_to audience fields during Google OAuth token verification\n- Return clean HTTP 403 responses on direct session authentication errors\n- Handle trailing slashes on /Branding/Css and cache reflected SetPermission lookup",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_12.0.0.zip",
+        "checksum": "4ebdc7eb25b0eeef9e0a51ff80204b8d",
+        "timestamp": "2026-11-12T23:53:24Z"
+      },
+      {
+        "version": "0.5.2.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Add thread-safe lock around on-disk index.html and branding.xml injection\n- Support both aud and issued_to audience fields during Google OAuth token verification\n- Return clean HTTP 403 responses on direct session authentication errors\n- Handle trailing slashes on /Branding/Css and cache reflected SetPermission lookup",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.11.0.zip",
+        "checksum": "da44225b5a51d53cb6ef6fde4d0dbbce",
+        "timestamp": "2026-11-12T23:53:24Z"
+      },
+      {
+        "version": "0.5.2.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Add thread-safe lock around on-disk index.html and branding.xml injection\n- Support both aud and issued_to audience fields during Google OAuth token verification\n- Return clean HTTP 403 responses on direct session authentication errors\n- Handle trailing slashes on /Branding/Css and cache reflected SetPermission lookup",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.2.0_10.9.0.zip",
+        "checksum": "6e81ea986c2fdeed925dbaea53b6d349",
+        "timestamp": "2026-11-12T23:53:24Z"
+      },
+      {
+        "version": "0.5.1.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add thread-safe profile synchronization lock across concurrent household requests\n- Use constant-time PIN comparison with bounded brute-force lockout pruning\n- Add ETag caching (304 Not Modified) on /Branding/Css\n- Sanitize symbol and emoji profile names for Jellyfin 12 case-insensitive usernames",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_12.0.0.zip",
+        "checksum": "6d9c958fb078d60a5a1ae8ec7351d6fd",
+        "timestamp": "2026-11-12T23:23:02Z"
+      },
+      {
+        "version": "0.5.1.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Add thread-safe profile synchronization lock across concurrent household requests\n- Use constant-time PIN comparison with bounded brute-force lockout pruning\n- Add ETag caching (304 Not Modified) on /Branding/Css\n- Sanitize symbol and emoji profile names for Jellyfin 12 case-insensitive usernames",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.11.0.zip",
+        "checksum": "ee535368e7b210462149a66fe345bd9b",
+        "timestamp": "2026-11-12T23:23:02Z"
+      },
+      {
+        "version": "0.5.1.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Add thread-safe profile synchronization lock across concurrent household requests\n- Use constant-time PIN comparison with bounded brute-force lockout pruning\n- Add ETag caching (304 Not Modified) on /Branding/Css\n- Sanitize symbol and emoji profile names for Jellyfin 12 case-insensitive usernames",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.1.0_10.9.0.zip",
+        "checksum": "9ea0500a0cd182ac0aac05951621f4a4",
+        "timestamp": "2026-11-12T23:23:02Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Initial public beta release\n- Netflix-style home screen with living hero billboard, hover previews, and smart collections\n- Server-verified Google Sign-In gate with HMAC-signed household sessions\n- Real multi-user \"Who's watching?\" profiles backed by Jellyfin Server Users with PIN & Google locks\n- Redesigned video player with Episodes & Seasons drawer, Audio & Subtitles popover, and Next Episode countdown\n- Desktop, mobile, and 10-foot Smart TV layouts with built-in Quick Connect & Cast",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_12.0.0.zip",
+        "checksum": "b90b2dea6430f1bba96d5d13b13131f0",
+        "timestamp": "2026-11-12T21:55:29Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Initial public beta release\n- Netflix-style home screen with living hero billboard, hover previews, and smart collections\n- Server-verified Google Sign-In gate with HMAC-signed household sessions\n- Real multi-user \"Who's watching?\" profiles backed by Jellyfin Server Users with PIN & Google locks\n- Redesigned video player with Episodes & Seasons drawer, Audio & Subtitles popover, and Next Episode countdown\n- Desktop, mobile, and 10-foot Smart TV layouts with built-in Quick Connect & Cast",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.11.0.zip",
+        "checksum": "766b1aef5b739584570ea3ed7bf45a8a",
+        "timestamp": "2026-11-12T21:55:29Z"
+      },
+      {
+        "version": "0.5.0.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Initial public beta release\n- Netflix-style home screen with living hero billboard, hover previews, and smart collections\n- Server-verified Google Sign-In gate with HMAC-signed household sessions\n- Real multi-user \"Who's watching?\" profiles backed by Jellyfin Server Users with PIN & Google locks\n- Redesigned video player with Episodes & Seasons drawer, Audio & Subtitles popover, and Next Episode countdown\n- Desktop, mobile, and 10-foot Smart TV layouts with built-in Quick Connect & Cast",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.0.0_10.9.0.zip",
+        "checksum": "d5d02643cbf935665143c7bbf460e71d",
+        "timestamp": "2026-11-12T21:55:29Z"
       }
     ]
   }
