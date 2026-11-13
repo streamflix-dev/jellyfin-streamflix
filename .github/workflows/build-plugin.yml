@@ -153,3 +153,76 @@ jobs:
             git commit -m "chore(release): build v${PLUGIN_VERSION} plugin packages and update manifest.json [skip ci]"
             git push origin HEAD:main
           fi
+
+      - name: Create or Update Git Release Tag & GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+
+          version = os.environ["PLUGIN_VERSION"].strip()
+          parts = version.split(".")
+          tag = "v" + ".".join(parts[:3] if len(parts) == 4 and parts[3] == "0" else parts)
+
+          manifest = json.loads(pathlib.Path("manifest.json").read_text(encoding="utf-8"))
+          entries = {
+              v["targetAbi"]: v
+              for v in manifest[0]["versions"]
+              if v.get("version") == version
+          }
+          raw_cl = entries["12.0.0.0"]["changelog"]
+          bullets = raw_cl.split("\n\n", 1)[1] if "\n\n" in raw_cl else raw_cl
+
+          notes = (
+              f"## What's Changed in {tag}\n\n"
+              f"{bullets}\n\n"
+              f"### Packages & MD5 Checksums\n\n"
+              f"| Jellyfin Server | Target ABI | Runtime | Asset | MD5 |\n"
+              f"| :--- | :--- | :--- | :--- | :--- |\n"
+              f"| **12.x** | `12.0.0.0` | .NET 10.0 | `Jellyfin.Plugin.StreamFlix_{version}_12.0.0.zip` | `{entries['12.0.0.0']['checksum']}` |\n"
+              f"| **10.11.x** | `10.11.0.0` | .NET 9.0 | `Jellyfin.Plugin.StreamFlix_{version}_10.11.0.zip` | `{entries['10.11.0.0']['checksum']}` |\n"
+              f"| **10.9.x – 10.10.x** | `10.9.0.0` | .NET 8.0 | `Jellyfin.Plugin.StreamFlix_{version}_10.9.0.zip` | `{entries['10.9.0.0']['checksum']}` |\n"
+          )
+          pathlib.Path("release_notes.md").write_text(notes, encoding="utf-8")
+
+          zips = [
+              f"dist/Jellyfin.Plugin.StreamFlix_{version}_12.0.0.zip",
+              f"dist/Jellyfin.Plugin.StreamFlix_{version}_10.11.0.zip",
+              f"dist/Jellyfin.Plugin.StreamFlix_{version}_10.9.0.zip",
+          ]
+
+          # Create annotated git tag at HEAD if it does not already exist
+          tag_exists = subprocess.run(
+              ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+          ).returncode == 0
+          if not tag_exists:
+              subprocess.run([
+                  "git", "-c", "user.name=github-actions[bot]",
+                  "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+                  "tag", "-a", tag, "HEAD", "-m", f"StreamFlix {tag} ({version})\n\n{bullets}"
+              ], check=True)
+              subprocess.run(["git", "push", "origin", tag], check=True)
+
+          # Create or update GitHub Release
+          rel_exists = subprocess.run(
+              ["gh", "release", "view", tag],
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+          ).returncode == 0
+          if rel_exists:
+              subprocess.run([
+                  "gh", "release", "edit", tag,
+                  "--title", f"StreamFlix {tag} ({version})",
+                  "--notes-file", "release_notes.md"
+              ], check=True)
+              subprocess.run(["gh", "release", "upload", tag, "--clobber", *zips], check=True)
+          else:
+              subprocess.run([
+                  "gh", "release", "create", tag, *zips,
+                  "--title", f"StreamFlix {tag} ({version})",
+                  "--notes-file", "release_notes.md",
+                  "--latest"
+              ], check=True)
+          PY
