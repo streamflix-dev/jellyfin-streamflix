@@ -43,6 +43,36 @@ public class StreamFlixProfileConfig
 }
 
 /// <summary>
+/// Represents a time-limited, revocable Guest Pass locked to a single non-administrator StreamFlix profile.
+/// </summary>
+public class StreamFlixGuestPass
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public string ProfileId { get; set; } = string.Empty;
+
+    public string ProfileNameSnapshot { get; set; } = string.Empty;
+
+    public string CreatedAtUtc { get; set; } = string.Empty;
+
+    public string ExpiresAtUtc { get; set; } = string.Empty;
+
+    public int MaxRedemptions { get; set; }
+
+    public int RedemptionCount { get; set; }
+
+    public string? LastRedeemedAtUtc { get; set; }
+
+    public bool Revoked { get; set; }
+
+    public string? RevokedAtUtc { get; set; }
+
+    public string SecretNonce { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Plugin configuration stored directly on the Jellyfin Server (`plugins/configurations/Jellyfin.Plugin.StreamFlix.xml`).
 /// Lists are initialized empty in the parameterless constructor so .NET XmlSerializer does not re-add deleted
 /// default profiles when deserializing configuration from disk.
@@ -83,6 +113,12 @@ public class PluginConfiguration : BasePluginConfiguration
         OidcClientSecret = string.Empty;
         OidcRequireAllowlist = false;
         ApprovedOidcUsers = new List<string>();
+        GuestPasses = new List<StreamFlixGuestPass>();
+        EnableSeerr = false;
+        SeerrUrl = string.Empty;
+        SeerrApiKey = string.Empty;
+        SeerrAllowKids = false;
+        SeerrAllowGuests = false;
         MigratedV7 = false;
     }
 
@@ -230,6 +266,36 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets optional approved OIDC emails, preferred_usernames, or subjects (one per line).
     /// </summary>
     public List<string> ApprovedOidcUsers { get; set; }
+
+    /// <summary>
+    /// Gets or sets temporary, revocable Guest Passes issued by administrators.
+    /// </summary>
+    public List<StreamFlixGuestPass> GuestPasses { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Seerr / Jellyseerr / Overseerr media request integration is enabled.
+    /// </summary>
+    public bool EnableSeerr { get; set; }
+
+    /// <summary>
+    /// Gets or sets the base URL of the Seerr / Jellyseerr / Overseerr instance (e.g. <c>http://localhost:5055</c>).
+    /// </summary>
+    public string SeerrUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets the server-only Seerr / Jellyseerr API key (<c>X-Api-Key</c>). Never sent to browsers.
+    /// </summary>
+    public string SeerrApiKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Kids profiles are allowed to see and submit Seerr requests.
+    /// </summary>
+    public bool SeerrAllowKids { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Guest Pass viewers are allowed to see and submit Seerr requests.
+    /// </summary>
+    public bool SeerrAllowGuests { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the one-time v7 configuration migration has run.

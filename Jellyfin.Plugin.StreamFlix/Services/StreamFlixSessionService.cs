@@ -22,27 +22,45 @@ public static class StreamFlixSessionService
     public const string AuthKindOidc = "oidc";
     public const string AuthKindJellyfin = "jellyfin";
     public const string AuthKindJellyfinAdmin = "jellyfin_admin";
+    public const string AuthKindGuestPass = "guest_pass";
+    public const string GuestHandoffCookieName = "sf_guest_handoff";
+    public const string GuestHandoffTokenPurpose = "guest_handoff";
 
     private const int MaxPinFailures = 5;
+    private const int MaxPinTargetFailures = 14;
     private const int MaxLoginFailures = 6;
+    private const int MaxGuestFailures = 8;
 
     private static readonly TimeSpan PinLockout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan LoginLockout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan GuestLockout = TimeSpan.FromMinutes(5);
 
     private static readonly ConcurrentDictionary<string, PinAttemptState> PinAttempts = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, PinAttemptState> PinTargetAttempts = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, PinAttemptState> LoginAttempts = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, PinAttemptState> GuestAttempts = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly object KeyLock = new();
 
     /// <summary>
-    /// A validated household session.
+    /// A validated household or guest session.
     /// </summary>
     public sealed record SessionInfo(
         string Email,
         DateTimeOffset ExpiresAt,
         string AuthKind = AuthKindGoogle,
         string? JellyfinUserId = null,
-        string? Username = null);
+        string? Username = null,
+        string? GuestPassId = null,
+        string? LockedProfileId = null);
+
+    /// <summary>
+    /// Short-lived HttpOnly cookie payload used to complete 1-click Guest Pass link/QR redemption.
+    /// </summary>
+    public sealed record GuestHandoffPayload(
+        string PassId,
+        string Code,
+        string CreatedAt);
 
     /// <summary>
     /// Returns true when the email is on the allowlist or is the Google lock of any profile.
@@ -197,6 +215,145 @@ public static class StreamFlixSessionService
     }
 
     /// <summary>
+    /// Computes the unforgeable shareable code (<c>{passId}-{24HexMac}</c>) for a Guest Pass.
+    /// </summary>
+    public static string ComputeGuestPassCode(PluginConfiguration config, StreamFlixGuestPass pass)
+    {
+        var key = GetOrCreateKey(config);
+        var material = $"guest_pass_code:v1:{pass.Id}:{pass.ProfileId}:{pass.SecretNonce}:{pass.ExpiresAtUtc}";
+        var mac = Sign(key, material);
+        var shortMac = Convert.ToHexString(mac, 0, 12).ToLowerInvariant();
+        return $"{pass.Id}-{shortMac}";
+    }
+
+    /// <summary>
+    /// Normalizes a raw Guest Pass input (accepts either the bare pass code or a full <c>/StreamFlix/Guest/{code}</c> URL).
+    /// </summary>
+    public static string ExtractGuestPassCode(string? rawInput)
+    {
+        if (string.IsNullOrWhiteSpace(rawInput))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = rawInput.Trim();
+        var guestIdx = trimmed.LastIndexOf("/StreamFlix/Guest/", StringComparison.OrdinalIgnoreCase);
+        if (guestIdx >= 0)
+        {
+            trimmed = trimmed.Substring(guestIdx + "/StreamFlix/Guest/".Length);
+        }
+
+        var qIdx = trimmed.IndexOfAny(new[] { '?', '#', '/' });
+        if (qIdx >= 0)
+        {
+            trimmed = trimmed.Substring(0, qIdx);
+        }
+
+        return Uri.UnescapeDataString(trimmed).Trim();
+    }
+
+    /// <summary>
+    /// Verifies a Guest Pass code for redemption (checking HMAC signature, revocation, expiry, and redemption cap).
+    /// </summary>
+    public static bool TryVerifyGuestPassForRedemption(
+        PluginConfiguration config,
+        string? rawInput,
+        out StreamFlixGuestPass? matchedPass,
+        out string failureReason)
+    {
+        matchedPass = null;
+        failureReason = "Invalid or expired Guest Pass.";
+
+        var code = ExtractGuestPassCode(rawInput);
+        var dashIdx = code.LastIndexOf('-');
+        if (dashIdx <= 0 || dashIdx >= code.Length - 8)
+        {
+            return false;
+        }
+
+        var passId = code.Substring(0, dashIdx);
+        var pass = (config.GuestPasses ?? new())
+            .FirstOrDefault(g => string.Equals(g.Id, passId, StringComparison.Ordinal));
+        if (pass == null || string.IsNullOrWhiteSpace(pass.SecretNonce) || string.IsNullOrWhiteSpace(pass.ProfileId))
+        {
+            return false;
+        }
+
+        var expectedCode = ComputeGuestPassCode(config, pass);
+        var normalizedExpectedBytes = Encoding.UTF8.GetBytes(expectedCode.ToLowerInvariant());
+        var suppliedBytes = Encoding.UTF8.GetBytes(code.ToLowerInvariant());
+        if (!CryptographicOperations.FixedTimeEquals(normalizedExpectedBytes, suppliedBytes))
+        {
+            return false;
+        }
+
+        if (pass.Revoked)
+        {
+            failureReason = "This Guest Pass has been revoked.";
+            return false;
+        }
+
+        if (!DateTimeOffset.TryParse(pass.ExpiresAtUtc, out var expiresAt) || expiresAt <= DateTimeOffset.UtcNow)
+        {
+            failureReason = "This Guest Pass has expired.";
+            return false;
+        }
+
+        if (pass.MaxRedemptions > 0 && pass.RedemptionCount >= pass.MaxRedemptions)
+        {
+            failureReason = "This Guest Pass has already reached its maximum number of redemptions.";
+            return false;
+        }
+
+        matchedPass = pass;
+        failureReason = string.Empty;
+        return true;
+    }
+
+    /// <summary>
+    /// Issues a signed Guest Pass session locked strictly to <paramref name="profile"/> until <paramref name="pass"/> expires or is revoked.
+    /// </summary>
+    public static SessionInfo IssueGuestPassSession(
+        PluginConfiguration config,
+        StreamFlixGuestPass pass,
+        StreamFlixProfileConfig profile,
+        out string token)
+    {
+        var key = GetOrCreateKey(config);
+        var maxAllowed = DateTimeOffset.UtcNow.AddDays(30);
+        var passExpires = DateTimeOffset.TryParse(pass.ExpiresAtUtc, out var parsedExp)
+            ? parsedExp
+            : DateTimeOffset.UtcNow.AddHours(24);
+        var expires = passExpires < maxAllowed ? passExpires : maxAllowed;
+        var label = string.IsNullOrWhiteSpace(pass.Label) ? profile.Name : pass.Label.Trim();
+
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new SessionPayload
+        {
+            K = AuthKindGuestPass,
+            E = string.Empty,
+            U = (profile.JellyfinUserId ?? string.Empty).Trim(),
+            Un = label,
+            Gp = pass.Id,
+            Lp = profile.Id,
+            X = expires.ToUnixTimeSeconds(),
+            V = config.SessionVersion,
+            N = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)),
+        });
+
+        var body = Base64UrlEncode(payload);
+        var sig = Base64UrlEncode(Sign(key, body));
+        token = body + "." + sig;
+        return new SessionInfo(
+            string.Empty,
+            expires,
+            AuthKindGuestPass,
+            (profile.JellyfinUserId ?? string.Empty).Trim(),
+            label,
+            pass.Id,
+            profile.Id);
+    }
+
+    /// <summary>
     /// Signs a short-lived, domain-separated token (e.g. OIDC PKCE state or single-use callback handoff cookie).
     /// </summary>
     public static string SignShortLivedPayload<T>(PluginConfiguration config, string purpose, T data, TimeSpan ttl)
@@ -341,6 +498,42 @@ public static class StreamFlixSessionService
                 return new SessionInfo(string.Empty, expires, AuthKindJellyfinAdmin, payload.U, payload.Un);
             }
 
+            if (string.Equals(kind, AuthKindGuestPass, StringComparison.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(payload.Gp) || string.IsNullOrWhiteSpace(payload.Lp))
+                {
+                    return null;
+                }
+
+                var pass = (config.GuestPasses ?? new())
+                    .FirstOrDefault(g => string.Equals(g.Id, payload.Gp, StringComparison.Ordinal));
+                if (pass == null
+                    || pass.Revoked
+                    || !string.Equals(pass.ProfileId, payload.Lp, StringComparison.Ordinal)
+                    || !DateTimeOffset.TryParse(pass.ExpiresAtUtc, out var passExpires)
+                    || passExpires <= DateTimeOffset.UtcNow)
+                {
+                    return null;
+                }
+
+                var lockedProfile = (config.Profiles ?? new())
+                    .FirstOrDefault(p => string.Equals(p.Id, payload.Lp, StringComparison.Ordinal));
+                if (lockedProfile == null)
+                {
+                    return null;
+                }
+
+                var effectiveExpires = passExpires < expires ? passExpires : expires;
+                return new SessionInfo(
+                    string.Empty,
+                    effectiveExpires,
+                    AuthKindGuestPass,
+                    payload.U,
+                    payload.Un,
+                    pass.Id,
+                    lockedProfile.Id);
+            }
+
             return null;
         }
         catch
@@ -415,9 +608,9 @@ public static class StreamFlixSessionService
     }
 
     /// <summary>
-    /// Builds a spoof-resistant rate-limit key for PIN and password login attempts: keys directly on the socket IP
-    /// for non-loopback connections (preventing header spoofing), and sub-keys on the first valid forwarded client IP
-    /// when Jellyfin sits behind a localhost reverse proxy (<c>127.0.0.1</c> / <c>::1</c>).
+    /// Builds a spoof-resistant rate-limit key for PIN, password login, and Guest Pass attempts: keys directly on the socket IP
+    /// for public/external connections (preventing header spoofing), and sub-keys on the rightmost external forwarded IP
+    /// when Jellyfin sits behind a localhost, Docker bridge, or LAN reverse proxy.
     /// </summary>
     public static string GetRateLimitClientKey(HttpContext? httpContext)
     {
@@ -428,25 +621,52 @@ public static class StreamFlixSessionService
         }
 
         var normalizedRemote = remoteIp.IsIPv4MappedToIPv6 ? remoteIp.MapToIPv4() : remoteIp;
-        if (!IPAddress.IsLoopback(normalizedRemote))
+        if (!IsPrivateOrLoopbackIp(normalizedRemote))
         {
             return normalizedRemote.ToString();
         }
 
         var headers = httpContext!.Request.Headers;
-        foreach (var headerName in new[] { "CF-Connecting-IP", "True-Client-IP", "X-Real-IP", "X-Forwarded-For" })
+        foreach (var singleHeader in new[] { "CF-Connecting-IP", "True-Client-IP", "X-Real-IP" })
         {
-            var raw = headers[headerName].ToString();
+            var raw = headers[singleHeader].ToString();
             if (string.IsNullOrWhiteSpace(raw))
             {
                 continue;
             }
 
-            var first = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (first.Length > 0 && IPAddress.TryParse(StripOptionalPort(first[0]), out var fwdIp))
+            var parts = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length > 0 && IPAddress.TryParse(StripOptionalPort(parts[^1]), out var fwdIp))
             {
                 var normFwd = fwdIp.IsIPv4MappedToIPv6 ? fwdIp.MapToIPv4() : fwdIp;
                 return normalizedRemote + "|" + normFwd;
+            }
+        }
+
+        var xff = headers["X-Forwarded-For"].ToString();
+        if (!string.IsNullOrWhiteSpace(xff))
+        {
+            var parts = xff.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            IPAddress? fallbackPrivate = null;
+            for (var i = parts.Length - 1; i >= 0; i--)
+            {
+                if (!IPAddress.TryParse(StripOptionalPort(parts[i]), out var hopIp))
+                {
+                    continue;
+                }
+
+                var normHop = hopIp.IsIPv4MappedToIPv6 ? hopIp.MapToIPv4() : hopIp;
+                if (!IsPrivateOrLoopbackIp(normHop))
+                {
+                    return normalizedRemote + "|" + normHop;
+                }
+
+                fallbackPrivate ??= normHop;
+            }
+
+            if (fallbackPrivate != null)
+            {
+                return normalizedRemote + "|" + fallbackPrivate;
             }
         }
 
@@ -532,6 +752,15 @@ public static class StreamFlixSessionService
     public static void ResetPinFailures(string key) =>
         PinAttempts.TryRemove(key, out _);
 
+    public static bool IsPinTargetLockedOut(string profileId, out TimeSpan retryAfter) =>
+        IsAttemptLockedOut(PinTargetAttempts, "profile:" + profileId, out retryAfter);
+
+    public static void RegisterPinTargetFailure(string profileId) =>
+        RegisterAttemptFailure(PinTargetAttempts, "profile:" + profileId, MaxPinTargetFailures, PinLockout);
+
+    public static void ResetPinTargetFailures(string profileId) =>
+        PinTargetAttempts.TryRemove("profile:" + profileId, out _);
+
     public static bool IsLoginLockedOut(string key, out TimeSpan retryAfter) =>
         IsAttemptLockedOut(LoginAttempts, key, out retryAfter);
 
@@ -540,6 +769,15 @@ public static class StreamFlixSessionService
 
     public static void ResetLoginFailures(string key) =>
         LoginAttempts.TryRemove(key, out _);
+
+    public static bool IsGuestLockedOut(string key, out TimeSpan retryAfter) =>
+        IsAttemptLockedOut(GuestAttempts, key, out retryAfter);
+
+    public static void RegisterGuestFailure(string key) =>
+        RegisterAttemptFailure(GuestAttempts, key, MaxGuestFailures, GuestLockout);
+
+    public static void ResetGuestFailures(string key) =>
+        GuestAttempts.TryRemove(key, out _);
 
     private static bool IsAttemptLockedOut(ConcurrentDictionary<string, PinAttemptState> map, string key, out TimeSpan retryAfter)
     {
@@ -678,6 +916,10 @@ public static class StreamFlixSessionService
         public string? U { get; set; }
 
         public string? Un { get; set; }
+
+        public string? Gp { get; set; }
+
+        public string? Lp { get; set; }
 
         public long X { get; set; }
 

@@ -146,58 +146,80 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        if (configuration is PluginConfiguration incoming)
+        lock (ConfigPersistLock)
         {
-            var existing = Configuration;
-            if (existing != null)
+            if (configuration is PluginConfiguration incoming)
             {
-                // Guard against partial/stale configuration posts wiping profiles or session signing keys
-                if ((incoming.Profiles == null || incoming.Profiles.Count == 0)
-                    && existing.Profiles != null
-                    && existing.Profiles.Count > 0)
+                var existing = Configuration;
+                if (existing != null)
                 {
-                    incoming.Profiles = existing.Profiles;
-                    incoming.ProfilesSeeded = existing.ProfilesSeeded;
-                }
+                    // Guard against partial/stale configuration posts wiping profiles, guest passes, secrets, or session keys
+                    if ((incoming.Profiles == null || incoming.Profiles.Count == 0)
+                        && existing.Profiles != null
+                        && existing.Profiles.Count > 0)
+                    {
+                        incoming.Profiles = existing.Profiles;
+                        incoming.ProfilesSeeded = existing.ProfilesSeeded;
+                    }
 
-                if ((incoming.DeletedProfileIds == null || incoming.DeletedProfileIds.Count == 0)
-                    && existing.DeletedProfileIds != null
-                    && existing.DeletedProfileIds.Count > 0)
-                {
-                    incoming.DeletedProfileIds = existing.DeletedProfileIds;
-                }
+                    if ((incoming.DeletedProfileIds == null || incoming.DeletedProfileIds.Count == 0)
+                        && existing.DeletedProfileIds != null
+                        && existing.DeletedProfileIds.Count > 0)
+                    {
+                        incoming.DeletedProfileIds = existing.DeletedProfileIds;
+                    }
 
-                if (string.IsNullOrWhiteSpace(incoming.SessionSigningKey) && !string.IsNullOrWhiteSpace(existing.SessionSigningKey))
-                {
-                    incoming.SessionSigningKey = existing.SessionSigningKey;
-                }
+                    if ((incoming.GuestPasses == null || incoming.GuestPasses.Count == 0)
+                        && existing.GuestPasses != null
+                        && existing.GuestPasses.Count > 0)
+                    {
+                        incoming.GuestPasses = existing.GuestPasses;
+                    }
 
-                if (incoming.SessionVersion <= 1 && existing.SessionVersion > 1)
-                {
-                    incoming.SessionVersion = existing.SessionVersion;
-                }
+                    if (string.IsNullOrWhiteSpace(incoming.SessionSigningKey) && !string.IsNullOrWhiteSpace(existing.SessionSigningKey))
+                    {
+                        incoming.SessionSigningKey = existing.SessionSigningKey;
+                    }
 
-                if (!incoming.MigratedV7 && existing.MigratedV7)
-                {
-                    incoming.MigratedV7 = true;
-                }
+                    if (string.Equals(incoming.GoogleClientSecret, "__KEEP__", StringComparison.Ordinal))
+                    {
+                        incoming.GoogleClientSecret = existing.GoogleClientSecret;
+                    }
 
-                if (!incoming.FirstGoogleAccountClaimed && (existing.FirstGoogleAccountClaimed || (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)))
+                    if (string.Equals(incoming.OidcClientSecret, "__KEEP__", StringComparison.Ordinal))
+                    {
+                        incoming.OidcClientSecret = existing.OidcClientSecret;
+                    }
+
+                    if (string.Equals(incoming.SeerrApiKey, "__KEEP__", StringComparison.Ordinal))
+                    {
+                        incoming.SeerrApiKey = existing.SeerrApiKey;
+                    }
+
+                    if (incoming.SessionVersion <= 1 && existing.SessionVersion > 1)
+                    {
+                        incoming.SessionVersion = existing.SessionVersion;
+                    }
+
+                    if (!incoming.MigratedV7 && existing.MigratedV7)
+                    {
+                        incoming.MigratedV7 = true;
+                    }
+
+                    if (!incoming.FirstGoogleAccountClaimed && (existing.FirstGoogleAccountClaimed || (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)))
+                    {
+                        incoming.FirstGoogleAccountClaimed = true;
+                    }
+                }
+                else if (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)
                 {
                     incoming.FirstGoogleAccountClaimed = true;
                 }
             }
-            else if (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)
-            {
-                incoming.FirstGoogleAccountClaimed = true;
-            }
-        }
 
-        base.UpdateConfiguration(configuration);
+            base.UpdateConfiguration(configuration);
 
-        if (configuration is PluginConfiguration savedCfg)
-        {
-            lock (ConfigPersistLock)
+            if (configuration is PluginConfiguration savedCfg)
             {
                 WriteShadowBackupsSafe(savedCfg);
             }
@@ -231,12 +253,16 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
 
         return (cfg.Profiles != null && cfg.Profiles.Count > 0)
+            || (cfg.GuestPasses != null && cfg.GuestPasses.Count > 0)
             || !string.IsNullOrWhiteSpace(cfg.GoogleClientId)
             || !string.IsNullOrWhiteSpace(cfg.GoogleClientSecret)
             || (cfg.ApprovedGoogleAccounts != null && cfg.ApprovedGoogleAccounts.Count > 0)
             || cfg.EnableCustomOidc
             || !string.IsNullOrWhiteSpace(cfg.OidcIssuerUrl)
             || !string.IsNullOrWhiteSpace(cfg.OidcClientId)
+            || cfg.EnableSeerr
+            || !string.IsNullOrWhiteSpace(cfg.SeerrUrl)
+            || !string.IsNullOrWhiteSpace(cfg.SeerrApiKey)
             || !string.IsNullOrWhiteSpace(cfg.CustomBrandName)
             || !string.IsNullOrWhiteSpace(cfg.SessionSigningKey)
             || cfg.AllowStandardJellyfinLogin
@@ -266,9 +292,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
             // Only snapshot non-blank XML that has already been migrated or populated with user settings/profiles
             if (xmlText.Contains("<StreamFlixProfileConfig>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<StreamFlixGuestPass>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<SessionSigningKey>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<GoogleClientId>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<OidcIssuerUrl>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<SeerrUrl>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<MigratedV7>true</MigratedV7>", StringComparison.OrdinalIgnoreCase))
             {
                 File.WriteAllText(XmlBackupFilePath, xmlText, Encoding.UTF8);
@@ -425,6 +453,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 OidcClientId = Val(root, nameof(PluginConfiguration.OidcClientId)) ?? string.Empty,
                 OidcClientSecret = Val(root, nameof(PluginConfiguration.OidcClientSecret)) ?? string.Empty,
                 OidcRequireAllowlist = BoolVal(root, nameof(PluginConfiguration.OidcRequireAllowlist), false),
+                EnableSeerr = BoolVal(root, nameof(PluginConfiguration.EnableSeerr), false),
+                SeerrUrl = Val(root, nameof(PluginConfiguration.SeerrUrl)) ?? string.Empty,
+                SeerrApiKey = Val(root, nameof(PluginConfiguration.SeerrApiKey)) ?? string.Empty,
+                SeerrAllowKids = BoolVal(root, nameof(PluginConfiguration.SeerrAllowKids), false),
+                SeerrAllowGuests = BoolVal(root, nameof(PluginConfiguration.SeerrAllowGuests), false),
                 MigratedV7 = BoolVal(root, nameof(PluginConfiguration.MigratedV7), true),
             };
 
@@ -495,6 +528,36 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 }
             }
 
+            var guestPassesEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.GuestPasses), StringComparison.OrdinalIgnoreCase));
+            if (guestPassesEl != null)
+            {
+                foreach (var gpEl in guestPassesEl.Elements())
+                {
+                    var gpId = Val(gpEl, nameof(StreamFlixGuestPass.Id)) ?? string.Empty;
+                    var gpProfileId = Val(gpEl, nameof(StreamFlixGuestPass.ProfileId)) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(gpId) || string.IsNullOrWhiteSpace(gpProfileId))
+                    {
+                        continue;
+                    }
+
+                    cfg.GuestPasses.Add(new StreamFlixGuestPass
+                    {
+                        Id = gpId,
+                        Label = Val(gpEl, nameof(StreamFlixGuestPass.Label)) ?? string.Empty,
+                        ProfileId = gpProfileId,
+                        ProfileNameSnapshot = Val(gpEl, nameof(StreamFlixGuestPass.ProfileNameSnapshot)) ?? string.Empty,
+                        CreatedAtUtc = Val(gpEl, nameof(StreamFlixGuestPass.CreatedAtUtc)) ?? string.Empty,
+                        ExpiresAtUtc = Val(gpEl, nameof(StreamFlixGuestPass.ExpiresAtUtc)) ?? string.Empty,
+                        MaxRedemptions = IntVal(gpEl, nameof(StreamFlixGuestPass.MaxRedemptions), 0),
+                        RedemptionCount = IntVal(gpEl, nameof(StreamFlixGuestPass.RedemptionCount), 0),
+                        LastRedeemedAtUtc = Val(gpEl, nameof(StreamFlixGuestPass.LastRedeemedAtUtc)),
+                        Revoked = BoolVal(gpEl, nameof(StreamFlixGuestPass.Revoked), false),
+                        RevokedAtUtc = Val(gpEl, nameof(StreamFlixGuestPass.RevokedAtUtc)),
+                        SecretNonce = Val(gpEl, nameof(StreamFlixGuestPass.SecretNonce)) ?? string.Empty,
+                    });
+                }
+            }
+
             return cfg;
         }
         catch
@@ -549,6 +612,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             if (string.IsNullOrWhiteSpace(cfg.HeroContentType))
             {
                 cfg.HeroContentType = "all";
+                dirty = true;
+            }
+
+            if (cfg.GuestPasses == null)
+            {
+                cfg.GuestPasses = new List<StreamFlixGuestPass>();
                 dirty = true;
             }
 

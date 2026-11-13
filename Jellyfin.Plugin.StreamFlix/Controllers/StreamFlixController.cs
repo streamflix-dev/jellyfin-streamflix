@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -168,6 +170,139 @@ public class DeleteProfileRequest
     public string? CurrentPin { get; set; }
 }
 
+public class SaveAdminConfigRequest
+{
+    public bool EnableStreamFlixUi { get; set; } = true;
+
+    public string? CustomBrandName { get; set; }
+
+    public bool RequireGoogleAuth { get; set; } = true;
+
+    public bool EnableGoogleSignIn { get; set; } = true;
+
+    public bool AllowStandardJellyfinLogin { get; set; }
+
+    public bool AllowAdminFallbackLogin { get; set; }
+
+    public bool AdminFallbackLanOnly { get; set; }
+
+    public bool BypassLoginGateOnLan { get; set; }
+
+    public bool AutoProvisionJellyfinUsers { get; set; } = true;
+
+    public string? GoogleClientId { get; set; }
+
+    public string? GoogleClientSecret { get; set; }
+
+    public bool ClearGoogleClientSecret { get; set; }
+
+    public List<string>? ApprovedGoogleAccounts { get; set; }
+
+    public int SessionLifetimeDays { get; set; } = 30;
+
+    public string? Top10SelectionMode { get; set; }
+
+    public int HeroRotationSeconds { get; set; } = 9;
+
+    public int HeroSlideCount { get; set; } = 8;
+
+    public string? HeroSelectionMode { get; set; }
+
+    public string? HeroContentType { get; set; }
+
+    public List<string>? HeroLibraryIds { get; set; }
+
+    public bool EnableCustomOidc { get; set; }
+
+    public string? OidcProviderName { get; set; }
+
+    public string? OidcIssuerUrl { get; set; }
+
+    public string? OidcClientId { get; set; }
+
+    public string? OidcClientSecret { get; set; }
+
+    public bool ClearOidcClientSecret { get; set; }
+
+    public bool OidcRequireAllowlist { get; set; }
+
+    public List<string>? ApprovedOidcUsers { get; set; }
+
+    public bool EnableSeerr { get; set; }
+
+    public string? SeerrUrl { get; set; }
+
+    public string? SeerrApiKey { get; set; }
+
+    public bool ClearSeerrApiKey { get; set; }
+
+    public bool SeerrAllowKids { get; set; }
+
+    public bool SeerrAllowGuests { get; set; }
+}
+
+public class CreateGuestPassRequest
+{
+    public string? Label { get; set; }
+
+    public string ProfileId { get; set; } = string.Empty;
+
+    public int DurationHours { get; set; } = 24;
+
+    public int MaxRedemptions { get; set; } = 2;
+}
+
+public class RevokeGuestPassRequest
+{
+    public string Id { get; set; } = string.Empty;
+}
+
+public class RedeemGuestPassRequest
+{
+    public string Code { get; set; } = string.Empty;
+
+    public string? DeviceId { get; set; }
+
+    public string? DeviceName { get; set; }
+
+    public string? AppName { get; set; }
+
+    public string? AppVersion { get; set; }
+}
+
+public class MovieNightCandidatesRequest
+{
+    public List<string>? ProfileIds { get; set; }
+
+    public string? MediaType { get; set; }
+
+    public string? Genre { get; set; }
+
+    public int MaxRuntimeMinutes { get; set; }
+
+    public bool OnlyUnwatched { get; set; } = true;
+
+    public int Count { get; set; } = 8;
+}
+
+public class TestSeerrConfigRequest
+{
+    public string? SeerrUrl { get; set; }
+
+    public string? SeerrApiKey { get; set; }
+}
+
+public class SubmitSeerrMediaRequest
+{
+    public int TmdbId { get; set; }
+
+    public string MediaType { get; set; } = string.Empty;
+
+    public List<int>? Seasons { get; set; }
+
+    public string? ProfileId { get; set; }
+}
+
 /// <summary>
 /// Serves the embedded StreamFlix Netflix UI script &amp; styles, verifies Google OAuth 2.0 tokens and issues signed
 /// household sessions, and provisions/activates real Jellyfin Server Users per profile so every profile has its own
@@ -186,6 +321,10 @@ public class DeleteProfileRequest
 [Route("StreamFlix")]
 public class StreamFlixController : ControllerBase
 {
+    private const int MaxProfilesCount = 24;
+    private const int MaxStoredGuestPasses = 100;
+    private const int MaxActiveGuestPasses = 50;
+
     private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
 
     private static readonly Lazy<EmbeddedAsset> ScriptAsset = new(() => EmbeddedAsset.Load("Jellyfin.Plugin.StreamFlix.Web.streamflix.js"));
@@ -193,6 +332,9 @@ public class StreamFlixController : ControllerBase
     private static readonly Lazy<EmbeddedAsset> StyleAsset = new(() => EmbeddedAsset.Load("Jellyfin.Plugin.StreamFlix.Web.streamflix.css"));
 
     private static readonly SemaphoreSlim SyncLock = new(1, 1);
+
+    private static readonly ConcurrentDictionary<string, ConcurrentBag<string>> ActiveGuestTokens = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, (int Count, DateTimeOffset WindowReset)> SeerrRequestRateMap = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
@@ -263,6 +405,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> GetPublicConfig()
     {
+        SetNoStoreSecurityHeaders();
         Plugin.Instance?.EnsureInjectedThrottled();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
@@ -270,11 +413,153 @@ public class StreamFlixController : ControllerBase
         return Ok(BuildPublicState(config, caller));
     }
 
+    [HttpGet("AdminConfig")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> GetAdminConfig()
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can read StreamFlix admin configuration." });
+        }
+
+        return Ok(BuildAdminConfigResponse(config));
+    }
+
+    [HttpPost("AdminConfig")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> SaveAdminConfig([FromBody] SaveAdminConfigRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (request == null)
+        {
+            return BadRequest(new { message = "Missing configuration payload." });
+        }
+
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can update StreamFlix settings." });
+        }
+
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            config.EnableStreamFlixUi = request.EnableStreamFlixUi;
+            var brand = (request.CustomBrandName ?? string.Empty).Trim();
+            config.CustomBrandName = brand.Length > 32 ? brand.Substring(0, 32).Trim() : brand;
+
+            config.RequireGoogleAuth = request.RequireGoogleAuth;
+            config.EnableGoogleSignIn = request.EnableGoogleSignIn;
+            config.AllowStandardJellyfinLogin = request.AllowStandardJellyfinLogin;
+            config.AllowAdminFallbackLogin = request.AllowAdminFallbackLogin;
+            config.AdminFallbackLanOnly = request.AdminFallbackLanOnly;
+            config.BypassLoginGateOnLan = request.BypassLoginGateOnLan;
+            config.AutoProvisionJellyfinUsers = request.AutoProvisionJellyfinUsers;
+
+            config.GoogleClientId = (request.GoogleClientId ?? string.Empty).Trim();
+            if (request.ClearGoogleClientSecret)
+            {
+                config.GoogleClientSecret = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(request.GoogleClientSecret)
+                && !string.Equals(request.GoogleClientSecret.Trim(), "__KEEP__", StringComparison.Ordinal))
+            {
+                config.GoogleClientSecret = request.GoogleClientSecret.Trim();
+            }
+
+            if (request.ApprovedGoogleAccounts != null)
+            {
+                config.ApprovedGoogleAccounts = request.ApprovedGoogleAccounts
+                    .Select(e => (e ?? string.Empty).Trim().ToLowerInvariant())
+                    .Where(e => EmailRegex.IsMatch(e))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (config.ApprovedGoogleAccounts.Count > 0)
+                {
+                    config.FirstGoogleAccountClaimed = true;
+                }
+            }
+
+            config.SessionLifetimeDays = Math.Clamp(request.SessionLifetimeDays <= 0 ? 30 : request.SessionLifetimeDays, 1, 365);
+            config.Top10SelectionMode = NormalizeTop10Mode(request.Top10SelectionMode);
+            config.HeroRotationSeconds = Math.Clamp(request.HeroRotationSeconds, 0, 120);
+            config.HeroSlideCount = Math.Clamp(request.HeroSlideCount <= 0 ? 8 : request.HeroSlideCount, 1, 15);
+            config.HeroSelectionMode = NormalizeHeroSelectionMode(request.HeroSelectionMode);
+            config.HeroContentType = NormalizeHeroContentType(request.HeroContentType);
+
+            if (request.HeroLibraryIds != null)
+            {
+                config.HeroLibraryIds = request.HeroLibraryIds
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            config.EnableCustomOidc = request.EnableCustomOidc;
+            var oidcName = (request.OidcProviderName ?? string.Empty).Trim();
+            config.OidcProviderName = oidcName.Length > 32 ? oidcName.Substring(0, 32).Trim() : oidcName;
+            config.OidcIssuerUrl = (request.OidcIssuerUrl ?? string.Empty).Trim();
+            config.OidcClientId = (request.OidcClientId ?? string.Empty).Trim();
+            if (request.ClearOidcClientSecret)
+            {
+                config.OidcClientSecret = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(request.OidcClientSecret)
+                && !string.Equals(request.OidcClientSecret.Trim(), "__KEEP__", StringComparison.Ordinal))
+            {
+                config.OidcClientSecret = request.OidcClientSecret.Trim();
+            }
+
+            config.OidcRequireAllowlist = request.OidcRequireAllowlist;
+            if (request.ApprovedOidcUsers != null)
+            {
+                config.ApprovedOidcUsers = request.ApprovedOidcUsers
+                    .Select(u => (u ?? string.Empty).Trim())
+                    .Where(u => !string.IsNullOrEmpty(u))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            config.EnableSeerr = request.EnableSeerr;
+            config.SeerrUrl = StreamFlixSeerrService.NormalizeBaseUrl(request.SeerrUrl);
+            if (request.ClearSeerrApiKey)
+            {
+                config.SeerrApiKey = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(request.SeerrApiKey)
+                && !string.Equals(request.SeerrApiKey.Trim(), "__KEEP__", StringComparison.Ordinal))
+            {
+                config.SeerrApiKey = request.SeerrApiKey.Trim();
+            }
+
+            config.SeerrAllowKids = request.SeerrAllowKids;
+            config.SeerrAllowGuests = request.SeerrAllowGuests;
+
+            Plugin.Instance?.SaveConfiguration();
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+
+        Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
+        await SyncProfilesAsync(config, force: true).ConfigureAwait(false);
+        return Ok(BuildAdminConfigResponse(config));
+    }
+
     [HttpPost("SetupSecrets")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> SetupSecrets([FromBody] SetupSecretsRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         if (request == null)
         {
             return BadRequest(new { message = "Missing request payload." });
@@ -327,6 +612,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> VerifyGoogle([FromBody] VerifyGoogleRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         if (string.IsNullOrWhiteSpace(request?.AccessToken))
         {
             return BadRequest(new { verified = false, message = "Missing Google OAuth access token." });
@@ -450,6 +736,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> StandardLogin([FromBody] PasswordLoginRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         if (!config.AllowStandardJellyfinLogin)
         {
@@ -538,6 +825,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> AdminLogin([FromBody] PasswordLoginRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var isUnconfiguredGate = IsGateUnconfigured(config);
         if (!config.AllowAdminFallbackLogin && !isUnconfiguredGate)
@@ -1108,6 +1396,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> RevokeAllSessions()
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!caller.IsAdmin)
@@ -1126,6 +1415,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> ActivateProfile([FromBody] ActivateProfileRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
@@ -1141,17 +1431,33 @@ public class StreamFlixController : ControllerBase
             return NotFound(new { code = "profile_not_found", message = "That profile no longer exists." });
         }
 
-        var lockResult = CheckGoogleLock(profile, caller);
-        if (lockResult != null)
+        var isGuest = IsGuestSession(caller);
+        if (isGuest)
         {
-            return lockResult;
+            if (!string.Equals(profile.Id, caller.Session?.LockedProfileId, StringComparison.Ordinal)
+                || IsProfileLinkedToAdmin(profile))
+            {
+                return StatusCode(403, new
+                {
+                    code = "guest_profile_locked",
+                    message = "This Guest Pass only grants access to its assigned profile.",
+                });
+            }
         }
-
-        var suppliedPin = (!string.IsNullOrWhiteSpace(request?.Pin) ? request!.Pin : request?.PinCode) ?? string.Empty;
-        var pinResult = CheckPin(profile, suppliedPin);
-        if (pinResult != null)
+        else
         {
-            return pinResult;
+            var lockResult = CheckGoogleLock(profile, caller);
+            if (lockResult != null)
+            {
+                return lockResult;
+            }
+
+            var suppliedPin = (!string.IsNullOrWhiteSpace(request?.Pin) ? request!.Pin : request?.PinCode) ?? string.Empty;
+            var pinResult = CheckPin(profile, suppliedPin);
+            if (pinResult != null)
+            {
+                return pinResult;
+            }
         }
 
         var primaryAdmin = StreamFlixStartupTask.GetPrimaryAdminUserCompat(_userManager);
@@ -1204,6 +1510,15 @@ public class StreamFlixController : ControllerBase
         }
 
         var isAdminUser = (primaryAdmin != null && user.Id == primaryAdmin.Id) || StreamFlixStartupTask.IsUserAdminCompat(user);
+        if (isGuest && isAdminUser)
+        {
+            return StatusCode(403, new
+            {
+                code = "guest_admin_forbidden",
+                message = "Guest Passes cannot sign in to an administrator account.",
+            });
+        }
+
         var needsUserUpdate = false;
         if (isAdminUser)
         {
@@ -1241,8 +1556,12 @@ public class StreamFlixController : ControllerBase
 
         var appName = !string.IsNullOrWhiteSpace(request?.AppName) ? request!.AppName!.Trim() : "Jellyfin Web";
         var appVersion = !string.IsNullOrWhiteSpace(request?.AppVersion) ? request!.AppVersion!.Trim() : "10.11.0";
-        var deviceId = !string.IsNullOrWhiteSpace(request?.DeviceId) ? request!.DeviceId!.Trim() : $"streamflix-profile-{profile.Id}";
-        var deviceName = !string.IsNullOrWhiteSpace(request?.DeviceName) ? request!.DeviceName!.Trim() : $"StreamFlix ({profile.Name})";
+        var deviceId = isGuest && !string.IsNullOrWhiteSpace(caller.Session?.GuestPassId)
+            ? BuildGuestDeviceId(caller.Session!.GuestPassId!, request?.DeviceId)
+            : (!string.IsNullOrWhiteSpace(request?.DeviceId) ? request!.DeviceId!.Trim() : $"streamflix-profile-{profile.Id}");
+        var deviceName = isGuest
+            ? $"StreamFlix Guest ({(string.IsNullOrWhiteSpace(caller.Session?.Username) ? profile.Name : caller.Session!.Username)})"
+            : (!string.IsNullOrWhiteSpace(request?.DeviceName) ? request!.DeviceName!.Trim() : $"StreamFlix ({profile.Name})");
 
         var authRequest = new AuthenticationRequest
         {
@@ -1266,6 +1585,11 @@ public class StreamFlixController : ControllerBase
             return StatusCode(403, new { code = "auth_failed", message = $"Could not sign in to Jellyfin as \"{user.Username}\". Ensure the account is enabled in Server Dashboard → Users." });
         }
 
+        if (isGuest && !string.IsNullOrWhiteSpace(caller.Session?.GuestPassId) && !string.IsNullOrWhiteSpace(authResult.AccessToken))
+        {
+            TrackGuestAccessToken(caller.Session!.GuestPassId!, authResult.AccessToken);
+        }
+
         return Ok(new
         {
             userId = user.Id.ToString("N"),
@@ -1285,11 +1609,17 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> VerifyPin([FromBody] VerifyPinRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
+        }
+
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot access PIN-protected profiles." });
         }
 
         var profile = FindProfile(config, request?.ProfileId);
@@ -1312,6 +1642,7 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> SaveProfile([FromBody] SaveProfileRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         if (request == null)
         {
             return BadRequest(new { message = "Missing profile payload." });
@@ -1322,6 +1653,11 @@ public class StreamFlixController : ControllerBase
         if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
+        }
+
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot create or edit profiles." });
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -1344,6 +1680,10 @@ public class StreamFlixController : ControllerBase
 
         var existing = !string.IsNullOrWhiteSpace(request.Id) ? FindProfile(config, request.Id) : null;
         var isNewProfile = existing == null;
+        if (isNewProfile && config.Profiles.Count >= MaxProfilesCount)
+        {
+            return BadRequest(new { message = $"You can create at most {MaxProfilesCount} profiles." });
+        }
 
         // Administrator/owner profiles can only be edited while signed in to an administrator profile,
         // and protected profiles can only be edited by someone who can open them.
@@ -1472,11 +1812,17 @@ public class StreamFlixController : ControllerBase
             }
         }
 
+        var autoRevokedPassIds = new List<string>();
         await SyncLock.WaitAsync().ConfigureAwait(false);
         try
         {
             if (existing == null)
             {
+                if (config.Profiles.Count >= MaxProfilesCount)
+                {
+                    return BadRequest(new { message = $"You can create at most {MaxProfilesCount} profiles." });
+                }
+
                 existing = new StreamFlixProfileConfig
                 {
                     Id = $"streamflix_{Guid.NewGuid():N}",
@@ -1513,6 +1859,21 @@ public class StreamFlixController : ControllerBase
                 existing.JellyfinUsername = targetUser.Username;
             }
 
+            // Never allow active Guest Passes to remain active if a profile is re-linked to an administrator account
+            if (IsProfileLinkedToAdmin(existing) && config.GuestPasses != null)
+            {
+                var nowIso = DateTimeOffset.UtcNow.ToString("O");
+                foreach (var gp in config.GuestPasses)
+                {
+                    if (!gp.Revoked && string.Equals(gp.ProfileId, existing.Id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        gp.Revoked = true;
+                        gp.RevokedAtUtc = nowIso;
+                        autoRevokedPassIds.Add(gp.Id);
+                    }
+                }
+            }
+
             config.DeletedProfileIds?.RemoveAll(d =>
                 string.Equals(d, existing.Id, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(d, existing.Name, StringComparison.OrdinalIgnoreCase));
@@ -1526,6 +1887,11 @@ public class StreamFlixController : ControllerBase
             SyncLock.Release();
         }
 
+        foreach (var revokedId in autoRevokedPassIds)
+        {
+            await RevokeGuestJellyfinSessionsAsync(revokedId).ConfigureAwait(false);
+        }
+
         return Ok(BuildPublicState(config, caller));
     }
 
@@ -1534,11 +1900,17 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> ReorderProfiles([FromBody] ReorderProfilesRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
+        }
+
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot reorder profiles." });
         }
 
         if (request?.ProfileIds != null && request.ProfileIds.Count > 0 && config.Profiles.Count > 1)
@@ -1586,11 +1958,17 @@ public class StreamFlixController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<object>> DeleteProfile([FromBody] DeleteProfileRequest? request)
     {
+        SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
         if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
+        }
+
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot delete profiles." });
         }
 
         if (config.Profiles.Count <= 1)
@@ -1627,6 +2005,7 @@ public class StreamFlixController : ControllerBase
         string? deletedUserId = null;
         var shouldDeleteUser = false;
 
+        var revokedForDeletedProfile = new List<string>();
         await SyncLock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -1639,6 +2018,20 @@ public class StreamFlixController : ControllerBase
             if (!string.IsNullOrWhiteSpace(target.Id))
             {
                 config.DeletedProfileIds.Add(target.Id);
+            }
+
+            if (config.GuestPasses != null)
+            {
+                var nowIso = DateTimeOffset.UtcNow.ToString("O");
+                foreach (var gp in config.GuestPasses)
+                {
+                    if (!gp.Revoked && string.Equals(gp.ProfileId, target.Id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        gp.Revoked = true;
+                        gp.RevokedAtUtc = nowIso;
+                        revokedForDeletedProfile.Add(gp.Id);
+                    }
+                }
             }
 
             config.Profiles.Remove(target);
@@ -1657,6 +2050,11 @@ public class StreamFlixController : ControllerBase
             SyncLock.Release();
         }
 
+        foreach (var passId in revokedForDeletedProfile)
+        {
+            await RevokeGuestJellyfinSessionsAsync(passId).ConfigureAwait(false);
+        }
+
         // Only delete the underlying Jellyfin user if an admin explicitly asked and it isn't shared by another profile
         if (shouldDeleteUser && Guid.TryParse(deletedUserId, out var jfUid))
         {
@@ -1668,6 +2066,589 @@ public class StreamFlixController : ControllerBase
         }
 
         return Ok(BuildPublicState(config, caller));
+    }
+
+    [HttpGet("GuestPasses")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> ListGuestPasses()
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can manage Guest Passes." });
+        }
+
+        var eligibleProfiles = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Where(p => !IsProfileLinkedToAdmin(p))
+            .Select(p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                avatarEmoji = p.AvatarEmoji,
+                avatarColorHex = SanitizeHexColor(p.AvatarColorHex),
+                isKids = p.IsKids,
+            })
+            .ToList();
+
+        var passes = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+            .OrderByDescending(p => p.CreatedAtUtc, StringComparer.Ordinal)
+            .Select(p => MapGuestPassAdmin(config, p))
+            .ToList();
+
+        return Ok(new
+        {
+            passes,
+            eligibleProfiles,
+        });
+    }
+
+    [HttpPost("GuestPasses/Create")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> CreateGuestPass([FromBody] CreateGuestPassRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (request == null || string.IsNullOrWhiteSpace(request.ProfileId))
+        {
+            return BadRequest(new { message = "Choose a non-administrator profile for the Guest Pass." });
+        }
+
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can create Guest Passes." });
+        }
+
+        await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+
+        var profile = FindProfile(config, request.ProfileId);
+        if (profile == null)
+        {
+            return NotFound(new { message = "Selected profile was not found." });
+        }
+
+        if (IsProfileLinkedToAdmin(profile))
+        {
+            return BadRequest(new
+            {
+                code = "admin_profile_forbidden",
+                message = "Guest Passes can only be created for non-administrator profiles. Select or create a standard viewer/Guest profile.",
+            });
+        }
+
+        var hours = Math.Clamp(request.DurationHours <= 0 ? 24 : request.DurationHours, 1, 720);
+        var maxRedemptions = Math.Clamp(request.MaxRedemptions, 0, 100);
+        var rawLabel = (request.Label ?? string.Empty).Trim();
+        if (rawLabel.Length > 48)
+        {
+            rawLabel = rawLabel.Substring(0, 48).Trim();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var pass = new StreamFlixGuestPass
+        {
+            Id = "gp_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(5)).ToLowerInvariant(),
+            Label = string.IsNullOrEmpty(rawLabel) ? $"{profile.Name} Pass" : rawLabel,
+            ProfileId = profile.Id,
+            ProfileNameSnapshot = profile.Name,
+            CreatedAtUtc = now.ToString("O"),
+            ExpiresAtUtc = now.AddHours(hours).ToString("O"),
+            MaxRedemptions = maxRedemptions,
+            RedemptionCount = 0,
+            Revoked = false,
+            SecretNonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(18)),
+        };
+
+        string code;
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            config.GuestPasses ??= new List<StreamFlixGuestPass>();
+            var activeCount = config.GuestPasses.Count(g => GetGuestPassStatus(g) == "active");
+            if (activeCount >= MaxActiveGuestPasses)
+            {
+                return BadRequest(new { message = $"You already have {MaxActiveGuestPasses} active Guest Passes. Revoke or clear old passes first." });
+            }
+
+            if (config.GuestPasses.Count >= MaxStoredGuestPasses)
+            {
+                var removable = config.GuestPasses
+                    .Where(g => GetGuestPassStatus(g) != "active")
+                    .OrderBy(g => g.CreatedAtUtc, StringComparer.Ordinal)
+                    .Take((config.GuestPasses.Count - MaxStoredGuestPasses) + 1)
+                    .ToList();
+                foreach (var old in removable)
+                {
+                    config.GuestPasses.Remove(old);
+                }
+            }
+
+            config.GuestPasses.Insert(0, pass);
+            code = StreamFlixSessionService.ComputeGuestPassCode(config, pass);
+            Plugin.Instance?.SaveConfiguration();
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+
+        var shareUrl = BuildAbsoluteGuestPassUri(code);
+        var qrSvg = StreamFlixQrCode.GenerateSvg(shareUrl);
+
+        return Ok(new
+        {
+            pass = MapGuestPassAdmin(config, pass),
+            code,
+            shareUrl,
+            qrSvg,
+        });
+    }
+
+    [HttpGet("GuestPasses/{id}/ShareInfo")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> GetGuestPassShareInfo([FromRoute] string id)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can view Guest Pass QR codes." });
+        }
+
+        var pass = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+            .FirstOrDefault(g => string.Equals(g.Id, (id ?? string.Empty).Trim(), StringComparison.Ordinal));
+        if (pass == null)
+        {
+            return NotFound(new { message = "Guest Pass not found." });
+        }
+
+        var code = StreamFlixSessionService.ComputeGuestPassCode(config, pass);
+        var shareUrl = BuildAbsoluteGuestPassUri(code);
+        var qrSvg = StreamFlixQrCode.GenerateSvg(shareUrl);
+
+        return Ok(new
+        {
+            pass = MapGuestPassAdmin(config, pass),
+            code,
+            shareUrl,
+            qrSvg,
+        });
+    }
+
+    [HttpPost("GuestPasses/Revoke")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> RevokeGuestPass([FromBody] RevokeGuestPassRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        var passId = (request?.Id ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(passId))
+        {
+            return BadRequest(new { message = "Missing Guest Pass ID." });
+        }
+
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can revoke Guest Passes." });
+        }
+
+        StreamFlixGuestPass? targetPass = null;
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            targetPass = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+                .FirstOrDefault(g => string.Equals(g.Id, passId, StringComparison.Ordinal));
+            if (targetPass == null)
+            {
+                return NotFound(new { message = "Guest Pass not found." });
+            }
+
+            targetPass.Revoked = true;
+            targetPass.RevokedAtUtc = DateTimeOffset.UtcNow.ToString("O");
+            Plugin.Instance?.SaveConfiguration();
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+
+        await RevokeGuestJellyfinSessionsAsync(targetPass.Id).ConfigureAwait(false);
+        _logger.LogInformation("StreamFlix: revoked Guest Pass '{PassId}' ({Label}).", targetPass.Id, targetPass.Label);
+
+        var passes = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+            .OrderByDescending(p => p.CreatedAtUtc, StringComparer.Ordinal)
+            .Select(p => MapGuestPassAdmin(config, p))
+            .ToList();
+        return Ok(new { revoked = true, passes });
+    }
+
+    [HttpPost("GuestPasses/Purge")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> PurgeInactiveGuestPasses()
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can clear Guest Passes." });
+        }
+
+        var removed = 0;
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (config.GuestPasses != null)
+            {
+                removed = config.GuestPasses.RemoveAll(g => GetGuestPassStatus(g) != "active");
+                if (removed > 0)
+                {
+                    Plugin.Instance?.SaveConfiguration();
+                }
+            }
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+
+        var passes = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+            .OrderByDescending(p => p.CreatedAtUtc, StringComparer.Ordinal)
+            .Select(p => MapGuestPassAdmin(config, p))
+            .ToList();
+        return Ok(new { removed, passes });
+    }
+
+    [HttpGet("Guest/{code}")]
+    [AllowAnonymous]
+    public ActionResult StartGuestPassHandoff([FromRoute] string code)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var safeWebBase = ResolveSafeRelativeWebPath(null);
+
+        var lockKey = "guest|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
+        if (StreamFlixSessionService.IsGuestLockedOut(lockKey, out var retryAfter))
+        {
+            var mins = Math.Max(1, ((int)Math.Ceiling(retryAfter.TotalSeconds) + 59) / 60);
+            return Redirect(BuildGuestReturnUrl(safeWebBase, $"Too many Guest Pass attempts. Please wait {mins} min and try again."));
+        }
+
+        if (!StreamFlixSessionService.TryVerifyGuestPassForRedemption(config, code, out var pass, out var failureReason)
+            || pass == null)
+        {
+            StreamFlixSessionService.RegisterGuestFailure(lockKey);
+            return Redirect(BuildGuestReturnUrl(safeWebBase, failureReason));
+        }
+
+        var profile = FindProfile(config, pass.ProfileId);
+        if (profile == null || IsProfileLinkedToAdmin(profile))
+        {
+            return Redirect(BuildGuestReturnUrl(safeWebBase, "This Guest Pass is no longer linked to an eligible profile."));
+        }
+
+        // Issue a 90-second HttpOnly handoff cookie; RedemptionCount is only incremented when the real browser
+        // calls POST /StreamFlix/Guest/Complete so chat preview / link-unfurler bots never burn redemptions.
+        var handoffPayload = new StreamFlixSessionService.GuestHandoffPayload(
+            PassId: pass.Id,
+            Code: StreamFlixSessionService.ExtractGuestPassCode(code),
+            CreatedAt: DateTimeOffset.UtcNow.ToString("O"));
+        var signedCookie = StreamFlixSessionService.SignShortLivedPayload(
+            config,
+            StreamFlixSessionService.GuestHandoffTokenPurpose,
+            handoffPayload,
+            TimeSpan.FromSeconds(90));
+
+        Response.Cookies.Append(
+            StreamFlixSessionService.GuestHandoffCookieName,
+            signedCookie,
+            BuildOidcCookieOptions(TimeSpan.FromSeconds(90)));
+
+        return Redirect(BuildGuestReturnUrl(safeWebBase, errorMessage: null));
+    }
+
+    [HttpPost("Guest/Complete")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> CompleteGuestPassHandoff([FromBody] RedeemGuestPassRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var rawCookie = Request.Cookies[StreamFlixSessionService.GuestHandoffCookieName];
+        DeleteOidcCookie(StreamFlixSessionService.GuestHandoffCookieName);
+
+        var handoff = StreamFlixSessionService.VerifyShortLivedPayload<StreamFlixSessionService.GuestHandoffPayload>(
+            config,
+            StreamFlixSessionService.GuestHandoffTokenPurpose,
+            rawCookie);
+        if (handoff == null || string.IsNullOrWhiteSpace(handoff.Code))
+        {
+            return StatusCode(401, new
+            {
+                verified = false,
+                code = "guest_handoff_expired",
+                message = "Guest Pass link session expired or cookies were blocked. Open the Guest Pass link again or enter the pass code.",
+            });
+        }
+
+        return await RedeemGuestPassAndActivateAsync(config, handoff.Code, request).ConfigureAwait(false);
+    }
+
+    [HttpPost("Guest/Redeem")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> RedeemGuestPassByCode([FromBody] RedeemGuestPassRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (string.IsNullOrWhiteSpace(request?.Code))
+        {
+            return BadRequest(new { verified = false, message = "Enter your Guest Pass code or invite link." });
+        }
+
+        var config = Config;
+        return await RedeemGuestPassAndActivateAsync(config, request!.Code, request).ConfigureAwait(false);
+    }
+
+    [HttpPost("MovieNight/Candidates")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> GetMovieNightCandidates([FromBody] MovieNightCandidatesRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!HasHouseholdAccess(config, caller))
+        {
+            return GoogleRequired(config);
+        }
+
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { code = "guest_pass_restricted", message = "Movie Night Matcher requires full household profile access." });
+        }
+
+        await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+
+        var requestedIds = (request?.ProfileIds ?? new List<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToList();
+
+        var selectedProfiles = new List<StreamFlixProfileConfig>();
+        foreach (var pid in requestedIds)
+        {
+            var p = FindProfile(config, pid);
+            if (p != null && selectedProfiles.All(x => !string.Equals(x.Id, p.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                selectedProfiles.Add(p);
+            }
+        }
+
+        if (selectedProfiles.Count < 2)
+        {
+            return BadRequest(new { message = "Select at least 2 household profiles to start Movie Night Matcher." });
+        }
+
+        var result = ComputeMovieNightCandidates(selectedProfiles, request ?? new MovieNightCandidatesRequest());
+        return Ok(result);
+    }
+
+    [HttpPost("Seerr/Test")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> TestSeerrConfig([FromBody] TestSeerrConfigRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        if (!caller.IsAdmin)
+        {
+            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can test Seerr settings." });
+        }
+
+        var url = !string.IsNullOrWhiteSpace(request?.SeerrUrl) ? request!.SeerrUrl : config.SeerrUrl;
+        var rawKey = (request?.SeerrApiKey ?? string.Empty).Trim();
+        var apiKey = string.IsNullOrEmpty(rawKey) || string.Equals(rawKey, "__KEEP__", StringComparison.Ordinal)
+            ? config.SeerrApiKey
+            : rawKey;
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        var (status, summary, checks) = await StreamFlixSeerrService.TestConnectionAsync(url, apiKey, cts.Token).ConfigureAwait(false);
+        return Ok(new
+        {
+            status,
+            summary,
+            checks = checks.Select(c => new
+            {
+                status = c.Status,
+                label = c.Label,
+                detail = c.Detail,
+            }).ToList(),
+        });
+    }
+
+    [HttpGet("Seerr/Search")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> SearchSeerr(
+        [FromQuery] string? query = null,
+        [FromQuery] string? profileId = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        var (allowed, isKids, denyReason) = await EvaluateSeerrPermissionAsync(config, caller, profileId).ConfigureAwait(false);
+        if (!allowed)
+        {
+            return StatusCode(403, new { code = "seerr_forbidden", message = denyReason });
+        }
+
+        var q = (query ?? string.Empty).Trim();
+        if (q.Length < 2)
+        {
+            return Ok(new { results = Array.Empty<object>() });
+        }
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(8));
+            var items = await StreamFlixSeerrService.SearchAsync(config, q, isKids, cts.Token).ConfigureAwait(false);
+            return Ok(new
+            {
+                results = items.Select(i => new
+                {
+                    tmdbId = i.TmdbId,
+                    mediaType = i.MediaType,
+                    title = i.Title,
+                    year = i.Year,
+                    overview = i.Overview,
+                    rating = i.Rating,
+                    posterUrl = i.PosterUrl,
+                    backdropUrl = i.BackdropUrl,
+                    mediaStatus = i.MediaStatus,
+                    statusLabel = i.StatusLabel,
+                    jellyfinMediaId = i.JellyfinMediaId,
+                }).ToList(),
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: Seerr search failed.");
+            return StatusCode(502, new { code = "seerr_unreachable", message = ex.Message });
+        }
+    }
+
+    [HttpGet("Seerr/Tv/{tmdbId:int}")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> GetSeerrTvDetails(
+        [FromRoute] int tmdbId,
+        [FromQuery] string? profileId = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        var (allowed, _, denyReason) = await EvaluateSeerrPermissionAsync(config, caller, profileId).ConfigureAwait(false);
+        if (!allowed)
+        {
+            return StatusCode(403, new { code = "seerr_forbidden", message = denyReason });
+        }
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(8));
+            var tv = await StreamFlixSeerrService.GetTvDetailsAsync(config, tmdbId, cts.Token).ConfigureAwait(false);
+            return Ok(new
+            {
+                tmdbId = tv.TmdbId,
+                title = tv.Title,
+                year = tv.Year,
+                overview = tv.Overview,
+                backdropUrl = tv.BackdropUrl,
+                mediaStatus = tv.MediaStatus,
+                statusLabel = tv.StatusLabel,
+                seasons = tv.Seasons.Select(s => new
+                {
+                    seasonNumber = s.SeasonNumber,
+                    name = s.Name,
+                    episodeCount = s.EpisodeCount,
+                    year = s.Year,
+                    status = s.Status,
+                    statusLabel = s.StatusLabel,
+                }).ToList(),
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: Seerr TV detail lookup failed for TMDB {TmdbId}.", tmdbId);
+            return StatusCode(502, new { code = "seerr_unreachable", message = ex.Message });
+        }
+    }
+
+    [HttpPost("Seerr/Request")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> SubmitSeerrRequest([FromBody] SubmitSeerrMediaRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (request == null || request.TmdbId <= 0 || string.IsNullOrWhiteSpace(request.MediaType))
+        {
+            return BadRequest(new { ok = false, message = "Missing media details for request." });
+        }
+
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        var (allowed, _, denyReason) = await EvaluateSeerrPermissionAsync(config, caller, request.ProfileId).ConfigureAwait(false);
+        if (!allowed)
+        {
+            return StatusCode(403, new { ok = false, code = "seerr_forbidden", message = denyReason });
+        }
+
+        var rateKey = "seerr|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
+        if (!AllowSeerrSubmitRate(rateKey))
+        {
+            return StatusCode(429, new { ok = false, code = "rate_limited", message = "Too many media requests submitted recently. Please wait a couple of minutes." });
+        }
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(12));
+            var (ok, mediaStatus, statusLabel, message) = await StreamFlixSeerrService.SubmitRequestAsync(
+                config,
+                request.TmdbId,
+                request.MediaType,
+                request.Seasons,
+                cts.Token).ConfigureAwait(false);
+
+            return Ok(new
+            {
+                ok,
+                mediaStatus,
+                statusLabel,
+                message,
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: Seerr request failed for TMDB {TmdbId}.", request.TmdbId);
+            return StatusCode(502, new { ok = false, code = "seerr_request_failed", message = ex.Message });
+        }
     }
 
     private bool IsProfileLinkedToAdmin(StreamFlixProfileConfig? profile)
@@ -1791,10 +2772,11 @@ public class StreamFlixController : ControllerBase
         }
 
         var lockKey = StreamFlixSessionService.GetRateLimitClientKey(HttpContext) + "|" + profile.Id;
-        if (StreamFlixSessionService.IsPinLockedOut(lockKey, out var retryAfter))
+        if (StreamFlixSessionService.IsPinLockedOut(lockKey, out var retryAfter)
+            || StreamFlixSessionService.IsPinTargetLockedOut(profile.Id, out retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
-            Response.Headers["Retry-After"] = secs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Response.Headers["Retry-After"] = secs.ToString(CultureInfo.InvariantCulture);
             return StatusCode(429, new { code = "pin_locked", retryAfterSeconds = secs, message = $"Too many wrong PINs. Try again in {Math.Max(1, (secs + 59) / 60)} min." });
         }
 
@@ -1806,10 +2788,12 @@ public class StreamFlixController : ControllerBase
         if (!StreamFlixSessionService.ConstantTimePinEquals(profile.PinCode, suppliedPin))
         {
             StreamFlixSessionService.RegisterPinFailure(lockKey);
+            StreamFlixSessionService.RegisterPinTargetFailure(profile.Id);
             return StatusCode(403, new { code = "pin_invalid", message = "Incorrect PIN. Please try again." });
         }
 
         StreamFlixSessionService.ResetPinFailures(lockKey);
+        StreamFlixSessionService.ResetPinTargetFailures(profile.Id);
         return null;
     }
 
@@ -1878,16 +2862,35 @@ public class StreamFlixController : ControllerBase
                     }
                 }
             }
+            else if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindGuestPass, StringComparison.Ordinal))
+            {
+                var lockedProf = FindProfile(config, session.LockedProfileId);
+                if (lockedProf == null || IsProfileLinkedToAdmin(lockedProf))
+                {
+                    session = null;
+                }
+                else if (!string.IsNullOrWhiteSpace(lockedProf.JellyfinUserId)
+                    && Guid.TryParse(lockedProf.JellyfinUserId, out var gpUid))
+                {
+                    var gpUser = _userManager.GetUserById(gpUid);
+                    if (gpUser != null && (StreamFlixStartupTask.IsUserDisabledCompat(gpUser) || StreamFlixStartupTask.IsUserAdminCompat(gpUser)))
+                    {
+                        session = null;
+                    }
+                }
+            }
         }
 
         var isAuthenticated = false;
         var isAdmin = sessionIsAdmin;
+        JUser? jellyfinAuthUser = null;
         try
         {
             var info = await _authContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
             if (info != null && info.IsAuthenticated && (info.IsApiKey || !StreamFlixStartupTask.IsUserDisabledCompat(info.User)))
             {
                 isAuthenticated = true;
+                jellyfinAuthUser = info.User;
                 isAdmin = isAdmin || info.IsApiKey || StreamFlixStartupTask.IsUserAdminCompat(info.User);
             }
         }
@@ -1896,7 +2899,7 @@ public class StreamFlixController : ControllerBase
             _logger.LogDebug(ex, "StreamFlix: could not read Jellyfin authorization info.");
         }
 
-        return new CallerContext(session, isAuthenticated, isAdmin, isLocalLan);
+        return new CallerContext(session, isAuthenticated, isAdmin, isLocalLan, jellyfinAuthUser);
     }
 
     private async Task SyncProfilesAsync(PluginConfiguration config, bool force)
@@ -1966,6 +2969,7 @@ public class StreamFlixController : ControllerBase
     private object BuildPublicState(PluginConfiguration config, CallerContext caller)
     {
         var hasAccess = HasHouseholdAccess(config, caller);
+        var isGuestPass = IsGuestSession(caller);
         var isUnconfiguredGate = IsGateUnconfigured(config);
         var canShowAdminFallback = isUnconfiguredGate
             || (config.AllowAdminFallbackLogin && (!config.AdminFallbackLanOnly || caller.IsLocalLan));
@@ -1985,10 +2989,24 @@ public class StreamFlixController : ControllerBase
             : new List<object>();
 
         var profilesSnapshot = (config.Profiles ?? new List<StreamFlixProfileConfig>()).ToList();
+        if (isGuestPass)
+        {
+            profilesSnapshot = profilesSnapshot
+                .Where(p => string.Equals(p.Id, caller.Session?.LockedProfileId, StringComparison.Ordinal) && !IsProfileLinkedToAdmin(p))
+                .ToList();
+        }
+
+        var activeGuestPass = isGuestPass && !string.IsNullOrWhiteSpace(caller.Session?.GuestPassId)
+            ? (config.GuestPasses ?? new List<StreamFlixGuestPass>())
+                .FirstOrDefault(g => string.Equals(g.Id, caller.Session!.GuestPassId, StringComparison.Ordinal))
+            : null;
+
         var approvedSnapshot = (config.ApprovedGoogleAccounts ?? new List<string>()).ToList();
         var approvedOidcSnapshot = (config.ApprovedOidcUsers ?? new List<string>()).ToList();
         var oidcConfigured = StreamFlixOidcService.IsConfigured(config);
         var oidcProviderName = StreamFlixOidcService.GetDisplayProviderName(config);
+        var seerrConfigured = StreamFlixSeerrService.IsConfigured(config);
+        var seerrEnabled = hasAccess && seerrConfigured && (!isGuestPass || config.SeerrAllowGuests);
         var heroLibrariesSnapshot = (config.HeroLibraryIds ?? new List<string>())
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id.Trim())
@@ -2009,7 +3027,7 @@ public class StreamFlixController : ControllerBase
             oidcConfigured,
             oidcProviderName,
             oidcRequireAllowlist = config.OidcRequireAllowlist,
-            hasOidcClientSecret = !string.IsNullOrWhiteSpace(config.OidcClientSecret),
+            hasOidcClientSecret = caller.IsAdmin && !string.IsNullOrWhiteSpace(config.OidcClientSecret),
             allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,
             allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
             adminFallbackLanOnly = config.AdminFallbackLanOnly,
@@ -2018,9 +3036,17 @@ public class StreamFlixController : ControllerBase
             canShowAdminFallback,
             googleClientId = caller.IsAdmin || config.EnableGoogleSignIn ? config.GoogleClientId : string.Empty,
             googleConfigured = !string.IsNullOrWhiteSpace(config.GoogleClientId),
-            hasGoogleClientSecret = !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
+            hasGoogleClientSecret = caller.IsAdmin && !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
             hasAccess,
             isAdmin = caller.IsAdmin,
+            isGuestPass,
+            guestPassLabel = activeGuestPass?.Label,
+            guestPassExpiresAt = activeGuestPass?.ExpiresAtUtc ?? caller.Session?.ExpiresAt.ToString("O"),
+            lockedProfileId = isGuestPass ? caller.Session?.LockedProfileId : null,
+            seerrConfigured = caller.IsAdmin && seerrConfigured,
+            seerrEnabled,
+            seerrAllowKids = config.SeerrAllowKids,
+            seerrAllowGuests = config.SeerrAllowGuests,
             session = caller.Session == null
                 ? null
                 : new
@@ -2030,6 +3056,8 @@ public class StreamFlixController : ControllerBase
                     email = caller.Session.Email,
                     username = caller.Session.Username,
                     userId = caller.Session.JellyfinUserId,
+                    guestPassId = caller.Session.GuestPassId,
+                    lockedProfileId = caller.Session.LockedProfileId,
                     expiresAt = caller.Session.ExpiresAt,
                 },
             top10SelectionMode = NormalizeTop10Mode(config.Top10SelectionMode),
@@ -2042,7 +3070,7 @@ public class StreamFlixController : ControllerBase
             approvedOidcUsers = hasAccess && caller.IsAdmin ? approvedOidcSnapshot : new List<string>(),
             serverUsers,
             profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(p, caller)).ToList() : new List<object>(),
-            showcaseItems = hasAccess ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
+            showcaseItems = hasAccess && !isGuestPass ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
         };
     }
 
@@ -2603,7 +3631,8 @@ public class StreamFlixController : ControllerBase
             }
         }
 
-        var lockEmail = string.IsNullOrWhiteSpace(p.GoogleAccountEmail) ? null : p.GoogleAccountEmail.Trim();
+        var isGuest = IsGuestSession(caller);
+        var lockEmail = isGuest || string.IsNullOrWhiteSpace(p.GoogleAccountEmail) ? null : p.GoogleAccountEmail.Trim();
         var callerOwnsLock = lockEmail != null && caller.Session != null
             && string.Equals(caller.Session.Email, lockEmail, StringComparison.OrdinalIgnoreCase);
 
@@ -2619,17 +3648,834 @@ public class StreamFlixController : ControllerBase
             isAdmin,
             isOwner = StreamFlixStartupTask.IsOwnerProfile(p),
             maturityRating = p.MaturityRating,
-            hasPin = !string.IsNullOrWhiteSpace(p.PinCode),
-            pinLength = string.IsNullOrWhiteSpace(p.PinCode) ? 0 : p.PinCode.Trim().Length,
-            googleLocked = lockEmail != null,
+            hasPin = !isGuest && !string.IsNullOrWhiteSpace(p.PinCode),
+            pinLength = isGuest || string.IsNullOrWhiteSpace(p.PinCode) ? 0 : p.PinCode.Trim().Length,
+            googleLocked = !isGuest && lockEmail != null,
             googleAccountEmail = lockEmail != null && (caller.IsAdmin || callerOwnsLock) ? lockEmail : null,
             googleAccountHint = lockEmail != null ? StreamFlixSessionService.MaskEmail(lockEmail) : null,
-            googleLockSatisfied = lockEmail == null || callerOwnsLock || caller.IsAdmin,
+            googleLockSatisfied = isGuest || lockEmail == null || callerOwnsLock || caller.IsAdmin,
             autoplayNextEpisode = p.AutoplayNextEpisode,
             autoplayPreviews = p.AutoplayPreviews,
             jellyfinUserId = p.JellyfinUserId,
             jellyfinUsername = p.JellyfinUsername,
         };
+    }
+
+    private void SetNoStoreSecurityHeaders()
+    {
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+
+    private static bool IsGuestSession(CallerContext caller)
+    {
+        return !caller.IsAdmin
+            && caller.Session != null
+            && string.Equals(caller.Session.AuthKind, StreamFlixSessionService.AuthKindGuestPass, StringComparison.Ordinal);
+    }
+
+    private static object BuildAdminConfigResponse(PluginConfiguration config)
+    {
+        return new
+        {
+            version = Plugin.VersionString,
+            enableStreamFlixUi = config.EnableStreamFlixUi,
+            customBrandName = config.CustomBrandName ?? string.Empty,
+            requireGoogleAuth = config.RequireGoogleAuth,
+            enableGoogleSignIn = config.EnableGoogleSignIn,
+            allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,
+            allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
+            adminFallbackLanOnly = config.AdminFallbackLanOnly,
+            bypassLoginGateOnLan = config.BypassLoginGateOnLan,
+            autoProvisionJellyfinUsers = config.AutoProvisionJellyfinUsers,
+            googleClientId = config.GoogleClientId ?? string.Empty,
+            hasGoogleClientSecret = !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
+            approvedGoogleAccounts = (config.ApprovedGoogleAccounts ?? new List<string>()).ToList(),
+            sessionLifetimeDays = Math.Clamp(config.SessionLifetimeDays <= 0 ? 30 : config.SessionLifetimeDays, 1, 365),
+            sessionVersion = Math.Max(1, config.SessionVersion),
+            top10SelectionMode = NormalizeTop10Mode(config.Top10SelectionMode),
+            heroRotationSeconds = Math.Clamp(config.HeroRotationSeconds, 0, 120),
+            heroSlideCount = Math.Clamp(config.HeroSlideCount <= 0 ? 8 : config.HeroSlideCount, 1, 15),
+            heroSelectionMode = NormalizeHeroSelectionMode(config.HeroSelectionMode),
+            heroContentType = NormalizeHeroContentType(config.HeroContentType),
+            heroLibraryIds = (config.HeroLibraryIds ?? new List<string>()).ToList(),
+            enableCustomOidc = config.EnableCustomOidc,
+            oidcProviderName = config.OidcProviderName ?? string.Empty,
+            oidcIssuerUrl = config.OidcIssuerUrl ?? string.Empty,
+            oidcClientId = config.OidcClientId ?? string.Empty,
+            hasOidcClientSecret = !string.IsNullOrWhiteSpace(config.OidcClientSecret),
+            oidcRequireAllowlist = config.OidcRequireAllowlist,
+            approvedOidcUsers = (config.ApprovedOidcUsers ?? new List<string>()).ToList(),
+            enableSeerr = config.EnableSeerr,
+            seerrUrl = config.SeerrUrl ?? string.Empty,
+            hasSeerrApiKey = !string.IsNullOrWhiteSpace(config.SeerrApiKey),
+            seerrAllowKids = config.SeerrAllowKids,
+            seerrAllowGuests = config.SeerrAllowGuests,
+        };
+    }
+
+    private static string GetGuestPassStatus(StreamFlixGuestPass pass)
+    {
+        if (pass.Revoked)
+        {
+            return "revoked";
+        }
+
+        if (!DateTimeOffset.TryParse(pass.ExpiresAtUtc, out var exp) || exp <= DateTimeOffset.UtcNow)
+        {
+            return "expired";
+        }
+
+        if (pass.MaxRedemptions > 0 && pass.RedemptionCount >= pass.MaxRedemptions)
+        {
+            return "exhausted";
+        }
+
+        return "active";
+    }
+
+    private static object MapGuestPassAdmin(PluginConfiguration config, StreamFlixGuestPass pass)
+    {
+        var liveProfile = FindProfile(config, pass.ProfileId);
+        return new
+        {
+            id = pass.Id,
+            label = pass.Label,
+            profileId = pass.ProfileId,
+            profileName = liveProfile?.Name ?? pass.ProfileNameSnapshot,
+            profileEmoji = liveProfile?.AvatarEmoji ?? "🎬",
+            profileColorHex = SanitizeHexColor(liveProfile?.AvatarColorHex),
+            createdAtUtc = pass.CreatedAtUtc,
+            expiresAtUtc = pass.ExpiresAtUtc,
+            maxRedemptions = pass.MaxRedemptions,
+            redemptionCount = pass.RedemptionCount,
+            lastRedeemedAtUtc = pass.LastRedeemedAtUtc,
+            revoked = pass.Revoked,
+            revokedAtUtc = pass.RevokedAtUtc,
+            status = GetGuestPassStatus(pass),
+        };
+    }
+
+    private string BuildAbsolutePublicBaseUrl()
+    {
+        var scheme = Request.Scheme;
+        var host = Request.Host.Value;
+        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : string.Empty;
+
+        var remoteIp = HttpContext.Connection.RemoteIpAddress;
+        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp))
+        {
+            var fwdProto = Request.Headers["X-Forwarded-Proto"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+            if (fwdProto != null && (string.Equals(fwdProto, "https", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(fwdProto, "http", StringComparison.OrdinalIgnoreCase)))
+            {
+                scheme = fwdProto.ToLowerInvariant();
+            }
+
+            var fwdHost = Request.Headers["X-Forwarded-Host"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(fwdHost) && IsSafeHostHeader(fwdHost))
+            {
+                host = fwdHost;
+            }
+
+            if (string.IsNullOrEmpty(pathBase))
+            {
+                var fwdPrefix = Request.Headers["X-Forwarded-Prefix"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(fwdPrefix) && fwdPrefix.StartsWith('/') && !fwdPrefix.StartsWith("//", StringComparison.Ordinal) && !fwdPrefix.Contains('\\'))
+                {
+                    pathBase = fwdPrefix.TrimEnd('/');
+                }
+            }
+        }
+
+        return $"{scheme}://{host}{pathBase.TrimEnd('/')}";
+    }
+
+    private string BuildAbsoluteGuestPassUri(string code)
+    {
+        return $"{BuildAbsolutePublicBaseUrl()}/StreamFlix/Guest/{Uri.EscapeDataString(code)}";
+    }
+
+    private static string BuildGuestReturnUrl(string safeRelativeWebPath, string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return $"{safeRelativeWebPath}?sf_guest=1#/home";
+        }
+
+        return $"{safeRelativeWebPath}?sf_guest_error={Uri.EscapeDataString(errorMessage.Trim())}#/home";
+    }
+
+    private static string BuildGuestDeviceId(string passId, string? clientDeviceId)
+    {
+        var suffix = string.Empty;
+        if (!string.IsNullOrWhiteSpace(clientDeviceId))
+        {
+            var chars = clientDeviceId.Trim()
+                .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                .Take(24)
+                .ToArray();
+            suffix = new string(chars);
+        }
+
+        if (string.IsNullOrEmpty(suffix))
+        {
+            suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant();
+        }
+
+        return $"streamflix-guest-{passId}-{suffix}";
+    }
+
+    private static void TrackGuestAccessToken(string passId, string accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(passId) || string.IsNullOrWhiteSpace(accessToken))
+        {
+            return;
+        }
+
+        if (ActiveGuestTokens.Count > 256)
+        {
+            ActiveGuestTokens.Clear();
+        }
+
+        var bag = ActiveGuestTokens.GetOrAdd(passId, _ => new ConcurrentBag<string>());
+        if (bag.Count < 64)
+        {
+            bag.Add(accessToken);
+        }
+    }
+
+    private async Task RevokeGuestJellyfinSessionsAsync(string passId)
+    {
+        if (string.IsNullOrWhiteSpace(passId))
+        {
+            return;
+        }
+
+        var tokensToRevoke = new HashSet<string>(StringComparer.Ordinal);
+        if (ActiveGuestTokens.TryRemove(passId, out var trackedBag))
+        {
+            foreach (var tok in trackedBag)
+            {
+                if (!string.IsNullOrWhiteSpace(tok))
+                {
+                    tokensToRevoke.Add(tok);
+                }
+            }
+        }
+
+        var devicePrefix = $"streamflix-guest-{passId}-";
+        try
+        {
+            var liveSessions = _sessionManager.Sessions?.ToList();
+            if (liveSessions != null)
+            {
+                foreach (var sess in liveSessions)
+                {
+                    if (sess?.DeviceId == null || !sess.DeviceId.StartsWith(devicePrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (sess.GetType().GetProperty("AccessToken")?.GetValue(sess) is string liveTok
+                        && !string.IsNullOrWhiteSpace(liveTok))
+                    {
+                        tokensToRevoke.Add(liveTok);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "StreamFlix: non-fatal error scanning live sessions during Guest Pass revocation.");
+        }
+
+        var logoutStringMethod = typeof(ISessionManager).GetMethod("Logout", new[] { typeof(string) })
+            ?? _sessionManager.GetType().GetMethod("Logout", new[] { typeof(string) });
+
+        if (logoutStringMethod != null)
+        {
+            foreach (var tok in tokensToRevoke)
+            {
+                try
+                {
+                    if (logoutStringMethod.Invoke(_sessionManager, new object[] { tok }) is Task logoutTask)
+                    {
+                        await logoutTask.ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "StreamFlix: non-fatal error logging out Guest Pass Jellyfin token.");
+                }
+            }
+        }
+    }
+
+    private async Task<ActionResult<object>> RedeemGuestPassAndActivateAsync(
+        PluginConfiguration config,
+        string rawCode,
+        RedeemGuestPassRequest? request)
+    {
+        var lockKey = "guest|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
+        if (StreamFlixSessionService.IsGuestLockedOut(lockKey, out var retryAfter))
+        {
+            var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
+            Response.Headers["Retry-After"] = secs.ToString(CultureInfo.InvariantCulture);
+            return StatusCode(429, new
+            {
+                verified = false,
+                code = "guest_locked",
+                retryAfterSeconds = secs,
+                message = $"Too many failed Guest Pass attempts. Try again in {Math.Max(1, (secs + 59) / 60)} min.",
+            });
+        }
+
+        await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+
+        StreamFlixGuestPass? pass = null;
+        StreamFlixProfileConfig? profile = null;
+        StreamFlixSessionService.SessionInfo? guestSession = null;
+        var sessionToken = string.Empty;
+
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!StreamFlixSessionService.TryVerifyGuestPassForRedemption(config, rawCode, out pass, out var failureReason)
+                || pass == null)
+            {
+                StreamFlixSessionService.RegisterGuestFailure(lockKey);
+                return StatusCode(403, new
+                {
+                    verified = false,
+                    code = "guest_invalid",
+                    message = failureReason,
+                });
+            }
+
+            profile = FindProfile(config, pass.ProfileId);
+            if (profile == null || IsProfileLinkedToAdmin(profile))
+            {
+                return StatusCode(403, new
+                {
+                    verified = false,
+                    code = "guest_profile_invalid",
+                    message = "This Guest Pass is no longer linked to an eligible non-administrator profile.",
+                });
+            }
+
+            pass.RedemptionCount = Math.Max(0, pass.RedemptionCount) + 1;
+            pass.LastRedeemedAtUtc = DateTimeOffset.UtcNow.ToString("O");
+            guestSession = StreamFlixSessionService.IssueGuestPassSession(config, pass, profile, out sessionToken);
+            Plugin.Instance?.SaveConfiguration();
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+
+        StreamFlixSessionService.ResetGuestFailures(lockKey);
+
+        // Resolve or auto-provision the assigned non-administrator Jellyfin user and sign the guest directly into it
+        var primaryAdmin = StreamFlixStartupTask.GetPrimaryAdminUserCompat(_userManager);
+        var user = (!string.IsNullOrWhiteSpace(profile.JellyfinUserId) && Guid.TryParse(profile.JellyfinUserId, out var parsedUid))
+            ? _userManager.GetUserById(parsedUid)
+            : null;
+        if (user == null)
+        {
+            var targetName = !string.IsNullOrWhiteSpace(profile.JellyfinUsername) ? profile.JellyfinUsername.Trim() : profile.Name.Trim();
+            user = StreamFlixStartupTask.FindSafeUserByName(_userManager, config, profile, targetName, profile.Name);
+            if (user == null && config.AutoProvisionJellyfinUsers)
+            {
+                try
+                {
+                    user = await _userManager.CreateUserAsync(StreamFlixStartupTask.GetAvailableUsername(_userManager, targetName)).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "StreamFlix: could not auto-provision Jellyfin user '{TargetName}' for Guest Pass.", targetName);
+                }
+            }
+        }
+
+        if (user == null || StreamFlixStartupTask.IsUserDisabledCompat(user) || StreamFlixStartupTask.IsUserAdminCompat(user))
+        {
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "guest_user_unavailable",
+                message = "The Jellyfin account for this Guest Pass is currently unavailable.",
+            });
+        }
+
+        var needsUpdate = false;
+        var desiredAge = StreamFlixStartupTask.ParentalAgeFromMaturity(profile.MaturityRating, profile.IsKids);
+        if (StreamFlixStartupTask.TryGetMaxParentalAge(user) != desiredAge && StreamFlixStartupTask.TrySetMaxParentalAge(user, desiredAge))
+        {
+            needsUpdate = true;
+        }
+
+        if (StreamFlixStartupTask.EnsureUserLibraryAccessAndPermissions(user, primaryAdmin))
+        {
+            needsUpdate = true;
+        }
+
+        if (needsUpdate)
+        {
+            await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        }
+
+        var deviceId = BuildGuestDeviceId(pass.Id, request?.DeviceId);
+        var authRequest = new AuthenticationRequest
+        {
+            App = !string.IsNullOrWhiteSpace(request?.AppName) ? request!.AppName!.Trim() : "Jellyfin Web",
+            AppVersion = !string.IsNullOrWhiteSpace(request?.AppVersion) ? request!.AppVersion!.Trim() : "10.11.0",
+            DeviceId = deviceId,
+            DeviceName = $"StreamFlix Guest ({(string.IsNullOrWhiteSpace(pass.Label) ? profile.Name : pass.Label)})",
+            UserId = user.Id,
+            Username = user.Username,
+            RemoteEndPoint = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1",
+        };
+
+        AuthenticationResult authResult;
+        try
+        {
+            authResult = await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: Guest Pass AuthenticateDirect failed for '{Username}'.", user.Username);
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "guest_auth_failed",
+                message = "Could not start the Guest Pass media session.",
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(authResult.AccessToken))
+        {
+            TrackGuestAccessToken(pass.Id, authResult.AccessToken);
+        }
+
+        var guestCaller = new CallerContext(guestSession, true, false, StreamFlixSessionService.IsLocalLanRequest(HttpContext), user);
+        var mappedProfile = MapProfilePublic(profile, guestCaller);
+
+        return Ok(new
+        {
+            verified = true,
+            authKind = StreamFlixSessionService.AuthKindGuestPass,
+            sessionToken,
+            expiresAt = guestSession.ExpiresAt,
+            guestPassId = pass.Id,
+            guestPassLabel = pass.Label,
+            lockedProfileId = profile.Id,
+            activation = new
+            {
+                userId = user.Id.ToString("N"),
+                userName = user.Username,
+                jellyfinUsername = user.Username,
+                accessToken = authResult.AccessToken,
+                serverId = _appHost.SystemId,
+                serverName = _appHost.FriendlyName,
+                user = authResult.User,
+                sessionInfo = authResult.SessionInfo,
+                profile = mappedProfile,
+            },
+        });
+    }
+
+    private Task<(bool Allowed, bool IsKids, string DenyReason)> EvaluateSeerrPermissionAsync(
+        PluginConfiguration config,
+        CallerContext caller,
+        string? requestedProfileId)
+    {
+        if (!HasHouseholdAccess(config, caller))
+        {
+            return Task.FromResult((false, false, "Sign in to StreamFlix first."));
+        }
+
+        if (!StreamFlixSeerrService.IsConfigured(config))
+        {
+            return Task.FromResult((false, false, "Seerr / Jellyseerr integration is not enabled on this server."));
+        }
+
+        var isGuest = IsGuestSession(caller);
+        if (isGuest && !config.SeerrAllowGuests)
+        {
+            return Task.FromResult((false, false, "Media requests are disabled for Guest Pass sessions."));
+        }
+
+        var effectiveProfileId = isGuest ? caller.Session?.LockedProfileId : requestedProfileId;
+        var profile = FindProfile(config, effectiveProfileId);
+        if (profile == null && caller.JellyfinUser != null)
+        {
+            var callerUid = caller.JellyfinUser.Id.ToString("N");
+            profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                .FirstOrDefault(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var isKids = profile?.IsKids == true;
+        if (isKids && !config.SeerrAllowKids)
+        {
+            return Task.FromResult((false, true, "Media requests are disabled for Kids profiles."));
+        }
+
+        return Task.FromResult((true, isKids, string.Empty));
+    }
+
+    private static bool AllowSeerrSubmitRate(string key)
+    {
+        if (SeerrRequestRateMap.Count > 512)
+        {
+            SeerrRequestRateMap.Clear();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var window = TimeSpan.FromMinutes(5);
+        var updated = SeerrRequestRateMap.AddOrUpdate(
+            key,
+            _ => (1, now.Add(window)),
+            (_, existing) => existing.WindowReset <= now
+                ? (1, now.Add(window))
+                : (existing.Count + 1, existing.WindowReset));
+        return updated.Count <= 20;
+    }
+
+    private object ComputeMovieNightCandidates(
+        List<StreamFlixProfileConfig> selectedProfiles,
+        MovieNightCandidatesRequest request)
+    {
+        var candidates = new List<(double Score, string GenreCsv, object Dto)>();
+        var allGenres = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var totalLibraryMatched = 0;
+
+        try
+        {
+            var watcherPairs = new List<(StreamFlixProfileConfig Profile, JUser? User, int? ParentalAge)>();
+            int? strictestAge = null;
+            JUser? mostRestrictedUser = null;
+
+            foreach (var p in selectedProfiles)
+            {
+                JUser? u = null;
+                if (!string.IsNullOrWhiteSpace(p.JellyfinUserId) && Guid.TryParse(p.JellyfinUserId, out var uid))
+                {
+                    u = _userManager.GetUserById(uid);
+                }
+
+                var age = IsProfileLinkedToAdmin(p)
+                    ? null
+                    : StreamFlixStartupTask.ParentalAgeFromMaturity(p.MaturityRating, p.IsKids);
+                if (age.HasValue && (!strictestAge.HasValue || age.Value < strictestAge.Value))
+                {
+                    strictestAge = age.Value;
+                    if (u != null)
+                    {
+                        mostRestrictedUser = u;
+                    }
+                }
+                else if (mostRestrictedUser == null && u != null && !StreamFlixStartupTask.IsUserAdminCompat(u))
+                {
+                    mostRestrictedUser = u;
+                }
+
+                watcherPairs.Add((p, u, age));
+            }
+
+            mostRestrictedUser ??= watcherPairs.Select(w => w.User).FirstOrDefault(u => u != null);
+
+            var queryType = typeof(ILibraryManager).Assembly.GetType("MediaBrowser.Controller.Entities.InternalItemsQuery");
+            var getItemList = queryType != null ? typeof(ILibraryManager).GetMethod("GetItemList", new[] { queryType }) : null;
+            if (queryType == null || getItemList == null)
+            {
+                return new { candidates = Array.Empty<object>(), availableGenres = Array.Empty<string>(), bracketSize = 0, totalMatched = 0 };
+            }
+
+            var userCtor = mostRestrictedUser != null ? queryType.GetConstructor(new[] { mostRestrictedUser.GetType() }) : null;
+            var query = userCtor != null && mostRestrictedUser != null
+                ? userCtor.Invoke(new object[] { mostRestrictedUser })
+                : Activator.CreateInstance(queryType);
+            if (query == null)
+            {
+                return new { candidates = Array.Empty<object>(), availableGenres = Array.Empty<string>(), bracketSize = 0, totalMatched = 0 };
+            }
+
+            if (userCtor == null && mostRestrictedUser != null)
+            {
+                queryType.GetProperty("User")?.SetValue(query, mostRestrictedUser);
+            }
+
+            queryType.GetProperty("Recursive")?.SetValue(query, true);
+            queryType.GetProperty("Limit")?.SetValue(query, 800);
+
+            var mediaTypeMode = (request.MediaType ?? "all").Trim().ToLowerInvariant();
+            var includeProp = queryType.GetProperty("IncludeItemTypes");
+            var elemType = includeProp?.PropertyType.IsArray == true ? includeProp.PropertyType.GetElementType() : null;
+            if (elemType != null && elemType.IsEnum)
+            {
+                var desiredTypeNames = mediaTypeMode switch
+                {
+                    "movie" or "movies" => new[] { "Movie" },
+                    "series" or "tv" => new[] { "Series" },
+                    _ => new[] { "Movie", "Series" },
+                };
+
+                var parsedEnums = new List<object>();
+                foreach (var tn in desiredTypeNames)
+                {
+                    if (Enum.TryParse(elemType, tn, ignoreCase: true, out var val) && val != null)
+                    {
+                        parsedEnums.Add(val);
+                    }
+                }
+
+                if (parsedEnums.Count > 0)
+                {
+                    var arr = Array.CreateInstance(elemType, parsedEnums.Count);
+                    for (var i = 0; i < parsedEnums.Count; i++)
+                    {
+                        arr.SetValue(parsedEnums[i], i);
+                    }
+
+                    includeProp!.SetValue(query, arr);
+                }
+            }
+
+            var getUserDataMethod = typeof(IUserDataManager).GetMethods()
+                .FirstOrDefault(m => m.Name == "GetUserData" && m.GetParameters().Length == 2)
+                ?? _userDataManager.GetType().GetMethods()
+                    .FirstOrDefault(m => m.Name == "GetUserData" && m.GetParameters().Length == 2);
+
+            var requestedGenre = (request.Genre ?? string.Empty).Trim();
+            if (string.Equals(requestedGenre, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                requestedGenre = string.Empty;
+            }
+
+            var maxRuntime = request.MaxRuntimeMinutes > 0 ? request.MaxRuntimeMinutes : 0;
+
+            if (getItemList.Invoke(_libraryManager, new[] { query }) is System.Collections.IEnumerable rawItems)
+            {
+                foreach (var item in rawItems)
+                {
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    var it = item.GetType();
+                    var typeName = it.Name;
+                    if (!string.Equals(typeName, "Movie", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(typeName, "Series", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (it.GetProperty("Id")?.GetValue(item) is not Guid id || id == Guid.Empty)
+                    {
+                        continue;
+                    }
+
+                    var officialRating = (it.GetProperty("OfficialRating")?.GetValue(item)?.ToString() ?? string.Empty).Trim();
+                    if (strictestAge.HasValue && !IsOfficialRatingAllowedForAge(officialRating, strictestAge.Value))
+                    {
+                        continue;
+                    }
+
+                    var runTimeMinutes = 0;
+                    if (it.GetProperty("RunTimeTicks")?.GetValue(item) is long ticks && ticks > 0)
+                    {
+                        runTimeMinutes = (int)Math.Round(ticks / 600_000_000.0);
+                    }
+
+                    if (maxRuntime > 0
+                        && string.Equals(typeName, "Movie", StringComparison.OrdinalIgnoreCase)
+                        && runTimeMinutes > maxRuntime)
+                    {
+                        continue;
+                    }
+
+                    // Check watch state & My List status across every selected watcher
+                    var playedByAny = false;
+                    var favoritedBy = new List<string>();
+                    foreach (var (prof, u, _) in watcherPairs)
+                    {
+                        if (u == null || getUserDataMethod == null)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            var firstParamType = getUserDataMethod.GetParameters()[0].ParameterType;
+                            var arg0 = firstParamType == typeof(Guid) ? (object)u.Id : u;
+                            var ud = getUserDataMethod.Invoke(_userDataManager, new[] { arg0, item });
+                            if (ud != null)
+                            {
+                                var udt = ud.GetType();
+                                var pl = udt.GetProperty("Played")?.GetValue(ud) is bool bPl && bPl;
+                                var pc = udt.GetProperty("PlayCount")?.GetValue(ud) is int iPc ? iPc : 0;
+                                if (pl || pc > 0)
+                                {
+                                    playedByAny = true;
+                                    if (request.OnlyUnwatched)
+                                    {
+                                        break;
+                                    }
+                                }
+
+                                if (udt.GetProperty("IsFavorite")?.GetValue(ud) is bool bFav && bFav)
+                                {
+                                    favoritedBy.Add(prof.Name);
+                                }
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    if (request.OnlyUnwatched && playedByAny)
+                    {
+                        continue;
+                    }
+
+                    var itemGenres = new List<string>();
+                    if (it.GetProperty("Genres")?.GetValue(item) is IEnumerable<string> gEnum)
+                    {
+                        foreach (var g in gEnum)
+                        {
+                            if (!string.IsNullOrWhiteSpace(g))
+                            {
+                                var cg = g.Trim();
+                                itemGenres.Add(cg);
+                                allGenres.Add(cg);
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(requestedGenre)
+                        && !itemGenres.Any(g => string.Equals(g, requestedGenre, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    totalLibraryMatched++;
+
+                    var name = it.GetProperty("Name")?.GetValue(item)?.ToString() ?? "Untitled";
+                    var year = it.GetProperty("ProductionYear")?.GetValue(item) is int yr && yr > 1880 ? yr : (int?)null;
+                    var communityRating = it.GetProperty("CommunityRating")?.GetValue(item) switch
+                    {
+                        float f => Math.Round(f, 1),
+                        double d => Math.Round(d, 1),
+                        _ => 0.0,
+                    };
+                    var overview = (it.GetProperty("Overview")?.GetValue(item)?.ToString() ?? string.Empty).Trim();
+                    string? tagline = null;
+                    if (it.GetProperty("Taglines")?.GetValue(item) is IEnumerable<string> tags)
+                    {
+                        tagline = tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t))?.Trim();
+                    }
+
+                    var hasBackdrop = it.GetProperty("BackdropImageTags")?.GetValue(item) is System.Collections.ICollection bdCol && bdCol.Count > 0;
+                    var hasLogo = false;
+                    if (it.GetProperty("ImageTags")?.GetValue(item) is System.Collections.IDictionary imgDict)
+                    {
+                        foreach (var k in imgDict.Keys)
+                        {
+                            if (string.Equals(k?.ToString(), "Logo", StringComparison.OrdinalIgnoreCase))
+                            {
+                                hasLogo = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    var score = (favoritedBy.Count * 24.0)
+                        + (communityRating * 1.5)
+                        + (playedByAny ? -12.0 : 6.0)
+                        + (Random.Shared.NextDouble() * 20.0);
+
+                    var dto = new
+                    {
+                        id = id.ToString("N"),
+                        name,
+                        type = typeName,
+                        year,
+                        officialRating,
+                        communityRating = communityRating > 0 ? (double?)communityRating : null,
+                        runTimeMinutes = runTimeMinutes > 0 ? (int?)runTimeMinutes : null,
+                        overview,
+                        tagline,
+                        genres = itemGenres.Take(4).ToArray(),
+                        hasBackdrop,
+                        hasLogo,
+                        sharedFavoriteCount = favoritedBy.Count,
+                        favoritedBy = favoritedBy.ToArray(),
+                    };
+
+                    candidates.Add((score, string.Join("|", itemGenres), dto));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: error computing Movie Night Matcher candidates.");
+        }
+
+        var desiredCount = Math.Clamp(request.Count <= 0 ? 8 : request.Count, 2, 16);
+        var bracketSize = candidates.Count >= 8 && desiredCount >= 8
+            ? 8
+            : (candidates.Count >= 4 && desiredCount >= 4
+                ? 4
+                : (candidates.Count >= 2 ? 2 : candidates.Count));
+
+        var picked = candidates
+            .OrderByDescending(c => c.Score)
+            .Take(bracketSize)
+            .Select(c => c.Dto)
+            .ToList();
+
+        var sortedGenres = allGenres
+            .OrderBy(g => g, StringComparer.OrdinalIgnoreCase)
+            .Take(40)
+            .ToArray();
+
+        return new
+        {
+            candidates = picked,
+            bracketSize,
+            totalMatched = totalLibraryMatched,
+            availableGenres = sortedGenres,
+            watchers = selectedProfiles.Select(p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                avatarEmoji = p.AvatarEmoji,
+                avatarColorHex = SanitizeHexColor(p.AvatarColorHex),
+            }).ToArray(),
+        };
+    }
+
+    private static bool IsOfficialRatingAllowedForAge(string officialRating, int maxAge)
+    {
+        if (string.IsNullOrWhiteSpace(officialRating))
+        {
+            return maxAge >= 13;
+        }
+
+        var r = officialRating.Trim().ToUpperInvariant();
+        var requiredAge = r switch
+        {
+            "G" or "TV-Y" or "TV-G" or "U" or "ALL" or "APPROVED" => 0,
+            "TV-Y7" or "TV-Y7-FV" or "PG" or "TV-PG" or "7" or "10" => 8,
+            "PG-13" or "TV-14" or "12" or "12A" or "13" or "14" or "14A" => 13,
+            "R" or "TV-MA" or "15" or "16" or "17" or "18" or "MA15+" => 17,
+            "NC-17" or "X" or "XXX" or "AO" or "R18+" => 21,
+            _ => 13,
+        };
+        return requiredAge <= maxAge;
     }
 
     private ActionResult ServeAsset(EmbeddedAsset asset, string contentType)
@@ -2639,6 +4485,7 @@ public class StreamFlixController : ControllerBase
             && string.Equals(requestedVer, Plugin.AssetCacheVersion, StringComparison.Ordinal)
             ? "public, max-age=86400"
             : "no-cache";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["ETag"] = asset.ETag;
 
         var ifNoneMatch = Request.Headers["If-None-Match"].ToString();
@@ -2654,7 +4501,8 @@ public class StreamFlixController : ControllerBase
         StreamFlixSessionService.SessionInfo? Session,
         bool IsJellyfinAuthenticated,
         bool IsAdmin,
-        bool IsLocalLan = false);
+        bool IsLocalLan = false,
+        JUser? JellyfinUser = null);
 
     private sealed class EmbeddedAsset
     {

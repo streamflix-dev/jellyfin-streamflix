@@ -186,31 +186,34 @@ public static class StreamFlixOidcService
         var clientId = (config.OidcClientId ?? string.Empty).Trim();
         var clientSecret = (config.OidcClientSecret ?? string.Empty).Trim();
 
-        var form = new List<KeyValuePair<string, string>>
+        await ValidateSafeOutboundUrlAsync(doc.TokenEndpoint, cancellationToken).ConfigureAwait(false);
+        var (tokenSuccess, tokenStatusCode, tokenBody) = await ExchangeAuthorizationCodeAsync(
+            doc.TokenEndpoint,
+            clientId,
+            clientSecret,
+            code.Trim(),
+            expectedState.RedirectUri,
+            expectedState.CodeVerifier,
+            useBasicAuth: !string.IsNullOrEmpty(clientSecret),
+            cancellationToken).ConfigureAwait(false);
+
+        if (!tokenSuccess && !string.IsNullOrEmpty(clientSecret) && (tokenStatusCode is 400 or 401))
         {
-            new("grant_type", "authorization_code"),
-            new("code", code.Trim()),
-            new("redirect_uri", expectedState.RedirectUri),
-            new("client_id", clientId),
-            new("code_verifier", expectedState.CodeVerifier),
-        };
-        if (!string.IsNullOrEmpty(clientSecret))
-        {
-            form.Add(new("client_secret", clientSecret));
+            // Fallback to client_secret_post for OIDC providers explicitly configured against client_secret_basic
+            (tokenSuccess, tokenStatusCode, tokenBody) = await ExchangeAuthorizationCodeAsync(
+                doc.TokenEndpoint,
+                clientId,
+                clientSecret,
+                code.Trim(),
+                expectedState.RedirectUri,
+                expectedState.CodeVerifier,
+                useBasicAuth: false,
+                cancellationToken).ConfigureAwait(false);
         }
 
-        await ValidateSafeOutboundUrlAsync(doc.TokenEndpoint, cancellationToken).ConfigureAwait(false);
-        using var tokenReq = new HttpRequestMessage(HttpMethod.Post, doc.TokenEndpoint)
+        if (!tokenSuccess)
         {
-            Content = new FormUrlEncodedContent(form),
-        };
-        tokenReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        using var tokenResp = await NoRedirectHttp.SendAsync(tokenReq, cancellationToken).ConfigureAwait(false);
-        var tokenBody = await tokenResp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (!tokenResp.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"OIDC token exchange failed (HTTP {(int)tokenResp.StatusCode}). Check your Client ID, Client Secret, and Redirect URI.");
+            throw new InvalidOperationException($"OIDC token exchange failed (HTTP {tokenStatusCode}). Check your Client ID, Client Secret, and Redirect URI.");
         }
 
         using var tokenJson = JsonDocument.Parse(tokenBody);
@@ -461,6 +464,11 @@ public static class StreamFlixOidcService
             JwksUri: jwksUri,
             UserInfoEndpoint: string.IsNullOrEmpty(userInfoEp) ? null : userInfoEp);
 
+        if (DiscoveryCache.Count > 64)
+        {
+            DiscoveryCache.Clear();
+        }
+
         DiscoveryCache[discoveryUrl] = new CachedDiscovery(doc, DateTimeOffset.UtcNow);
         return doc;
     }
@@ -479,8 +487,56 @@ public static class StreamFlixOidcService
         }
 
         var jwks = await FetchJwksJsonAsync(doc.JwksUri, cancellationToken).ConfigureAwait(false);
+        if (JwksCache.Count > 64)
+        {
+            JwksCache.Clear();
+        }
+
         JwksCache[doc.JwksUri] = new CachedJwks(jwks, DateTimeOffset.UtcNow);
         return jwks;
+    }
+
+    private static async Task<(bool Success, int StatusCode, string Body)> ExchangeAuthorizationCodeAsync(
+        string tokenEndpoint,
+        string clientId,
+        string clientSecret,
+        string code,
+        string redirectUri,
+        string codeVerifier,
+        bool useBasicAuth,
+        CancellationToken cancellationToken)
+    {
+        var form = new List<KeyValuePair<string, string>>
+        {
+            new("grant_type", "authorization_code"),
+            new("code", code),
+            new("redirect_uri", redirectUri),
+            new("code_verifier", codeVerifier),
+        };
+
+        using var tokenReq = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint);
+        if (useBasicAuth && !string.IsNullOrEmpty(clientSecret))
+        {
+            // RFC 6749 §2.3.1 client_secret_basic: URL-encode client_id and client_secret before joining with ':'
+            var basicPair = Uri.EscapeDataString(clientId) + ":" + Uri.EscapeDataString(clientSecret);
+            var basicB64 = Convert.ToBase64String(Encoding.ASCII.GetBytes(basicPair));
+            tokenReq.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicB64);
+        }
+        else
+        {
+            form.Add(new("client_id", clientId));
+            if (!string.IsNullOrEmpty(clientSecret))
+            {
+                form.Add(new("client_secret", clientSecret));
+            }
+        }
+
+        tokenReq.Content = new FormUrlEncodedContent(form);
+        tokenReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var tokenResp = await NoRedirectHttp.SendAsync(tokenReq, cancellationToken).ConfigureAwait(false);
+        var tokenBody = await tokenResp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return (tokenResp.IsSuccessStatusCode, (int)tokenResp.StatusCode, tokenBody);
     }
 
     private static async Task<string> FetchJwksJsonAsync(string jwksUri, CancellationToken cancellationToken)

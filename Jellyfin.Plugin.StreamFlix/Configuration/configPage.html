@@ -21,10 +21,10 @@
             #StreamFlixConfigPage .bfx-btn-danger { background:rgba(229,9,20,.14); color:#ff8a80; border-color:rgba(229,9,20,.6); }
             #StreamFlixConfigPage .bfx-btn-danger:hover:not(:disabled) { background:rgba(229,9,20,.26); border-color:#ff5252; color:#fff; }
             #StreamFlixConfigPage .bfx-btn-sm { padding:5px 9px; font-size:.8em; }
-            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-bottom:26px; }
+            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:26px; }
             #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:14px 16px; }
             #StreamFlixConfigPage .bfx-card-label { font-size:.75em; text-transform:uppercase; letter-spacing:.08em; opacity:.6; }
-            #StreamFlixConfigPage .bfx-card-value { font-size:1.08em; font-weight:700; margin-top:6px; display:flex; align-items:center; gap:8px; }
+            #StreamFlixConfigPage .bfx-card-value { font-size:1.05em; font-weight:700; margin-top:6px; display:flex; align-items:center; gap:8px; }
             #StreamFlixConfigPage .bfx-dot { width:9px; height:9px; border-radius:50%; background:#777; flex:none; }
             #StreamFlixConfigPage .bfx-dot.ok { background:#46d369; box-shadow:0 0 8px rgba(70,211,105,.6); }
             #StreamFlixConfigPage .bfx-dot.warn { background:#f5b041; box-shadow:0 0 8px rgba(245,176,65,.5); }
@@ -35,6 +35,7 @@
             #StreamFlixConfigPage .bfx-subbox { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:14px 16px; margin:10px 0 16px; }
             #StreamFlixConfigPage .bfx-subbox-title { font-size:.82em; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.72; margin-bottom:10px; }
             #StreamFlixConfigPage .bfx-grid-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
+            #StreamFlixConfigPage .bfx-grid-4 { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; align-items:end; }
             #StreamFlixConfigPage .bfx-profiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:12px; }
             #StreamFlixConfigPage .bfx-prof { display:flex; align-items:center; gap:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:10px 12px; transition:border-color .15s, opacity .2s; }
             #StreamFlixConfigPage .bfx-prof:hover { border-color:rgba(255,255,255,.25); }
@@ -49,7 +50,18 @@
             #StreamFlixConfigPage .bfx-badge.blue { background:rgba(66,133,244,.22); color:#9ec1ff; }
             #StreamFlixConfigPage .bfx-badge.green { background:rgba(70,211,105,.18); color:#8de5a6; }
             #StreamFlixConfigPage .bfx-badge.amber { background:rgba(245,176,65,.2); color:#f8cd85; }
+            #StreamFlixConfigPage .bfx-badge.muted { background:rgba(255,255,255,.08); color:rgba(255,255,255,.55); }
             #StreamFlixConfigPage .bfx-prof-actions { display:flex; gap:4px; flex:none; }
+            #StreamFlixConfigPage .bfx-passes { display:flex; flex-direction:column; gap:8px; }
+            #StreamFlixConfigPage .bfx-pass-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:rgba(0,0,0,.26); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:10px 14px; }
+            #StreamFlixConfigPage .bfx-pass-row.inactive { opacity:.58; }
+            #StreamFlixConfigPage .bfx-pass-main { flex:1; min-width:200px; }
+            #StreamFlixConfigPage .bfx-pass-title { font-weight:700; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+            #StreamFlixConfigPage .bfx-pass-sub { font-size:.8em; opacity:.66; margin-top:2px; }
+            #StreamFlixConfigPage .bfx-secret-row { display:flex; align-items:center; gap:8px; }
+            #StreamFlixConfigPage .bfx-secret-row input { flex:1; }
+            #StreamFlixConfigPage .bfx-secret-status { font-size:.78em; color:#8de5a6; margin-top:4px; }
+            #StreamFlixConfigPage .bfx-secret-status.hide { display:none; }
             #StreamFlixConfigPage .bfx-empty { opacity:.6; padding:10px 0; }
             #StreamFlixConfigPage .bfx-callout { border-left:3px solid #f5b041; background:rgba(245,176,65,.08); padding:10px 12px; border-radius:4px; font-size:.88em; margin:6px 0 14px; }
             #StreamFlixConfigPage .bfx-callout.red { border-left-color:#E50914; background:rgba(229,9,20,.08); }
@@ -78,10 +90,12 @@
             #StreamFlixConfigPage .bfx-skeleton { height:66px; border-radius:8px; background:linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%); background-size:200% 100%; animation:bfxShimmer 1.3s ease-in-out infinite; }
             #StreamFlixConfigPage .bfx-confirm-backdrop { position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,.78); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; }
             #StreamFlixConfigPage .bfx-confirm-backdrop.hide { display:none; }
-            #StreamFlixConfigPage .bfx-confirm-dialog { width:100%; max-width:440px; background:#18181c; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:22px 24px; box-shadow:0 26px 70px rgba(0,0,0,.75); color:#fff; }
+            #StreamFlixConfigPage .bfx-confirm-dialog { width:100%; max-width:460px; background:#18181c; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:22px 24px; box-shadow:0 26px 70px rgba(0,0,0,.75); color:#fff; }
             #StreamFlixConfigPage .bfx-confirm-dialog h4 { margin:0 0 8px; font-size:1.2em; display:flex; align-items:center; gap:8px; }
-            #StreamFlixConfigPage .bfx-confirm-dialog p { margin:0 0 20px; font-size:.93em; line-height:1.5; color:rgba(255,255,255,.78); }
-            #StreamFlixConfigPage .bfx-confirm-actions { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+            #StreamFlixConfigPage .bfx-confirm-dialog p { margin:0 0 18px; font-size:.92em; line-height:1.5; color:rgba(255,255,255,.78); }
+            #StreamFlixConfigPage .bfx-confirm-actions { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; margin-top:16px; }
+            #StreamFlixConfigPage .bfx-qr-box { width:212px; height:212px; margin:12px auto 16px; padding:10px; background:#fff; border-radius:12px; box-shadow:0 12px 34px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; }
+            #StreamFlixConfigPage .bfx-qr-box svg { width:100%; height:100%; display:block; }
             @keyframes bfxShimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
             @media (prefers-reduced-motion: reduce) { #StreamFlixConfigPage .bfx-skeleton { animation:none; } }
         </style>
@@ -94,7 +108,7 @@
                             <div class="bfx-logo" id="StreamFlixConfigLogo">STREAMFLIX</div>
                             <div>
                                 <h2>StreamFlix</h2>
-                                <div class="bfx-sub">Netflix-style home, flexible household sign-in and separate Jellyfin profiles <span id="StreamFlixVersionLabel"></span></div>
+                                <div class="bfx-sub">Netflix-style home, household profiles, expiring Guest Passes, Movie Night Matcher &amp; Seerr requests <span id="StreamFlixVersionLabel"></span></div>
                             </div>
                         </div>
                         <div class="bfx-row">
@@ -105,7 +119,7 @@
 
                     <div class="bfx-cards">
                         <div class="bfx-card">
-                            <div class="bfx-card-label">Google OAuth</div>
+                            <div class="bfx-card-label">SSO / OAuth</div>
                             <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGoogleDot"></span><span id="StreamFlixStatusGoogle">…</span></div>
                         </div>
                         <div class="bfx-card">
@@ -113,8 +127,12 @@
                             <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGateDot"></span><span id="StreamFlixStatusGate">…</span></div>
                         </div>
                         <div class="bfx-card">
-                            <div class="bfx-card-label">Approved Google emails</div>
-                            <div class="bfx-card-value" id="StreamFlixStatusAccounts">…</div>
+                            <div class="bfx-card-label">Seerr requests</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusSeerrDot"></span><span id="StreamFlixStatusSeerr">…</span></div>
+                        </div>
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Active guest passes</div>
+                            <div class="bfx-card-value" id="StreamFlixStatusGuestPasses">0</div>
                         </div>
                         <div class="bfx-card">
                             <div class="bfx-card-label">Profiles</div>
@@ -126,14 +144,71 @@
                         <div class="bfx-section-head">
                             <div>
                                 <h3>Profiles</h3>
-                                <div class="fieldDescription">Each profile is linked to its own Jellyfin user, so watch history, Continue Watching and favorites stay separate. Add a PIN or lock a profile to a Google account from <strong>Manage profiles</strong>.</div>
+                                <div class="fieldDescription">Each profile is linked to its own Jellyfin user, so watch history, Continue Watching and favorites stay separate. Add a PIN or lock a profile to a Google/OIDC email from <strong>Manage profiles</strong>.</div>
                             </div>
                         </div>
                         <div class="bfx-callout red hide" id="StreamFlixOwnerWarning">
-                            The <strong>Owner</strong> profile is linked to an administrator account but has no PIN or Google lock. Anyone signed in to your household can open it — consider protecting it.
+                            The <strong>Owner</strong> profile is linked to an administrator account but has no PIN or email lock. Anyone signed in to your household can open it — consider protecting it.
                         </div>
                         <div class="bfx-profiles" id="StreamFlixProfilesGrid">
                             <div class="bfx-skeleton"></div><div class="bfx-skeleton"></div><div class="bfx-skeleton"></div>
+                        </div>
+                    </div>
+
+                    <div class="bfx-section" id="StreamFlixGuestPassesSection">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Temporary Guest Passes</h3>
+                                <div class="fieldDescription">Share an expiring 1-click invite link or scannable QR code locked strictly to one non-administrator profile. Guests cannot switch profiles, edit settings, or pair Quick Connect devices, and revoking a pass ends active playback immediately.</div>
+                            </div>
+                            <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixPurgePassesBtn">Clear expired / revoked</button>
+                        </div>
+
+                        <div class="bfx-subbox">
+                            <div class="bfx-subbox-title">Create New Guest Pass</div>
+                            <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
+                                Create at least one non-administrator viewer or Guest profile in <strong>Manage profiles</strong> above before issuing a Guest Pass.
+                            </div>
+                            <div class="bfx-grid-4">
+                                <div class="inputContainer" style="margin:0;">
+                                    <label class="inputLabel inputLabelUnfocused" for="GuestPassLabel">Pass label (optional)</label>
+                                    <input id="GuestPassLabel" type="text" maxlength="48" is="emby-input" autocomplete="off" placeholder="Weekend Guest" />
+                                </div>
+                                <div class="selectContainer" style="margin:0;">
+                                    <label class="selectLabel" for="GuestPassProfileId">Assigned non-admin profile</label>
+                                    <select id="GuestPassProfileId" is="emby-select" class="emby-select-withcolor emby-select"></select>
+                                </div>
+                                <div class="selectContainer" style="margin:0;">
+                                    <label class="selectLabel" for="GuestPassDurationHours">Expires after</label>
+                                    <select id="GuestPassDurationHours" is="emby-select" class="emby-select-withcolor emby-select">
+                                        <option value="4">4 hours (Movie night)</option>
+                                        <option value="12">12 hours</option>
+                                        <option value="24" selected>24 hours (1 day)</option>
+                                        <option value="48">48 hours (Weekend)</option>
+                                        <option value="72">3 days</option>
+                                        <option value="168">7 days (1 week)</option>
+                                        <option value="336">14 days (2 weeks)</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer" style="margin:0;">
+                                    <label class="selectLabel" for="GuestPassMaxRedemptions">Device / redemption cap</label>
+                                    <select id="GuestPassMaxRedemptions" is="emby-select" class="emby-select-withcolor emby-select">
+                                        <option value="1">1 device / browser</option>
+                                        <option value="2" selected>Up to 2 devices</option>
+                                        <option value="4">Up to 4 devices</option>
+                                        <option value="10">Up to 10 devices</option>
+                                        <option value="0">Unlimited until expiry</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="bfx-row" style="margin-top:12px;">
+                                <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixCreateGuestPassBtn">+ Generate Guest Pass &amp; QR</button>
+                                <span class="fieldDescription" style="margin:0;">QR codes are generated 100% locally on your Jellyfin server — pass URLs are never sent to external QR services.</span>
+                            </div>
+                        </div>
+
+                        <div class="bfx-passes" id="StreamFlixGuestPassesList">
+                            <div class="bfx-empty">No Guest Passes created yet.</div>
                         </div>
                     </div>
 
@@ -144,12 +219,12 @@
                                 <input id="EnableStreamFlixUi" name="EnableStreamFlixUi" type="checkbox" is="emby-checkbox" />
                                 <span>Enable the StreamFlix interface</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Netflix-style home with hero billboard, Top 10 badges, keyboard/D-pad remote support, profile switcher, and dark-themed login &amp; library pages.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Netflix-style home with hero billboard, Top 10 badges, Movie Night Matcher, keyboard/D-pad remote support, profile switcher, and dark-themed login &amp; library pages.</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom logo text (upper-left corner)</label>
-                            <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="40" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
+                            <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
                             <div class="fieldDescription">Customizes the red wordmark logo in the upper-left corner (plus the sign-in screen and home labels). Leave blank to use <strong>STREAMFLIX</strong>.</div>
                         </div>
 
@@ -158,7 +233,7 @@
                                 <input id="RequireGoogleAuth" name="RequireGoogleAuth" type="checkbox" is="emby-checkbox" />
                                 <span>Require household sign-in before "Who's watching?"</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Protects the profile picker behind Google Sign-In, Standard Jellyfin Login, or Hybrid Mode (both).</div>
+                            <div class="fieldDescription checkboxFieldDescription">Protects the profile picker behind Google Sign-In, Custom OIDC, Standard Jellyfin Login, or Hybrid Mode.</div>
                         </div>
                         <div class="bfx-callout red hide" id="StreamFlixOpenGateWarning">
                             <strong>Sign-in gate is off.</strong> Anyone who can reach this server can open PIN-free profiles without signing in first. Only disable this on a trusted private network.
@@ -172,7 +247,7 @@
                                     <input id="EnableGoogleSignIn" name="EnableGoogleSignIn" type="checkbox" is="emby-checkbox" />
                                     <span>Enable "Continue with Google"</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">Shows Google OAuth 2.0 sign-in when an OAuth Client ID is configured below. Disable if your server is local-only or you prefer Jellyfin passwords exclusively.</div>
+                                <div class="fieldDescription checkboxFieldDescription">Shows Google OAuth 2.0 sign-in when an OAuth Client ID is configured below. Disable if your server is local-only or you prefer Jellyfin passwords / OIDC exclusively.</div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription">
@@ -180,15 +255,15 @@
                                     <input id="AllowStandardJellyfinLogin" name="AllowStandardJellyfinLogin" type="checkbox" is="emby-checkbox" />
                                     <span>Allow Standard Jellyfin Login (Hybrid or Standalone Mode)</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">Adds a dark StreamFlix-themed Jellyfin username &amp; password sign-in form so household members can unlock "Who's watching?" with any Jellyfin account (alongside Google in Hybrid Mode, or instead of Google).</div>
+                                <div class="fieldDescription checkboxFieldDescription">Adds a dark StreamFlix-themed Jellyfin username &amp; password sign-in form so household members can unlock "Who's watching?" with any Jellyfin account.</div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label class="emby-checkbox-label">
                                     <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
-                                    <span>Show "Admin Sign-In" fallback link on the Google Sign-In screen</span>
+                                    <span>Show "Admin Sign-In" fallback link on the Sign-In screen</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, shows a subtle <em>Admin Sign-In</em> link on the Google Sign-In screen so server owners can log in without Google OAuth. Strictly verified on the backend — non-administrator Jellyfin accounts are rejected.</div>
+                                <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, shows a subtle <em>Admin Sign-In</em> link so server owners can log in without SSO. Strictly verified on the backend — non-administrator Jellyfin accounts are rejected.</div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription">
@@ -209,7 +284,7 @@
                         </div>
 
                         <div class="bfx-callout hide" id="StreamFlixNoAuthMethodWarning">
-                            All household sign-in methods (<strong>Google</strong>, <strong>Standard Jellyfin Login</strong>, and <strong>Beta OIDC</strong>) are currently off or unconfigured while the sign-in gate is required — only Jellyfin Administrators will be able to sign in.
+                            All household sign-in methods (<strong>Google</strong>, <strong>Standard Jellyfin Login</strong>, and <strong>Beta OIDC</strong>) are currently off or unconfigured while the sign-in gate is required — only Jellyfin Administrators and valid Guest Pass holders will be able to sign in.
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -228,7 +303,7 @@
 
                         <div class="bfx-row" style="margin-top:10px;">
                             <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">⚠ Sign out all devices</button>
-                            <span class="fieldDescription" style="margin:0;">Asks for confirmation first, then immediately ends every active StreamFlix household session across all browsers and TVs.</span>
+                            <span class="fieldDescription" style="margin:0;">Asks for confirmation first, then immediately ends every active StreamFlix household &amp; Guest Pass session across all browsers and TVs.</span>
                         </div>
                     </div>
 
@@ -296,12 +371,68 @@
                         </div>
                     </div>
 
+                    <div class="bfx-section" id="StreamFlixSeerrSection">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Seerr / Jellyseerr Media Requests</h3>
+                                <div class="fieldDescription">
+                                    Connect <strong>Seerr</strong>, <strong>Jellyseerr</strong>, or <strong>Overseerr</strong> so household members can discover and request missing Movies &amp; TV Seasons right inside StreamFlix Live Search — with zero extra navbar clutter and your API key kept strictly server-side.
+                                </div>
+                            </div>
+                            <button type="button" class="bfx-btn" id="StreamFlixTestSeerrBtn">✓ Test Seerr Connection</button>
+                        </div>
+
+                        <div class="bfx-oauth-results hide" id="StreamFlixSeerrTestResult" role="status" aria-live="polite"></div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:14px;">
+                            <label class="emby-checkbox-label">
+                                <input id="EnableSeerr" name="EnableSeerr" type="checkbox" is="emby-checkbox" />
+                                <span>Enable Seerr / Jellyseerr requests in StreamFlix Search</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Shows an <em>Available to Request</em> section beneath local search matches when searching titles in StreamFlix.</div>
+                        </div>
+
+                        <div class="bfx-grid-2">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="SeerrUrl">Seerr / Jellyseerr URL</label>
+                                <input id="SeerrUrl" name="SeerrUrl" type="text" is="emby-input" autocomplete="off" placeholder="http://localhost:5055" />
+                                <div class="fieldDescription">Base URL reachable from the Jellyfin Server container/host (e.g. <code>http://jellyseerr:5055</code> or <code>https://requests.example.com</code>).</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="SeerrApiKey">Seerr API Key (Settings → General)</label>
+                                <div class="bfx-secret-row">
+                                    <input id="SeerrApiKey" name="SeerrApiKey" type="password" is="emby-input" autocomplete="new-password" placeholder="Paste X-Api-Key" />
+                                    <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearSeerrApiKeyBtn">Clear</button>
+                                </div>
+                                <div class="bfx-secret-status hide" id="SeerrApiKeySavedHint">✓ API key stored securely on server (leave blank to keep current key)</div>
+                                <div class="fieldDescription">Stored server-side only and never exposed to browsers.</div>
+                            </div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="SeerrAllowKids" name="SeerrAllowKids" type="checkbox" is="emby-checkbox" />
+                                <span>Allow Kids profiles to search &amp; submit media requests</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, adult and Horror/Crime TMDB genres are filtered out automatically for Kids profiles.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
+                            <label class="emby-checkbox-label">
+                                <input id="SeerrAllowGuests" name="SeerrAllowGuests" type="checkbox" is="emby-checkbox" />
+                                <span>Allow Temporary Guest Pass viewers to submit media requests</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Off by default so temporary guests can browse and watch your existing library without queuing new downloads unless permitted.</div>
+                        </div>
+                    </div>
+
                     <div class="bfx-section">
                         <div class="bfx-section-head">
                             <div>
                                 <h3>Google sign-in (OAuth 2.0)</h3>
                                 <div class="fieldDescription">
-                                    In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="button-link">Google Cloud Console → Credentials</a>, create an <strong>OAuth client ID</strong> of type <em>Web application</em> and add the following:
+                                    In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="button-link">Google Cloud Console → Credentials</a>, create an <strong>OAuth client ID</strong> of type <em>Web application</em> and add the following:
                                 </div>
                             </div>
                             <button type="button" class="bfx-btn" id="StreamFlixTestOAuthBtn">✓ Test OAuth Config</button>
@@ -322,13 +453,17 @@
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="GoogleClientSecret">OAuth Client secret (optional)</label>
-                            <input id="GoogleClientSecret" name="GoogleClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                            <div class="bfx-secret-row">
+                                <input id="GoogleClientSecret" name="GoogleClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearGoogleClientSecretBtn">Clear</button>
+                            </div>
+                            <div class="bfx-secret-status hide" id="GoogleClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
                             <div class="fieldDescription">Not required for sign-in. Stored only on the server and never sent to browsers.</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="ApprovedGoogleEmails">Approved Google accounts</label>
-                            <textarea id="ApprovedGoogleEmails" name="ApprovedGoogleEmails" rows="6" class="emby-input bfx-textarea" placeholder="user@example.com&#10;member@example.com"></textarea>
+                            <textarea id="ApprovedGoogleEmails" name="ApprovedGoogleEmails" rows="5" class="emby-input bfx-textarea" placeholder="user@example.com&#10;member@example.com"></textarea>
                             <div class="fieldDescription">One email per line. Only these accounts (plus any account a profile is locked to) can unlock StreamFlix via Google Sign-In.</div>
                         </div>
                         <div class="bfx-callout hide" id="StreamFlixNoAccountsWarning">
@@ -341,7 +476,7 @@
                             <div>
                                 <h3>Custom OpenID Connect (OIDC) <span class="bfx-beta-tag">Beta Test</span></h3>
                                 <div class="fieldDescription">
-                                    Experimental self-hosted &amp; enterprise SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) using Authorization Code + PKCE (<code>S256</code>) and JWKS cryptographic token verification. Disabled by default.
+                                    Self-hosted &amp; enterprise SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) using Authorization Code + PKCE (<code>S256</code>), automatic <code>client_secret_basic</code> / <code>client_secret_post</code> negotiation, and JWKS cryptographic token verification. Disabled by default.
                                 </div>
                             </div>
                             <button type="button" class="bfx-btn" id="StreamFlixTestOidcBtn">✓ Test OIDC Discovery</button>
@@ -382,7 +517,11 @@
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="OidcClientSecret">OIDC Client Secret (optional for public PKCE clients)</label>
-                            <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                            <div class="bfx-secret-row">
+                                <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearOidcClientSecretBtn">Clear</button>
+                            </div>
+                            <div class="bfx-secret-status hide" id="OidcClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
                             <div class="fieldDescription">Required for confidential OIDC clients; leave blank for public PKCE-only clients. Stored server-side only and never sent to browsers.</div>
                         </div>
 
@@ -421,18 +560,47 @@
             </div>
         </div>
 
+        <div class="bfx-confirm-backdrop hide" id="StreamFlixQrModal" role="dialog" aria-modal="true" aria-labelledby="StreamFlixQrModalTitle">
+            <div class="bfx-confirm-dialog">
+                <h4 id="StreamFlixQrModalTitle">Guest Pass Ready</h4>
+                <p id="StreamFlixQrModalSub" style="margin-bottom:8px;"></p>
+                <div class="bfx-qr-box" id="StreamFlixQrSvgHost" aria-label="Guest Pass QR Code"></div>
+                <div class="fieldDescription">1-click invite link (phones &amp; browsers)</div>
+                <div class="bfx-uri"><code id="StreamFlixQrShareUrl"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixQrShareUrl">Copy Link</button></div>
+                <div class="fieldDescription" style="margin-top:8px;">Manual pass code (Smart TVs &amp; Sign-In screen)</div>
+                <div class="bfx-uri"><code id="StreamFlixQrPassCode"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixQrPassCode">Copy Code</button></div>
+                <div class="bfx-confirm-actions">
+                    <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixQrCloseBtn">Done</button>
+                </div>
+            </div>
+        </div>
+
         <script type="text/javascript">
             (function () {
-                var pluginId = '7cc1a505-91f6-4661-b4f9-7eee8be33b19';
                 var page = document.querySelector('#StreamFlixConfigPage');
                 var form = page.querySelector('#StreamFlixConfigForm');
                 var grid = page.querySelector('#StreamFlixProfilesGrid');
                 var profiles = [];
+                var guestPasses = [];
+                var eligibleGuestProfiles = [];
                 var lastPublic = null;
                 var availableLibraries = [];
                 var selectedHeroLibIds = [];
+                var heroLibrariesLoaded = false;
+                var reorderBusy = false;
+                var bundleLoadPromise = null;
                 var activeConfirmResolver = null;
                 var confirmOpenedAt = 0;
+                var qrModalOpen = false;
+                var docKeydownBound = false;
+                var secretState = {
+                    googleSaved: false,
+                    googleClear: false,
+                    oidcSaved: false,
+                    oidcClear: false,
+                    seerrSaved: false,
+                    seerrClear: false
+                };
 
                 function $(sel) {
                     return page.querySelector(sel);
@@ -445,6 +613,14 @@
                         .replace(/>/g, '&gt;')
                         .replace(/"/g, '&quot;')
                         .replace(/'/g, '&#39;');
+                }
+
+                function cssAttrEscape(value) {
+                    var s = String(value == null ? '' : value);
+                    if (window.CSS && typeof window.CSS.escape === 'function') {
+                        return window.CSS.escape(s);
+                    }
+                    return s.replace(/["\\]/g, '\\$&');
                 }
 
                 function safeHexColor(value) {
@@ -476,7 +652,75 @@
                     }
                 }
 
+                function closeQrModal() {
+                    qrModalOpen = false;
+                    var modal = $('#StreamFlixQrModal');
+                    if (modal) {
+                        modal.classList.add('hide');
+                    }
+                }
+
+                function renderSafeQrSvg(targetEl, rawSvg) {
+                    targetEl.textContent = '';
+                    if (!rawSvg || typeof DOMParser === 'undefined') {
+                        return;
+                    }
+                    try {
+                        var doc = new DOMParser().parseFromString(String(rawSvg), 'image/svg+xml');
+                        var parsedSvg = doc && doc.documentElement;
+                        if (!parsedSvg || String(parsedSvg.nodeName).toLowerCase() !== 'svg') {
+                            return;
+                        }
+                        var ns = 'http://www.w3.org/2000/svg';
+                        var cleanSvg = document.createElementNS(ns, 'svg');
+                        cleanSvg.setAttribute('viewBox', parsedSvg.getAttribute('viewBox') || '0 0 35 35');
+                        cleanSvg.setAttribute('shape-rendering', 'crispEdges');
+                        cleanSvg.setAttribute('role', 'img');
+                        cleanSvg.setAttribute('aria-label', 'Guest Pass QR Code');
+
+                        Array.prototype.forEach.call(parsedSvg.children || [], function (child) {
+                            var tag = String(child.nodeName || '').toLowerCase();
+                            if (tag === 'rect') {
+                                var rect = document.createElementNS(ns, 'rect');
+                                rect.setAttribute('width', child.getAttribute('width') || '100%');
+                                rect.setAttribute('height', child.getAttribute('height') || '100%');
+                                rect.setAttribute('fill', '#ffffff');
+                                cleanSvg.appendChild(rect);
+                            } else if (tag === 'path') {
+                                var d = child.getAttribute('d') || '';
+                                if (/^[MmHhVvZz0-9,.\s-]+$/.test(d)) {
+                                    var path = document.createElementNS(ns, 'path');
+                                    path.setAttribute('fill', '#000000');
+                                    path.setAttribute('d', d);
+                                    cleanSvg.appendChild(path);
+                                }
+                            }
+                        });
+                        targetEl.appendChild(cleanSvg);
+                    } catch (e) {}
+                }
+
+                function openQrModal(info) {
+                    if (!info) {
+                        return;
+                    }
+                    var pass = info.pass || {};
+                    $('#StreamFlixQrModalTitle').textContent = (pass.label || 'Guest Pass') + ' — Ready to Share';
+                    var expText = pass.expiresAtUtc ? new Date(pass.expiresAtUtc).toLocaleString() : '';
+                    $('#StreamFlixQrModalSub').textContent = 'Locked to profile "' + (pass.profileName || 'Guest') + '"' + (expText ? ' · Expires ' + expText : '');
+                    $('#StreamFlixQrShareUrl').textContent = info.shareUrl || '';
+                    $('#StreamFlixQrPassCode').textContent = info.code || '';
+                    renderSafeQrSvg($('#StreamFlixQrSvgHost'), info.qrSvg || '');
+                    qrModalOpen = true;
+                    $('#StreamFlixQrModal').classList.remove('hide');
+                }
+
                 function confirmAction(text, title, confirmLabel) {
+                    if (activeConfirmResolver) {
+                        var stale = activeConfirmResolver;
+                        activeConfirmResolver = null;
+                        stale(false);
+                    }
                     var modal = $('#StreamFlixConfirmModal');
                     if (!modal) {
                         return Promise.resolve(window.confirm(text));
@@ -497,6 +741,18 @@
                     });
                 }
 
+                function onDocumentKeydown(e) {
+                    if (e.key === 'Escape') {
+                        if (activeConfirmResolver) {
+                            e.preventDefault();
+                            closeConfirmModal(false);
+                        } else if (qrModalOpen) {
+                            e.preventDefault();
+                            closeQrModal();
+                        }
+                    }
+                }
+
                 $('#StreamFlixConfirmCancelBtn').addEventListener('click', function () {
                     closeConfirmModal(false);
                 });
@@ -511,14 +767,13 @@
                         closeConfirmModal(false);
                     }
                 });
-                document.addEventListener('keydown', function (e) {
-                    if (e.key === 'Escape' && activeConfirmResolver) {
-                        e.preventDefault();
-                        closeConfirmModal(false);
+                $('#StreamFlixQrCloseBtn').addEventListener('click', closeQrModal);
+                $('#StreamFlixQrModal').addEventListener('click', function (e) {
+                    if (e.target === $('#StreamFlixQrModal')) {
+                        closeQrModal();
                     }
                 });
 
-                /* Authenticated call to the StreamFlix API (ApiClient attaches this admin's Jellyfin token). */
                 function streamflixApi(method, path, body) {
                     var options = {
                         type: method,
@@ -554,6 +809,9 @@
                     if (typeof window.__STREAMFLIX_OPEN_PROFILE_PICKER__ === 'function') {
                         return Promise.resolve();
                     }
+                    if (bundleLoadPromise) {
+                        return bundleLoadPromise;
+                    }
                     var verParam = getAssetQueryParam();
                     if (!document.querySelector('link[href*="StreamFlix/ClientStyles"]')) {
                         var link = document.createElement('link');
@@ -561,14 +819,21 @@
                         link.href = appendQuery(ApiClient.getUrl('StreamFlix/ClientStyles'), verParam);
                         document.head.appendChild(link);
                     }
-                    return fetch(appendQuery(ApiClient.getUrl('StreamFlix/ClientScript'), verParam))
-                        .then(function (r) { return r.text(); })
-                        .then(function (code) {
-                            var sc = document.createElement('script');
-                            sc.text = code;
-                            document.head.appendChild(sc);
-                        })
-                        .catch(function () {});
+                    bundleLoadPromise = new Promise(function (resolve) {
+                        var sc = document.createElement('script');
+                        sc.src = appendQuery(ApiClient.getUrl('StreamFlix/ClientScript'), verParam);
+                        sc.defer = true;
+                        sc.onload = function () {
+                            bundleLoadPromise = null;
+                            resolve();
+                        };
+                        sc.onerror = function () {
+                            bundleLoadPromise = null;
+                            resolve();
+                        };
+                        document.head.appendChild(sc);
+                    });
+                    return bundleLoadPromise;
                 }
 
                 function openPicker(manage) {
@@ -593,9 +858,42 @@
 
                 function setStatus(dotId, textId, level, text) {
                     var dot = $('#' + dotId);
-                    dot.className = 'bfx-dot' + (level ? ' ' + level : '');
-                    $('#' + textId).textContent = text;
+                    if (dot) {
+                        dot.className = 'bfx-dot' + (level ? ' ' + level : '');
+                    }
+                    var txt = $('#' + textId);
+                    if (txt) {
+                        txt.textContent = text;
+                    }
                 }
+
+                function syncSecretUi() {
+                    $('#GoogleClientSecretSavedHint').classList.toggle('hide', !(secretState.googleSaved && !secretState.googleClear));
+                    $('#ClearGoogleClientSecretBtn').classList.toggle('hide', !(secretState.googleSaved && !secretState.googleClear));
+
+                    $('#OidcClientSecretSavedHint').classList.toggle('hide', !(secretState.oidcSaved && !secretState.oidcClear));
+                    $('#ClearOidcClientSecretBtn').classList.toggle('hide', !(secretState.oidcSaved && !secretState.oidcClear));
+
+                    $('#SeerrApiKeySavedHint').classList.toggle('hide', !(secretState.seerrSaved && !secretState.seerrClear));
+                    $('#ClearSeerrApiKeyBtn').classList.toggle('hide', !(secretState.seerrSaved && !secretState.seerrClear));
+                }
+
+                $('#ClearGoogleClientSecretBtn').addEventListener('click', function () {
+                    secretState.googleClear = true;
+                    $('#GoogleClientSecret').value = '';
+                    syncSecretUi();
+                });
+                $('#ClearOidcClientSecretBtn').addEventListener('click', function () {
+                    secretState.oidcClear = true;
+                    $('#OidcClientSecret').value = '';
+                    syncSecretUi();
+                });
+                $('#ClearSeerrApiKeyBtn').addEventListener('click', function () {
+                    secretState.seerrClear = true;
+                    $('#SeerrApiKey').value = '';
+                    syncSecretUi();
+                    renderStatus();
+                });
 
                 function renderStatus() {
                     var clientId = $('#GoogleClientId').value.trim();
@@ -609,10 +907,14 @@
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
 
+                    var enableSeerr = $('#EnableSeerr').checked;
+                    var seerrHasUrl = Boolean($('#SeerrUrl').value.trim());
+                    var seerrHasKey = Boolean($('#SeerrApiKey').value.trim()) || (secretState.seerrSaved && !secretState.seerrClear);
+
                     if (!enableGoogle) {
                         setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', oidcReady ? 'ok' : 'warn', oidcReady ? 'OIDC (' + oidcLabel + ')' : 'Disabled');
                     } else if (clientId) {
-                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', oidcReady ? 'Configured + OIDC' : 'Configured');
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', oidcReady ? 'Google + OIDC' : 'Configured');
                     } else {
                         setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', oidcReady ? 'warn' : 'bad', oidcReady ? 'OIDC only' : 'Not configured');
                     }
@@ -633,7 +935,16 @@
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'warn', 'Admin setup mode');
                     }
 
-                    $('#StreamFlixStatusAccounts').textContent = String(accounts.length);
+                    if (!enableSeerr) {
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', '', 'Disabled');
+                    } else if (seerrHasUrl && seerrHasKey) {
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'ok', 'Active in Search');
+                    } else {
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'warn', 'Needs URL & API key');
+                    }
+
+                    var activePassCount = guestPasses.filter(function (g) { return g.status === 'active'; }).length;
+                    $('#StreamFlixStatusGuestPasses').textContent = String(activePassCount);
                     $('#StreamFlixStatusProfiles').textContent = String(profiles.length);
 
                     $('#StreamFlixOpenGateWarning').classList.toggle('hide', requireGate);
@@ -704,6 +1015,9 @@
                 }
 
                 function getCheckedHeroLibraryIds() {
+                    if (!heroLibrariesLoaded) {
+                        return selectedHeroLibIds.slice();
+                    }
                     var out = [];
                     Array.prototype.forEach.call(page.querySelectorAll('input[data-hero-lib-id]:checked'), function (cb) {
                         var id = cb.getAttribute('data-hero-lib-id');
@@ -734,6 +1048,7 @@
                             .filter(function (f) {
                                 return f.id && f.rawType !== 'music' && f.rawType !== 'books' && f.rawType !== 'photos' && f.rawType !== 'playlists';
                             });
+                        heroLibrariesLoaded = true;
                         renderHeroLibraries();
                     }).catch(function () {
                         $('#StreamFlixHeroLibrariesList').innerHTML = '<div class="bfx-empty">Could not load library list.</div>';
@@ -753,7 +1068,7 @@
                             + (p.isAdmin ? '<span class="bfx-badge amber">ADMIN</span>' : '')
                             + (p.isKids ? '<span class="bfx-badge green">KIDS</span>' : '')
                             + (p.hasPin ? '<span class="bfx-badge">🔒 PIN</span>' : '')
-                            + (p.googleLocked ? '<span class="bfx-badge blue" title="Locked to a Google account">G ' + esc(p.googleAccountEmail || p.googleAccountHint || '') + '</span>' : '')
+                            + (p.googleLocked ? '<span class="bfx-badge blue" title="Locked to an SSO email">G ' + esc(p.googleAccountEmail || p.googleAccountHint || '') + '</span>' : '')
                             + (!p.jellyfinUserId ? '<span class="bfx-badge red">NOT LINKED</span>' : '');
                         return ''
                             + '<div class="bfx-prof" data-id="' + esc(p.id) + '">'
@@ -774,6 +1089,152 @@
                     renderStatus();
                 }
 
+                function renderGuestPasses() {
+                    var sel = $('#GuestPassProfileId');
+                    var createBtn = $('#StreamFlixCreateGuestPassBtn');
+                    var prevVal = sel.value;
+                    if (!eligibleGuestProfiles.length) {
+                        sel.innerHTML = '<option value="">No non-admin profiles yet</option>';
+                        sel.disabled = true;
+                        createBtn.disabled = true;
+                        $('#StreamFlixNoGuestProfilesHint').classList.remove('hide');
+                    } else {
+                        sel.disabled = false;
+                        createBtn.disabled = false;
+                        $('#StreamFlixNoGuestProfilesHint').classList.add('hide');
+                        sel.innerHTML = eligibleGuestProfiles.map(function (p) {
+                            return '<option value="' + esc(p.id) + '">' + esc((p.avatarEmoji ? p.avatarEmoji + ' ' : '') + p.name + (p.isKids ? ' (Kids)' : '')) + '</option>';
+                        }).join('');
+                        if (prevVal && eligibleGuestProfiles.some(function (p) { return p.id === prevVal; })) {
+                            sel.value = prevVal;
+                        }
+                    }
+
+                    var host = $('#StreamFlixGuestPassesList');
+                    if (!guestPasses.length) {
+                        host.innerHTML = '<div class="bfx-empty">No Guest Passes created yet.</div>';
+                        renderStatus();
+                        return;
+                    }
+
+                    host.innerHTML = guestPasses.map(function (gp) {
+                        var st = gp.status || 'active';
+                        var badgeHtml = st === 'active'
+                            ? '<span class="bfx-badge green">ACTIVE</span>'
+                            : (st === 'revoked'
+                                ? '<span class="bfx-badge red">REVOKED</span>'
+                                : (st === 'exhausted'
+                                    ? '<span class="bfx-badge amber">MAXED OUT</span>'
+                                    : '<span class="bfx-badge muted">EXPIRED</span>'));
+                        var redemptionsText = gp.maxRedemptions > 0
+                            ? (gp.redemptionCount + ' / ' + gp.maxRedemptions + ' devices used')
+                            : (gp.redemptionCount + ' redeemed (unlimited cap)');
+                        var expDate = gp.expiresAtUtc ? new Date(gp.expiresAtUtc).toLocaleString() : '—';
+                        return ''
+                            + '<div class="bfx-pass-row' + (st !== 'active' ? ' inactive' : '') + '" data-pass-id="' + esc(gp.id) + '">'
+                            + '  <div class="bfx-avatar" style="width:36px;height:36px;font-size:18px;background:' + safeHexColor(gp.profileColorHex) + ';">' + esc(gp.profileEmoji || '🎬') + '</div>'
+                            + '  <div class="bfx-pass-main">'
+                            + '    <div class="bfx-pass-title"><span>' + esc(gp.label || 'Guest Pass') + '</span>' + badgeHtml + '</div>'
+                            + '    <div class="bfx-pass-sub">Profile: <strong>' + esc(gp.profileName || 'Guest') + '</strong> · ' + esc(redemptionsText) + ' · Expires: ' + esc(expDate) + '</div>'
+                            + '  </div>'
+                            + '  <div class="bfx-prof-actions">'
+                            + (st === 'active'
+                                ? '<button type="button" class="bfx-btn bfx-btn-sm" data-pass-act="qr">QR &amp; Link</button>'
+                                  + '<button type="button" class="bfx-btn bfx-btn-sm bfx-btn-danger" data-pass-act="revoke">Revoke</button>'
+                                : '')
+                            + '  </div>'
+                            + '</div>';
+                    }).join('');
+                    renderStatus();
+                }
+
+                function loadGuestPasses() {
+                    return streamflixApi('GET', 'GuestPasses').then(function (res) {
+                        guestPasses = (res && Array.isArray(res.passes)) ? res.passes : [];
+                        eligibleGuestProfiles = (res && Array.isArray(res.eligibleProfiles)) ? res.eligibleProfiles : [];
+                        renderGuestPasses();
+                    }).catch(function () {
+                        renderGuestPasses();
+                    });
+                }
+
+                $('#StreamFlixCreateGuestPassBtn').addEventListener('click', function () {
+                    var profileId = $('#GuestPassProfileId').value;
+                    if (!profileId) {
+                        toast('Choose a non-administrator profile first.');
+                        return;
+                    }
+                    var btn = $('#StreamFlixCreateGuestPassBtn');
+                    btn.disabled = true;
+                    streamflixApi('POST', 'GuestPasses/Create', {
+                        label: $('#GuestPassLabel').value.trim(),
+                        profileId: profileId,
+                        durationHours: parseInt($('#GuestPassDurationHours').value, 10) || 24,
+                        maxRedemptions: parseInt($('#GuestPassMaxRedemptions').value, 10) || 0
+                    }).then(function (res) {
+                        btn.disabled = false;
+                        $('#GuestPassLabel').value = '';
+                        loadGuestPasses();
+                        openQrModal(res);
+                    }).catch(function (err) {
+                        btn.disabled = false;
+                        toast(err.message || 'Could not create Guest Pass.');
+                    });
+                });
+
+                $('#StreamFlixPurgePassesBtn').addEventListener('click', function () {
+                    streamflixApi('POST', 'GuestPasses/Purge').then(function (res) {
+                        guestPasses = (res && Array.isArray(res.passes)) ? res.passes : [];
+                        renderGuestPasses();
+                        toast((res && res.removed ? res.removed : 0) + ' inactive pass(es) cleared');
+                    }).catch(function (err) {
+                        toast(err.message);
+                    });
+                });
+
+                $('#StreamFlixGuestPassesList').addEventListener('click', function (e) {
+                    var btn = e.target.closest('button[data-pass-act]');
+                    var row = btn && btn.closest('.bfx-pass-row');
+                    if (!btn || !row) {
+                        return;
+                    }
+                    var passId = row.getAttribute('data-pass-id');
+                    var act = btn.getAttribute('data-pass-act');
+                    if (act === 'qr') {
+                        btn.disabled = true;
+                        streamflixApi('GET', 'GuestPasses/' + encodeURIComponent(passId) + '/ShareInfo')
+                            .then(function (res) {
+                                btn.disabled = false;
+                                openQrModal(res);
+                            })
+                            .catch(function (err) {
+                                btn.disabled = false;
+                                toast(err.message);
+                            });
+                    } else if (act === 'revoke') {
+                        confirmAction(
+                            'Revoke this Guest Pass immediately? Any guest currently watching on this pass will be disconnected.',
+                            'Revoke Guest Pass?',
+                            'Revoke now'
+                        ).then(function (ok) {
+                            if (!ok) {
+                                return;
+                            }
+                            btn.disabled = true;
+                            streamflixApi('POST', 'GuestPasses/Revoke', { id: passId })
+                                .then(function (res) {
+                                    guestPasses = (res && Array.isArray(res.passes)) ? res.passes : [];
+                                    renderGuestPasses();
+                                    toast('Guest Pass revoked');
+                                })
+                                .catch(function (err) {
+                                    btn.disabled = false;
+                                    toast(err.message);
+                                });
+                        });
+                    }
+                });
+
                 function applyPublic(pub) {
                     lastPublic = pub || null;
                     if (pub && Array.isArray(pub.profiles)) {
@@ -783,23 +1244,32 @@
                         $('#StreamFlixVersionLabel').textContent = '· v' + String(pub.version).replace(/\.0$/, '');
                     }
                     renderProfiles();
+                    loadGuestPasses();
                 }
 
                 function reorder(profileId, delta) {
+                    if (reorderBusy) {
+                        return;
+                    }
                     var list = profiles.slice();
                     var idx = list.findIndex(function (p) { return p.id === profileId; });
                     var target = idx + delta;
                     if (idx < 0 || target < 0 || target >= list.length) {
                         return;
                     }
+                    reorderBusy = true;
                     var tmp = list[idx];
                     list[idx] = list[target];
                     list[target] = tmp;
                     profiles = list;
                     renderProfiles();
                     streamflixApi('POST', 'Profiles/Reorder', { profileIds: list.map(function (p) { return p.id; }) })
-                        .then(applyPublic)
+                        .then(function (pub) {
+                            reorderBusy = false;
+                            applyPublic(pub);
+                        })
                         .catch(function (err) {
+                            reorderBusy = false;
                             toast(err.message);
                             loadProfiles();
                         });
@@ -818,7 +1288,7 @@
                         if (!ok) {
                             return;
                         }
-                        var card = grid.querySelector('.bfx-prof[data-id="' + CSS.escape(profileId) + '"]');
+                        var card = grid.querySelector('.bfx-prof[data-id="' + cssAttrEscape(profileId) + '"]');
                         if (card) {
                             card.classList.add('busy');
                         }
@@ -860,7 +1330,7 @@
 
                 $('#StreamFlixRevokeAllBtn').addEventListener('click', function () {
                     confirmAction(
-                        'Are you sure you want to sign every device out of StreamFlix? Active TVs, phones, and browsers in your household will immediately need to sign in again.',
+                        'Are you sure you want to sign every device out of StreamFlix? Active TVs, phones, browsers, and Guest Passes will immediately need to sign in again.',
                         'Are you sure? Sign out all devices',
                         'Yes, sign out all devices'
                     ).then(function (ok) {
@@ -880,6 +1350,23 @@
                             });
                     });
                 });
+
+                function renderDiagnosticOutput(outBox, res, fallbackSummary) {
+                    var st = (res && res.status) || 'ok';
+                    var dotClass = st === 'ok' ? 'ok' : (st === 'warn' ? 'warn' : 'bad');
+                    var rows = ((res && res.checks) || []).map(function (c) {
+                        var cst = c.status || 'ok';
+                        var pillLabel = cst === 'ok' ? 'PASS' : (cst === 'warn' ? 'WARN' : 'ERROR');
+                        return ''
+                            + '<div class="bfx-oauth-check">'
+                            + '  <span class="bfx-oauth-pill ' + esc(cst) + '">' + pillLabel + '</span>'
+                            + '  <div><strong>' + esc(c.label) + ':</strong> ' + esc(c.detail) + '</div>'
+                            + '</div>';
+                    }).join('');
+                    outBox.innerHTML = ''
+                        + '<div class="bfx-oauth-summary"><span class="bfx-dot ' + dotClass + '"></span><span>' + esc((res && res.summary) || fallbackSummary) + '</span></div>'
+                        + rows;
+                }
 
                 $('#StreamFlixTestOAuthBtn').addEventListener('click', function () {
                     var btn = $('#StreamFlixTestOAuthBtn');
@@ -905,20 +1392,7 @@
                     }).then(function (res) {
                         btn.disabled = false;
                         btn.textContent = '✓ Test OAuth Config';
-                        var st = (res && res.status) || 'ok';
-                        var dotClass = st === 'ok' ? 'ok' : (st === 'warn' ? 'warn' : 'bad');
-                        var rows = ((res && res.checks) || []).map(function (c) {
-                            var cst = c.status || 'ok';
-                            var pillLabel = cst === 'ok' ? 'PASS' : (cst === 'warn' ? 'WARN' : 'ERROR');
-                            return ''
-                                + '<div class="bfx-oauth-check">'
-                                + '  <span class="bfx-oauth-pill ' + esc(cst) + '">' + pillLabel + '</span>'
-                                + '  <div><strong>' + esc(c.label) + ':</strong> ' + esc(c.detail) + '</div>'
-                                + '</div>';
-                        }).join('');
-                        outBox.innerHTML = ''
-                            + '<div class="bfx-oauth-summary"><span class="bfx-dot ' + dotClass + '"></span><span>' + esc((res && res.summary) || 'OAuth validation complete.') + '</span></div>'
-                            + rows;
+                        renderDiagnosticOutput(outBox, res, 'OAuth validation complete.');
                     }).catch(function (err) {
                         btn.disabled = false;
                         btn.textContent = '✓ Test OAuth Config';
@@ -943,20 +1417,7 @@
                     }).then(function (res) {
                         btn.disabled = false;
                         btn.textContent = '✓ Test OIDC Discovery';
-                        var st = (res && res.status) || 'ok';
-                        var dotClass = st === 'ok' ? 'ok' : (st === 'warn' ? 'warn' : 'bad');
-                        var rows = ((res && res.checks) || []).map(function (c) {
-                            var cst = c.status || 'ok';
-                            var pillLabel = cst === 'ok' ? 'PASS' : (cst === 'warn' ? 'WARN' : 'ERROR');
-                            return ''
-                                + '<div class="bfx-oauth-check">'
-                                + '  <span class="bfx-oauth-pill ' + esc(cst) + '">' + pillLabel + '</span>'
-                                + '  <div><strong>' + esc(c.label) + ':</strong> ' + esc(c.detail) + '</div>'
-                                + '</div>';
-                        }).join('');
-                        outBox.innerHTML = ''
-                            + '<div class="bfx-oauth-summary"><span class="bfx-dot ' + dotClass + '"></span><span>' + esc((res && res.summary) || 'OIDC validation complete.') + '</span></div>'
-                            + rows;
+                        renderDiagnosticOutput(outBox, res, 'OIDC validation complete.');
                     }).catch(function (err) {
                         btn.disabled = false;
                         btn.textContent = '✓ Test OIDC Discovery';
@@ -964,13 +1425,46 @@
                     });
                 });
 
+                $('#StreamFlixTestSeerrBtn').addEventListener('click', function () {
+                    var btn = $('#StreamFlixTestSeerrBtn');
+                    var outBox = $('#StreamFlixSeerrTestResult');
+                    btn.disabled = true;
+                    btn.textContent = 'Testing…';
+                    outBox.classList.remove('hide');
+                    outBox.innerHTML = '<div class="bfx-oauth-summary">Testing Seerr reachability &amp; API key…</div>';
+
+                    var typedKey = $('#SeerrApiKey').value.trim();
+                    var sendKey = typedKey ? typedKey : ((secretState.seerrSaved && !secretState.seerrClear) ? '__KEEP__' : '');
+
+                    streamflixApi('POST', 'Seerr/Test', {
+                        seerrUrl: $('#SeerrUrl').value.trim(),
+                        seerrApiKey: sendKey
+                    }).then(function (res) {
+                        btn.disabled = false;
+                        btn.textContent = '✓ Test Seerr Connection';
+                        renderDiagnosticOutput(outBox, res, 'Seerr check complete.');
+                    }).catch(function (err) {
+                        btn.disabled = false;
+                        btn.textContent = '✓ Test Seerr Connection';
+                        outBox.innerHTML = '<div class="bfx-oauth-summary"><span class="bfx-dot bad"></span><span>' + esc(err.message || 'Seerr connection check failed.') + '</span></div>';
+                    });
+                });
+
                 Array.prototype.forEach.call(page.querySelectorAll('[data-copy]'), function (btn) {
                     btn.addEventListener('click', function () {
-                        var text = $('#' + btn.getAttribute('data-copy')).textContent;
+                        var targetEl = $('#' + btn.getAttribute('data-copy'));
+                        var text = targetEl ? targetEl.textContent : '';
+                        var orig = btn.getAttribute('data-orig-label') || btn.textContent;
+                        btn.setAttribute('data-orig-label', orig);
                         var done = function () {
-                            var label = btn.textContent;
+                            if (btn._copyTimer) {
+                                clearTimeout(btn._copyTimer);
+                            }
                             btn.textContent = 'Copied';
-                            setTimeout(function () { btn.textContent = label; }, 1400);
+                            btn._copyTimer = setTimeout(function () {
+                                btn.textContent = orig;
+                                btn._copyTimer = null;
+                            }, 1400);
                         };
                         if (navigator.clipboard && navigator.clipboard.writeText) {
                             navigator.clipboard.writeText(text).then(done, function () { toast(text); });
@@ -980,14 +1474,14 @@
                     });
                 });
 
-                ['#GoogleClientId', '#ApprovedGoogleEmails', '#OidcProviderName', '#OidcIssuerUrl', '#OidcClientId', '#ApprovedOidcUsers'].forEach(function (sel) {
+                ['#GoogleClientId', '#ApprovedGoogleEmails', '#OidcProviderName', '#OidcIssuerUrl', '#OidcClientId', '#ApprovedOidcUsers', '#SeerrUrl', '#SeerrApiKey'].forEach(function (sel) {
                     $(sel).addEventListener('input', renderStatus);
                 });
                 $('#CustomBrandName').addEventListener('input', function () {
                     var val = $('#CustomBrandName').value.trim();
                     $('#StreamFlixConfigLogo').textContent = (val || 'STREAMFLIX').toUpperCase();
                 });
-                ['#RequireGoogleAuth', '#EnableGoogleSignIn', '#AllowStandardJellyfinLogin', '#AllowAdminFallbackLogin', '#AdminFallbackLanOnly', '#BypassLoginGateOnLan', '#EnableCustomOidc', '#OidcRequireAllowlist'].forEach(function (sel) {
+                ['#RequireGoogleAuth', '#EnableGoogleSignIn', '#AllowStandardJellyfinLogin', '#AllowAdminFallbackLogin', '#AdminFallbackLanOnly', '#BypassLoginGateOnLan', '#EnableCustomOidc', '#OidcRequireAllowlist', '#EnableSeerr'].forEach(function (sel) {
                     $(sel).addEventListener('change', renderStatus);
                 });
 
@@ -1012,42 +1506,66 @@
                     });
                 }
 
+                function applyAdminConfig(cfg) {
+                    $('#EnableStreamFlixUi').checked = cfg.enableStreamFlixUi !== false;
+                    $('#CustomBrandName').value = cfg.customBrandName || '';
+                    $('#StreamFlixConfigLogo').textContent = ((cfg.customBrandName || '').trim() || 'STREAMFLIX').toUpperCase();
+                    $('#RequireGoogleAuth').checked = cfg.requireGoogleAuth !== false;
+                    $('#EnableGoogleSignIn').checked = cfg.enableGoogleSignIn !== false;
+                    $('#AllowStandardJellyfinLogin').checked = Boolean(cfg.allowStandardJellyfinLogin);
+                    $('#AllowAdminFallbackLogin').checked = Boolean(cfg.allowAdminFallbackLogin);
+                    $('#AdminFallbackLanOnly').checked = Boolean(cfg.adminFallbackLanOnly);
+                    $('#BypassLoginGateOnLan').checked = Boolean(cfg.bypassLoginGateOnLan);
+                    $('#AutoProvisionJellyfinUsers').checked = cfg.autoProvisionJellyfinUsers !== false;
+                    $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
+                    $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
+                    $('#HeroSelectionMode').value = cfg.heroSelectionMode || 'recent';
+                    $('#HeroContentType').value = cfg.heroContentType || 'all';
+                    $('#HeroRotationSeconds').value = (typeof cfg.heroRotationSeconds === 'number' && cfg.heroRotationSeconds >= 0) ? cfg.heroRotationSeconds : 9;
+                    $('#HeroSlideCount').value = cfg.heroSlideCount > 0 ? cfg.heroSlideCount : 8;
+                    selectedHeroLibIds = Array.isArray(cfg.heroLibraryIds) ? cfg.heroLibraryIds.slice() : [];
+                    renderHeroLibraries();
+
+                    $('#GoogleClientId').value = cfg.googleClientId || '';
+                    $('#GoogleClientSecret').value = '';
+                    secretState.googleSaved = Boolean(cfg.hasGoogleClientSecret);
+                    secretState.googleClear = false;
+                    $('#ApprovedGoogleEmails').value = (cfg.approvedGoogleAccounts || []).join('\n');
+
+                    $('#EnableCustomOidc').checked = Boolean(cfg.enableCustomOidc);
+                    $('#OidcProviderName').value = cfg.oidcProviderName || '';
+                    $('#OidcIssuerUrl').value = cfg.oidcIssuerUrl || '';
+                    $('#OidcClientId').value = cfg.oidcClientId || '';
+                    $('#OidcClientSecret').value = '';
+                    secretState.oidcSaved = Boolean(cfg.hasOidcClientSecret);
+                    secretState.oidcClear = false;
+                    $('#OidcRequireAllowlist').checked = Boolean(cfg.oidcRequireAllowlist);
+                    $('#ApprovedOidcUsers').value = (cfg.approvedOidcUsers || []).join('\n');
+
+                    $('#EnableSeerr').checked = Boolean(cfg.enableSeerr);
+                    $('#SeerrUrl').value = cfg.seerrUrl || '';
+                    $('#SeerrApiKey').value = '';
+                    secretState.seerrSaved = Boolean(cfg.hasSeerrApiKey);
+                    secretState.seerrClear = false;
+                    $('#SeerrAllowKids').checked = Boolean(cfg.seerrAllowKids);
+                    $('#SeerrAllowGuests').checked = Boolean(cfg.seerrAllowGuests);
+
+                    syncSecretUi();
+                    renderStatus();
+                }
+
                 function loadPageData() {
+                    if (!docKeydownBound) {
+                        document.addEventListener('keydown', onDocumentKeydown);
+                        docKeydownBound = true;
+                    }
                     Dashboard.showLoadingMsg();
                     renderRedirectUris();
                     loadProfiles();
                     loadHeroLibraries();
 
-                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                        $('#EnableStreamFlixUi').checked = config.EnableStreamFlixUi !== false;
-                        $('#CustomBrandName').value = config.CustomBrandName || '';
-                        $('#StreamFlixConfigLogo').textContent = ((config.CustomBrandName || '').trim() || 'STREAMFLIX').toUpperCase();
-                        $('#RequireGoogleAuth').checked = config.RequireGoogleAuth !== false;
-                        $('#EnableGoogleSignIn').checked = config.EnableGoogleSignIn !== false;
-                        $('#AllowStandardJellyfinLogin').checked = Boolean(config.AllowStandardJellyfinLogin);
-                        $('#AllowAdminFallbackLogin').checked = Boolean(config.AllowAdminFallbackLogin);
-                        $('#AdminFallbackLanOnly').checked = Boolean(config.AdminFallbackLanOnly);
-                        $('#BypassLoginGateOnLan').checked = Boolean(config.BypassLoginGateOnLan);
-                        $('#AutoProvisionJellyfinUsers').checked = config.AutoProvisionJellyfinUsers !== false;
-                        $('#SessionLifetimeDays').value = config.SessionLifetimeDays > 0 ? config.SessionLifetimeDays : 30;
-                        $('#Top10SelectionMode').value = config.Top10SelectionMode || 'most_played';
-                        $('#HeroSelectionMode').value = config.HeroSelectionMode || 'recent';
-                        $('#HeroContentType').value = config.HeroContentType || 'all';
-                        $('#HeroRotationSeconds').value = (typeof config.HeroRotationSeconds === 'number' && config.HeroRotationSeconds >= 0) ? config.HeroRotationSeconds : 9;
-                        $('#HeroSlideCount').value = config.HeroSlideCount > 0 ? config.HeroSlideCount : 8;
-                        selectedHeroLibIds = Array.isArray(config.HeroLibraryIds) ? config.HeroLibraryIds.slice() : [];
-                        renderHeroLibraries();
-                        $('#GoogleClientId').value = config.GoogleClientId || '';
-                        $('#GoogleClientSecret').value = config.GoogleClientSecret || '';
-                        $('#ApprovedGoogleEmails').value = (config.ApprovedGoogleAccounts || []).join('\n');
-                        $('#EnableCustomOidc').checked = Boolean(config.EnableCustomOidc);
-                        $('#OidcProviderName').value = config.OidcProviderName || '';
-                        $('#OidcIssuerUrl').value = config.OidcIssuerUrl || '';
-                        $('#OidcClientId').value = config.OidcClientId || '';
-                        $('#OidcClientSecret').value = config.OidcClientSecret || '';
-                        $('#OidcRequireAllowlist').checked = Boolean(config.OidcRequireAllowlist);
-                        $('#ApprovedOidcUsers').value = (config.ApprovedOidcUsers || []).join('\n');
-                        renderStatus();
+                    streamflixApi('GET', 'AdminConfig').then(function (cfg) {
+                        applyAdminConfig(cfg || {});
                         Dashboard.hideLoadingMsg();
                     }).catch(function () {
                         Dashboard.hideLoadingMsg();
@@ -1055,6 +1573,14 @@
                 }
 
                 page.addEventListener('viewshow', loadPageData);
+                page.addEventListener('viewhide', function () {
+                    if (docKeydownBound) {
+                        document.removeEventListener('keydown', onDocumentKeydown);
+                        docKeydownBound = false;
+                    }
+                    closeConfirmModal(false);
+                    closeQrModal();
+                });
 
                 form.addEventListener('submit', function (e) {
                     e.preventDefault();
@@ -1075,51 +1601,58 @@
                     }
 
                     Dashboard.showLoadingMsg();
-                    // Re-read the stored configuration right before saving so profile changes made elsewhere aren't overwritten
-                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                        config.EnableStreamFlixUi = $('#EnableStreamFlixUi').checked;
-                        config.CustomBrandName = $('#CustomBrandName').value.trim().slice(0, 40);
-                        $('#CustomBrandName').value = config.CustomBrandName;
-                        $('#StreamFlixConfigLogo').textContent = (config.CustomBrandName || 'STREAMFLIX').toUpperCase();
-                        config.RequireGoogleAuth = $('#RequireGoogleAuth').checked;
-                        config.EnableGoogleSignIn = $('#EnableGoogleSignIn').checked;
-                        config.AllowStandardJellyfinLogin = $('#AllowStandardJellyfinLogin').checked;
-                        config.AllowAdminFallbackLogin = $('#AllowAdminFallbackLogin').checked;
-                        config.AdminFallbackLanOnly = $('#AdminFallbackLanOnly').checked;
-                        config.BypassLoginGateOnLan = $('#BypassLoginGateOnLan').checked;
-                        config.AutoProvisionJellyfinUsers = $('#AutoProvisionJellyfinUsers').checked;
-                        config.SessionLifetimeDays = days;
-                        config.Top10SelectionMode = $('#Top10SelectionMode').value || 'most_played';
-                        config.HeroSelectionMode = $('#HeroSelectionMode').value || 'recent';
-                        config.HeroContentType = $('#HeroContentType').value || 'all';
-                        config.HeroRotationSeconds = heroSecs;
-                        config.HeroSlideCount = heroSlides;
-                        config.HeroLibraryIds = getCheckedHeroLibraryIds();
-                        selectedHeroLibIds = config.HeroLibraryIds.slice();
-                        config.GoogleClientId = $('#GoogleClientId').value.trim();
-                        config.GoogleClientSecret = $('#GoogleClientSecret').value.trim();
-                        config.ApprovedGoogleAccounts = parseEmails($('#ApprovedGoogleEmails').value);
-                        $('#ApprovedGoogleEmails').value = config.ApprovedGoogleAccounts.join('\n');
-                        config.EnableCustomOidc = $('#EnableCustomOidc').checked;
-                        config.OidcProviderName = $('#OidcProviderName').value.trim().slice(0, 32);
-                        $('#OidcProviderName').value = config.OidcProviderName;
-                        config.OidcIssuerUrl = $('#OidcIssuerUrl').value.trim();
-                        config.OidcClientId = $('#OidcClientId').value.trim();
-                        config.OidcClientSecret = $('#OidcClientSecret').value.trim();
-                        config.OidcRequireAllowlist = $('#OidcRequireAllowlist').checked;
-                        config.ApprovedOidcUsers = parseOidcUsers($('#ApprovedOidcUsers').value);
-                        $('#ApprovedOidcUsers').value = config.ApprovedOidcUsers.join('\n');
-                        return ApiClient.updatePluginConfiguration(pluginId, config);
-                    }).then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
-                        renderStatus();
+                    var googleSecretTyped = $('#GoogleClientSecret').value.trim();
+                    var oidcSecretTyped = $('#OidcClientSecret').value.trim();
+                    var seerrKeyTyped = $('#SeerrApiKey').value.trim();
+
+                    var payload = {
+                        enableStreamFlixUi: $('#EnableStreamFlixUi').checked,
+                        customBrandName: $('#CustomBrandName').value.trim().slice(0, 32),
+                        requireGoogleAuth: $('#RequireGoogleAuth').checked,
+                        enableGoogleSignIn: $('#EnableGoogleSignIn').checked,
+                        allowStandardJellyfinLogin: $('#AllowStandardJellyfinLogin').checked,
+                        allowAdminFallbackLogin: $('#AllowAdminFallbackLogin').checked,
+                        adminFallbackLanOnly: $('#AdminFallbackLanOnly').checked,
+                        bypassLoginGateOnLan: $('#BypassLoginGateOnLan').checked,
+                        autoProvisionJellyfinUsers: $('#AutoProvisionJellyfinUsers').checked,
+                        googleClientId: $('#GoogleClientId').value.trim(),
+                        googleClientSecret: googleSecretTyped || '__KEEP__',
+                        clearGoogleClientSecret: Boolean(secretState.googleClear && !googleSecretTyped),
+                        approvedGoogleAccounts: parseEmails($('#ApprovedGoogleEmails').value),
+                        sessionLifetimeDays: days,
+                        top10SelectionMode: $('#Top10SelectionMode').value || 'most_played',
+                        heroRotationSeconds: heroSecs,
+                        heroSlideCount: heroSlides,
+                        heroSelectionMode: $('#HeroSelectionMode').value || 'recent',
+                        heroContentType: $('#HeroContentType').value || 'all',
+                        heroLibraryIds: getCheckedHeroLibraryIds(),
+                        enableCustomOidc: $('#EnableCustomOidc').checked,
+                        oidcProviderName: $('#OidcProviderName').value.trim().slice(0, 32),
+                        oidcIssuerUrl: $('#OidcIssuerUrl').value.trim(),
+                        oidcClientId: $('#OidcClientId').value.trim(),
+                        oidcClientSecret: oidcSecretTyped || '__KEEP__',
+                        clearOidcClientSecret: Boolean(secretState.oidcClear && !oidcSecretTyped),
+                        oidcRequireAllowlist: $('#OidcRequireAllowlist').checked,
+                        approvedOidcUsers: parseOidcUsers($('#ApprovedOidcUsers').value),
+                        enableSeerr: $('#EnableSeerr').checked,
+                        seerrUrl: $('#SeerrUrl').value.trim(),
+                        seerrApiKey: seerrKeyTyped || '__KEEP__',
+                        clearSeerrApiKey: Boolean(secretState.seerrClear && !seerrKeyTyped),
+                        seerrAllowKids: $('#SeerrAllowKids').checked,
+                        seerrAllowGuests: $('#SeerrAllowGuests').checked
+                    };
+
+                    streamflixApi('POST', 'AdminConfig', payload).then(function (saved) {
+                        Dashboard.hideLoadingMsg();
+                        applyAdminConfig(saved || payload);
+                        toast('Settings saved.');
                         loadProfiles();
                         if (typeof window.__STREAMFLIX_REFRESH_CONFIG__ === 'function') {
                             window.__STREAMFLIX_REFRESH_CONFIG__();
                         }
-                    }).catch(function () {
+                    }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
-                        toast('Saving failed. Please try again.');
+                        toast((err && err.message) || 'Saving failed. Please try again.');
                     });
                     return false;
                 });
