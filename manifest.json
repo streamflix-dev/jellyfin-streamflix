@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.5.5.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.5.0_12.0.0.zip",
+        "checksum": "ee2f770c818cb9f8bfb61c7201f62260",
+        "timestamp": "2026-11-13T00:48:03Z"
+      },
+      {
+        "version": "0.5.5.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.5.0_10.11.0.zip",
+        "checksum": "ccff922f6c1683855a60bcca0ee7e292",
+        "timestamp": "2026-11-13T00:48:03Z"
+      },
+      {
+        "version": "0.5.5.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.5.0_10.9.0.zip",
+        "checksum": "be132b844dc31af67125c20e310503f2",
+        "timestamp": "2026-11-13T00:48:03Z"
+      },
+      {
         "version": "0.5.4.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Remove non-working Auto-skip intros toggle from the account menu and video player check loop",
         "targetAbi": "12.0.0.0",
