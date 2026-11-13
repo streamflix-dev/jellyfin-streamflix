@@ -4,7 +4,7 @@
 
 **A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
 
-[![Version](https://img.shields.io/badge/version-0.5.7-E50914?style=flat-square)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.6.0-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=flat-square)](Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
@@ -91,9 +91,9 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 ## Highlights
 
 ### Flexible Household Sign-In & Security
-- **Google OAuth, Standard Login, or Hybrid Mode.** Require server-verified Google Sign-In (with one-click **Test OAuth Config** validation), enable a Netflix-themed **Standard Jellyfin Account** sign-in form alongside or instead of Google, or bypass the login gate automatically on trusted **Local LAN** connections.
-- **Opt-in Admin Sign-In fallback (off by default).** Server owners can optionally enable an **Admin Sign-In** link on the Google gate in plugin settings. It strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
-- **Profile-level locks & persistent config.** Protect any profile with a **4–8 digit PIN** and/or lock it to a **specific Google email**. Plugin configuration is automatically mirrored to persistent Jellyfin data storage so updates never reset your profiles or OAuth settings.
+- **Google OAuth, Custom OIDC (Beta), Standard Login, or Hybrid Mode.** Require server-verified Google Sign-In (with one-click **Test OAuth Config** validation), connect a self-hosted or cloud **OpenID Connect (OIDC)** provider in the bottom **Beta Test** settings section (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc. via Authorization Code + PKCE `S256` and RSA/ECDSA JWKS verification), enable a Netflix-themed **Standard Jellyfin Account** sign-in form, or bypass the login gate automatically on trusted **Local LAN** connections.
+- **Opt-in Admin Sign-In fallback (off by default).** Server owners can optionally enable an **Admin Sign-In** link on the sign-in gate in plugin settings. It strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
+- **Profile-level locks & persistent config.** Protect any profile with a **4–8 digit PIN** and/or lock it to a **specific verified Google or OIDC email**. Plugin configuration is automatically mirrored to persistent Jellyfin data storage so updates never reset your profiles or SSO settings.
 - **Admin-only user linking.** Only Jellyfin administrators can view server accounts, edit admin-linked profiles, or change which Jellyfin user backs a profile.
 
 ### Real Multi-User Profiles
@@ -101,10 +101,10 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 - **Customizable branding, avatars & accents.** Customize the upper-left corner brand wordmark, choose from 64 categorized icons and 14 accent colors (with one-click Shuffle), and reorder profiles freely.
 - **Quick Connect & Cast built in.** Pair Smart TVs and other Jellyfin apps straight from the profile menu via **Quick Connect** — signing that device in as the active profile's Jellyfin user — or launch **Cast** in one click.
 
-### Cinematic Home, Top 10 & Configurable Billboard
-- **Configurable Hero Billboard & frosted navigation.** Edge-to-edge hero with configurable slide count, auto-rotation interval (`0` to pause), content type, and library source filtering, paired with a header that transitions to frosted glass on scroll (`Home`, `Shows`, `Movies`, `Top 10`, `My List`, and `/` to search).
+### Cinematic Home, Top 10 & Interactive Discovery
+- **Configurable Hero Billboard & Surprise Me.** Edge-to-edge hero with configurable slide count, auto-rotation interval (`0` to pause), content type, and library source filtering — paired with a frosted category bar (`Home`, `Shows`, `Movies`, `Top 10`, `My List`, `/` quick search, and a **Surprise Me** random unwatched title picker with **Shuffle Again**).
 - **Dynamic Top 10 with `#1`–`#10` badges.** Choose server-wide most played, highest community rating, recently added, daily spotlight, or per-session randomized picks — complete with bold Netflix-style `#1`–`#10` rank badges.
-- **Rich hover previews & personalized rows.** Hover over any title for quick Play/Resume, My List, Watched, runtime/progress, and one-click **Remove from Continue Watching (`×`)** with Undo, alongside *Top Picks*, *Because You Watched…*, and smart genre/decade collections.
+- **Rich More Info & hover previews.** Detailed modals showcase ClearLogo title artwork, movie/series taglines, resume progress, audio/subtitle stream pickers, and **clickable Genre, Director & Cast chips** to browse matching titles in one click — alongside rich hover cards with one-click **Remove from Continue Watching (`×`)** + Undo.
 
 ### Netflix-Style Video Player
 - **Streamlined controls.** Slim red scrubber, centered title, 10s/30s skip buttons, play/pause pulse feedback, and a *"You're watching"* pause screen.
@@ -184,6 +184,7 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
     ├── Controllers/
     │   └── StreamFlixController.cs      # Auth, session, profile & asset endpoints
     ├── Services/
+    │   ├── StreamFlixOidcService.cs     # OIDC Relying Party (PKCE S256, discovery & JWKS verification)
     │   ├── StreamFlixSessionService.cs  # HMAC household sessions & PIN lockout tracking
     │   ├── StreamFlixStartupFilter.cs   # Request-time index.html script/style injection
     │   └── StreamFlixStartupTask.cs     # Jellyfin user provisioning & profile linking

@@ -234,6 +234,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !string.IsNullOrWhiteSpace(cfg.GoogleClientId)
             || !string.IsNullOrWhiteSpace(cfg.GoogleClientSecret)
             || (cfg.ApprovedGoogleAccounts != null && cfg.ApprovedGoogleAccounts.Count > 0)
+            || cfg.EnableCustomOidc
+            || !string.IsNullOrWhiteSpace(cfg.OidcIssuerUrl)
+            || !string.IsNullOrWhiteSpace(cfg.OidcClientId)
             || !string.IsNullOrWhiteSpace(cfg.CustomBrandName)
             || !string.IsNullOrWhiteSpace(cfg.SessionSigningKey)
             || cfg.AllowStandardJellyfinLogin
@@ -265,6 +268,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             if (xmlText.Contains("<StreamFlixProfileConfig>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<SessionSigningKey>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<GoogleClientId>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<OidcIssuerUrl>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<MigratedV7>true</MigratedV7>", StringComparison.OrdinalIgnoreCase))
             {
                 File.WriteAllText(XmlBackupFilePath, xmlText, Encoding.UTF8);
@@ -415,8 +419,23 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 HeroSlideCount = IntVal(root, nameof(PluginConfiguration.HeroSlideCount), 8),
                 HeroSelectionMode = Val(root, nameof(PluginConfiguration.HeroSelectionMode)) ?? "recent",
                 HeroContentType = Val(root, nameof(PluginConfiguration.HeroContentType)) ?? "all",
+                EnableCustomOidc = BoolVal(root, nameof(PluginConfiguration.EnableCustomOidc), false),
+                OidcProviderName = Val(root, nameof(PluginConfiguration.OidcProviderName)) ?? string.Empty,
+                OidcIssuerUrl = Val(root, nameof(PluginConfiguration.OidcIssuerUrl)) ?? string.Empty,
+                OidcClientId = Val(root, nameof(PluginConfiguration.OidcClientId)) ?? string.Empty,
+                OidcClientSecret = Val(root, nameof(PluginConfiguration.OidcClientSecret)) ?? string.Empty,
+                OidcRequireAllowlist = BoolVal(root, nameof(PluginConfiguration.OidcRequireAllowlist), false),
                 MigratedV7 = BoolVal(root, nameof(PluginConfiguration.MigratedV7), true),
             };
+
+            var approvedOidcEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.ApprovedOidcUsers), StringComparison.OrdinalIgnoreCase));
+            if (approvedOidcEl != null)
+            {
+                cfg.ApprovedOidcUsers = approvedOidcEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
 
             var approvedEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.ApprovedGoogleAccounts), StringComparison.OrdinalIgnoreCase));
             if (approvedEl != null)

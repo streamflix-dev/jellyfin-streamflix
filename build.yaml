@@ -1,22 +1,24 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.5.7.0"
+version: "0.6.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
-overview: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
+overview: "Netflix-style UI, server-verified Google/OIDC Sign-In & Netflix profiles backed by real Jellyfin users"
 description: >
   Transforms Jellyfin Web into StreamFlix with a Netflix #141414 dark cinema UI,
-  flexible authentication (server-verified Google Sign-In, themed Standard/Hybrid Jellyfin
-  login, opt-in Administrator-only fallback, and optional Local LAN bypass), and Netflix
-  "Who's watching?" profiles backed by real Jellyfin Server Users with independent Watch
-  History, Continue Watching, Next Up, Favorites, PINs, and per-profile Google locks.
+  flexible authentication (server-verified Google Sign-In, Beta Custom OpenID Connect SSO,
+  themed Standard/Hybrid Jellyfin login, opt-in Administrator-only fallback, and optional
+  Local LAN bypass), and Netflix "Who's watching?" profiles backed by real Jellyfin Server
+  Users with independent Watch History, Continue Watching, Next Up, Favorites, PINs, and
+  per-profile account locks.
 category: "General"
 imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png"
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup
-  - Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization
-  - Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save
+  - Add Beta Test Custom OpenID Connect (OIDC) SSO section at the bottom of plugin settings (Authorization Code + PKCE S256, RSA/ECDSA JWKS id_token verification, optional allowlist, and one-click Test OIDC Discovery for Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel & Okta)
+  - Add "Surprise Me" random unwatched title picker in the Cinema Hub subnav with in-modal "Shuffle Again"
+  - Upgrade "More Info" modal with ClearLogo artwork, movie/series taglines, resume progress bar, and interactive clickable Genre, Director & Cast discovery chips
+  - UI polish: remove native browser tooltip over the top-right profile pill, honor custom brand initial across badges & mosaic tiles, and refine keyboard/TV Back filter clearing

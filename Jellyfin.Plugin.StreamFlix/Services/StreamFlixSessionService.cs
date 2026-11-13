@@ -19,6 +19,7 @@ public static class StreamFlixSessionService
 {
     public const string HeaderName = "X-StreamFlix-Session";
     public const string AuthKindGoogle = "google";
+    public const string AuthKindOidc = "oidc";
     public const string AuthKindJellyfin = "jellyfin";
     public const string AuthKindJellyfinAdmin = "jellyfin_admin";
 
@@ -59,6 +60,46 @@ public static class StreamFlixSessionService
             || (config.Profiles ?? new())
                 .Any(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail)
                     && string.Equals(p.GoogleAccountEmail.Trim(), normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Returns true when the OIDC user is permitted under current OIDC allowlist configuration.
+    /// </summary>
+    public static bool IsOidcUserApproved(PluginConfiguration config, string? email, string? username, string? subject)
+    {
+        if (!config.OidcRequireAllowlist)
+        {
+            return !string.IsNullOrWhiteSpace(email)
+                || !string.IsNullOrWhiteSpace(username)
+                || !string.IsNullOrWhiteSpace(subject);
+        }
+
+        var approved = config.ApprovedOidcUsers ?? new();
+        bool MatchesAllowlist(string? candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return false;
+            }
+
+            var norm = candidate.Trim();
+            return approved.Any(a => string.Equals(a?.Trim(), norm, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (MatchesAllowlist(email) || MatchesAllowlist(username) || MatchesAllowlist(subject))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var normEmail = email.Trim();
+            return (config.Profiles ?? new())
+                .Any(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail)
+                    && string.Equals(p.GoogleAccountEmail.Trim(), normEmail, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -122,6 +163,103 @@ public static class StreamFlixSessionService
     }
 
     /// <summary>
+    /// Issues a new signed household session backed by a server-verified OpenID Connect (OIDC) login.
+    /// </summary>
+    public static SessionInfo IssueOidcSession(
+        PluginConfiguration config,
+        string? verifiedEmail,
+        string? username,
+        string subject,
+        out string token)
+    {
+        var key = GetOrCreateKey(config);
+        var lifetimeDays = Math.Clamp(config.SessionLifetimeDays <= 0 ? 30 : config.SessionLifetimeDays, 1, 365);
+        var expires = DateTimeOffset.UtcNow.AddDays(lifetimeDays);
+        var cleanEmail = string.IsNullOrWhiteSpace(verifiedEmail) ? string.Empty : verifiedEmail.Trim().ToLowerInvariant();
+        var cleanUser = string.IsNullOrWhiteSpace(username) ? cleanEmail : username.Trim();
+        var cleanSub = (subject ?? string.Empty).Trim();
+
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new SessionPayload
+        {
+            K = AuthKindOidc,
+            E = cleanEmail,
+            U = cleanSub,
+            Un = cleanUser,
+            X = expires.ToUnixTimeSeconds(),
+            V = config.SessionVersion,
+            N = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)),
+        });
+
+        var body = Base64UrlEncode(payload);
+        var sig = Base64UrlEncode(Sign(key, body));
+        token = body + "." + sig;
+        return new SessionInfo(cleanEmail, expires, AuthKindOidc, cleanSub, cleanUser);
+    }
+
+    /// <summary>
+    /// Signs a short-lived, domain-separated token (e.g. OIDC PKCE state or single-use callback handoff cookie).
+    /// </summary>
+    public static string SignShortLivedPayload<T>(PluginConfiguration config, string purpose, T data, TimeSpan ttl)
+    {
+        var key = GetOrCreateKey(config);
+        var exp = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds();
+        var envBytes = JsonSerializer.SerializeToUtf8Bytes(new ShortLivedEnvelope<T>
+        {
+            P = purpose,
+            X = exp,
+            V = config.SessionVersion,
+            D = data,
+        });
+        var body = Base64UrlEncode(envBytes);
+        var sig = Base64UrlEncode(Sign(key, purpose + ":" + body));
+        return body + "." + sig;
+    }
+
+    /// <summary>
+    /// Verifies and unpacks a short-lived, domain-separated token created by <see cref="SignShortLivedPayload{T}"/>.
+    /// </summary>
+    public static T? VerifyShortLivedPayload<T>(PluginConfiguration config, string purpose, string? token)
+        where T : class
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(config.SessionSigningKey))
+        {
+            return null;
+        }
+
+        var parts = token.Trim().Split('.');
+        if (parts.Length != 2)
+        {
+            return null;
+        }
+
+        try
+        {
+            var key = Convert.FromBase64String(config.SessionSigningKey);
+            var expected = Sign(key, purpose + ":" + parts[0]);
+            var provided = Base64UrlDecode(parts[1]);
+            if (!CryptographicOperations.FixedTimeEquals(expected, provided))
+            {
+                return null;
+            }
+
+            var env = JsonSerializer.Deserialize<ShortLivedEnvelope<T>>(Base64UrlDecode(parts[0]));
+            if (env == null
+                || !string.Equals(env.P, purpose, StringComparison.Ordinal)
+                || env.V != config.SessionVersion
+                || DateTimeOffset.FromUnixTimeSeconds(env.X) <= DateTimeOffset.UtcNow)
+            {
+                return null;
+            }
+
+            return env.D;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Validates a session token. Returns null when it is missing, forged, expired, revoked, or no longer permitted.
     /// </summary>
     public static SessionInfo? Validate(PluginConfiguration config, string? token)
@@ -168,6 +306,19 @@ public static class StreamFlixSessionService
                 }
 
                 return new SessionInfo(payload.E, expires, AuthKindGoogle, null, null);
+            }
+
+            if (string.Equals(kind, AuthKindOidc, StringComparison.Ordinal))
+            {
+                if (!config.EnableCustomOidc
+                    || string.IsNullOrWhiteSpace(config.OidcIssuerUrl)
+                    || string.IsNullOrWhiteSpace(config.OidcClientId)
+                    || !IsOidcUserApproved(config, payload.E, payload.Un, payload.U))
+                {
+                    return null;
+                }
+
+                return new SessionInfo(payload.E ?? string.Empty, expires, AuthKindOidc, payload.U, payload.Un);
             }
 
             if (string.Equals(kind, AuthKindJellyfin, StringComparison.Ordinal))
@@ -533,5 +684,16 @@ public static class StreamFlixSessionService
         public int V { get; set; }
 
         public string N { get; set; } = string.Empty;
+    }
+
+    private sealed class ShortLivedEnvelope<T>
+    {
+        public string P { get; set; } = string.Empty;
+
+        public long X { get; set; }
+
+        public int V { get; set; }
+
+        public T? D { get; set; }
     }
 }

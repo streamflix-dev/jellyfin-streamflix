@@ -76,6 +76,13 @@ public class PluginConfiguration : BasePluginConfiguration
         HeroSelectionMode = "recent";
         HeroContentType = "all";
         HeroLibraryIds = new List<string>();
+        EnableCustomOidc = false;
+        OidcProviderName = string.Empty;
+        OidcIssuerUrl = string.Empty;
+        OidcClientId = string.Empty;
+        OidcClientSecret = string.Empty;
+        OidcRequireAllowlist = false;
+        ApprovedOidcUsers = new List<string>();
         MigratedV7 = false;
     }
 
@@ -187,6 +194,42 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets optional Jellyfin Library/View IDs allowed in the hero billboard. Empty means all libraries.
     /// </summary>
     public List<string> HeroLibraryIds { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Beta Custom OpenID Connect (OIDC) SSO sign-in is enabled.
+    /// Disabled by default.
+    /// </summary>
+    public bool EnableCustomOidc { get; set; }
+
+    /// <summary>
+    /// Gets or sets the display name of the Custom OIDC provider (e.g. "Authentik", "Authelia", "Pocket ID", "SSO").
+    /// </summary>
+    public string OidcProviderName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the OIDC Issuer or <c>/.well-known/openid-configuration</c> URL.
+    /// </summary>
+    public string OidcIssuerUrl { get; set; }
+
+    /// <summary>
+    /// Gets or sets the OIDC Relying Party Client ID.
+    /// </summary>
+    public string OidcClientId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional OIDC Client Secret for confidential clients (never exposed to non-admin clients).
+    /// </summary>
+    public string OidcClientSecret { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether OIDC logins must match <see cref="ApprovedOidcUsers"/> (or a profile's email lock).
+    /// </summary>
+    public bool OidcRequireAllowlist { get; set; }
+
+    /// <summary>
+    /// Gets or sets optional approved OIDC emails, preferred_usernames, or subjects (one per line).
+    /// </summary>
+    public List<string> ApprovedOidcUsers { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the one-time v7 configuration migration has run.
