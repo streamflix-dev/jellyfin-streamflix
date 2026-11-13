@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.5.2.0"
+  PLUGIN_VERSION: "0.5.3.0"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks."
-  PLUGIN_CHANGELOG: "v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release."
+  PLUGIN_CHANGELOG: "v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog | v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification, clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery | v0.5.1: thread-safe profile sync, constant-time PIN check, ETag CSS caching, and JF12 username sanitization | v0.5: initial public beta release."
 
 jobs:
   build-and-publish:
@@ -58,17 +58,18 @@ jobs:
 
             mkdir -p "pkg_${target}"
             cp "out_${target}/Jellyfin.Plugin.StreamFlix.dll" "pkg_${target}/"
+            cp "Jellyfin.Plugin.StreamFlix/thumb.png" "pkg_${target}/thumb.png"
             jq -n \
               --arg guid "$PLUGIN_GUID" --arg name "$PLUGIN_NAME" \
               --arg description "$PLUGIN_DESCRIPTION" --arg overview "$PLUGIN_OVERVIEW" \
               --arg version "$PLUGIN_VERSION" --arg targetAbi "$abi" \
               --arg changelog "$PLUGIN_CHANGELOG" --arg timestamp "$TIMESTAMP" \
-              '{guid:$guid,name:$name,description:$description,overview:$overview,owner:"StreamFlix",category:"General",version:$version,targetAbi:$targetAbi,changelog:$changelog,timestamp:$timestamp}' \
+              '{guid:$guid,name:$name,description:$description,overview:$overview,owner:"StreamFlix",category:"General",version:$version,targetAbi:$targetAbi,changelog:$changelog,timestamp:$timestamp,imagePath:"thumb.png"}' \
               > "pkg_${target}/meta.json"
 
             local zip="dist/Jellyfin.Plugin.StreamFlix_${PLUGIN_VERSION}_${suffix}.zip"
             rm -f "$zip"
-            (cd "pkg_${target}" && zip -r "../${zip}" Jellyfin.Plugin.StreamFlix.dll meta.json)
+            (cd "pkg_${target}" && zip -r "../${zip}" Jellyfin.Plugin.StreamFlix.dll meta.json thumb.png)
             cp "$zip" "dist/Jellyfin.Plugin.StreamFlix_${suffix}.zip"
           }
 
@@ -101,8 +102,9 @@ jobs:
           jq -n \
             --arg guid "$PLUGIN_GUID" --arg name "$PLUGIN_NAME" \
             --arg overview "$PLUGIN_OVERVIEW" --arg description "$PLUGIN_DESCRIPTION" \
+            --arg imageUrl "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/Jellyfin.Plugin.StreamFlix/thumb.png" \
             --argjson versions "$VERSIONS" \
-            '[{guid:$guid,name:$name,overview:$overview,description:$description,owner:"StreamFlix",category:"General",versions:$versions}]' \
+            '[{guid:$guid,name:$name,overview:$overview,description:$description,owner:"StreamFlix",category:"General",imageUrl:$imageUrl,versions:$versions}]' \
             > manifest.json
           cat manifest.json
 

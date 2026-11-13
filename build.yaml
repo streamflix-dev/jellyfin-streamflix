@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.5.2.0"
+version: "0.5.3.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -14,9 +14,11 @@ description: >
   History, Continue Watching, Next Up, and Favorites. Profiles can be protected with a
   PIN and/or locked to a single Google account.
 category: "General"
+imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png"
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
+  - v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog
   - v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery
   - v0.5.1: stability & reliability hardening — thread-safe profile state synchronization across concurrent household requests, constant-time PIN verification with bounded brute-force lockout memory pruning, ETag-cached /Branding/Css responses (304 Not Modified), automatic Jellyfin 12 case-insensitive username sanitization for profiles with symbols/emojis, and branding.xml fallback tag insertion
   - v0.5: initial public beta release — Netflix-style home screen with living billboard & hover previews, server-verified Google Sign-In with HMAC household sessions, real multi-user "Who's watching?" profiles with PIN & Google account locks, custom video player with Episodes & Seasons drawer, unified Audio & Subtitles popover, Next Episode countdown & Auto-skip intros, Quick Connect & Cast in the profile menu, and tuned Desktop, Phone & 10-foot Smart TV layouts

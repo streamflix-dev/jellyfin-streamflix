@@ -4,7 +4,7 @@
 
 **A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
 
-[![Version](https://img.shields.io/badge/version-0.5.2-E50914?style=flat-square)](manifest.json)
+[![Version](https://img.shields.io/badge/version-0.5.3-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?style=flat-square)](Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
