@@ -3,11 +3,35 @@
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
     "overview": "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), optional themed Standard/Hybrid Jellyfin login & strict Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), optional themed Standard/Hybrid Jellyfin login & opt-in Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
+      {
+        "version": "0.5.7.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup\n- Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization\n- Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.7.0_12.0.0.zip",
+        "checksum": "7a4260b55f4379c2e1d3fc0810569f29",
+        "timestamp": "2026-11-13T03:36:59Z"
+      },
+      {
+        "version": "0.5.7.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup\n- Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization\n- Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.7.0_10.11.0.zip",
+        "checksum": "e1aeed6635818a5ffcae34bed981c383",
+        "timestamp": "2026-11-13T03:36:59Z"
+      },
+      {
+        "version": "0.5.7.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup\n- Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization\n- Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.5.7.0_10.9.0.zip",
+        "checksum": "f6e335bc7487270e43eb36ab854ad1a1",
+        "timestamp": "2026-11-13T03:36:59Z"
+      },
       {
         "version": "0.5.6.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Flexible authentication: Standard Jellyfin Login, Hybrid Mode, strict IsAdministrator Admin Sign-In fallback & Local LAN bypass\n- Admin safety & config persistence: automatic persistent config backup/restore across plugin updates, Sign-out confirmation modal, one-click Test OAuth Config & versioned asset cache-busting\n- Home, Top 10 & TV navigation: configurable Top 10 ranking modes with bold #1–#10 badges, configurable Hero Billboard rotation/library filtering, full keyboard & D-pad navigation, and top-right header profile pill clipping fix",
