@@ -19,25 +19,72 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 
 <table>
   <tr>
-    <td width="50%" align="center">
+    <td colspan="2" align="center">
+      <img src="docs/screenshots/home-hero.jpg" alt="StreamFlix Home and Hero Billboard" />
+      <br />
+      <sub><b>1. StreamFlix Home &amp; Hero Billboard</b> — Full-bleed featured billboard, frosted category bar, instant search &amp; Continue Watching</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/sign-in.jpg" alt="StreamFlix Google Sign-In Gate" />
       <br />
-      <sub><b>1. Household Google Sign-In</b> — Clean pre-login gate with zero library exposure</sub>
+      <sub><b>2. Household Google Sign-In</b> — Clean pre-login gate with zero library exposure</sub>
     </td>
-    <td width="50%" align="center">
+    <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/profile-picker.jpg" alt="StreamFlix Who's Watching Profile Picker" />
       <br />
-      <sub><b>2. Who's Watching?</b> — Per-member profiles with avatars, PINs &amp; Google locks</sub>
+      <sub><b>3. Who's Watching?</b> — Animated library mosaic with per-member profiles, Kids badges &amp; Google locks</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/home-account-menu.jpg" alt="StreamFlix Account Menu and Profile Switcher" />
+      <br />
+      <sub><b>4. Account Menu &amp; Profile Switcher</b> — One-click profile switching, Cast, Quick Connect &amp; StreamFlix Home toggle</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/title-details.jpg" alt="StreamFlix Title Details Modal" />
+      <br />
+      <sub><b>5. Title Details (&ldquo;More Info&rdquo;)</b> — Synopsis, video/audio stream picker, cast/director &amp; external links</sub>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
-      <img src="docs/screenshots/home-and-account-menu.png" alt="StreamFlix Home and Account Menu" />
+      <img src="docs/screenshots/top-10-row.jpg" alt="StreamFlix Top 10 Row" />
       <br />
-      <sub><b>3. StreamFlix Home &amp; Account Menu</b> — Segmented navigation, Cast, Quick Connect &amp; StreamFlix Home</sub>
+      <sub><b>6. Top 10 in StreamFlix Today</b> — Configurable server rankings with bold <code>#1</code>&ndash;<code>#10</code> badges &amp; rank numerals</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/player-controls.jpg" alt="StreamFlix Video Player Controls" />
+      <br />
+      <sub><b>7. Netflix-Style Video Player</b> — Slim red scrubber, 10s/30s skip, audio/subtitles, quality &amp; Picture-in-Picture</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/player-paused.jpg" alt="StreamFlix Video Player Pause Overlay" />
+      <br />
+      <sub><b>8. &ldquo;You're Watching&rdquo; Pause Screen</b> — ClearLogo artwork, runtime &amp; synopsis overlay while paused</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/edit-profile.jpg" alt="StreamFlix Edit Profile Modal" />
+      <br />
+      <sub><b>9. Profile Customization &amp; Security</b> — 64 avatars, 14 accent colors, maturity ratings, Kids mode, Google lock &amp; PIN</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/admin-settings.png" alt="StreamFlix Admin Dashboard Settings" />
+      <br />
+      <sub><b>10. Plugin Administration</b> — OAuth status, Jellyfin user mapping, custom branding &amp; authentication controls</sub>
     </td>
   </tr>
 </table>
+
+<p align="center">
+  <sub>Demo library media courtesy of <a href="https://studio.blender.org/films/">Blender Studio Open Movies</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY</a>) — featuring <i>Sintel</i> and <i>Cosmos Laundromat</i> (&copy; Blender Foundation).</sub>
+</p>
 
 ---
 
@@ -144,6 +191,10 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
         ├── streamflix.css               # Cinema theme, responsive/TV layouts & animations
         └── streamflix.js                # Sign-in gate, profile picker, home hub & player UI
 ```
+
+## Credits
+
+Demo library media courtesy of [Blender Studio Open Movies](https://studio.blender.org/films/) ([CC BY](https://creativecommons.org/licenses/by/4.0/)) — *Sintel* (© Blender Foundation | `durian.blender.org`, CC BY 3.0) and *Cosmos Laundromat* (© Blender Foundation | `gooseberry.blender.org`, CC BY 4.0).
 
 ## License
 
