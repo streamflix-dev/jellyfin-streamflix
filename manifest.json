@@ -2,12 +2,36 @@
   {
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
-    "overview": "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), optional themed Standard/Hybrid Jellyfin login & opt-in Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
+    "overview": "Netflix-style UI, server-verified Google/OIDC Sign-In & Netflix profiles backed by real Jellyfin users",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In & Beta Custom OpenID Connect (OIDC) SSO, optional themed Standard/Hybrid Jellyfin login & opt-in Admin-only fallback, and Netflix 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
+      {
+        "version": "0.6.0.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Add Beta Test Custom OpenID Connect (OIDC) SSO section at the bottom of plugin settings (Authorization Code + PKCE S256, RSA/ECDSA JWKS id_token verification, optional allowlist, and one-click Test OIDC Discovery for Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel & Okta)\n- Add \"Surprise Me\" random unwatched title picker in the Cinema Hub subnav with in-modal \"Shuffle Again\"\n- Upgrade \"More Info\" modal with ClearLogo artwork, movie/series taglines, resume progress bar, and interactive clickable Genre, Director & Cast discovery chips\n- UI polish: remove native browser tooltip over the top-right profile pill, honor custom brand initial across badges & mosaic tiles, and refine keyboard/TV Back filter clearing",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.6.0.0_12.0.0.zip",
+        "checksum": "c7e53370a5a09dffd49b44b248f3cb59",
+        "timestamp": "2026-11-13T04:51:11Z"
+      },
+      {
+        "version": "0.6.0.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Add Beta Test Custom OpenID Connect (OIDC) SSO section at the bottom of plugin settings (Authorization Code + PKCE S256, RSA/ECDSA JWKS id_token verification, optional allowlist, and one-click Test OIDC Discovery for Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel & Okta)\n- Add \"Surprise Me\" random unwatched title picker in the Cinema Hub subnav with in-modal \"Shuffle Again\"\n- Upgrade \"More Info\" modal with ClearLogo artwork, movie/series taglines, resume progress bar, and interactive clickable Genre, Director & Cast discovery chips\n- UI polish: remove native browser tooltip over the top-right profile pill, honor custom brand initial across badges & mosaic tiles, and refine keyboard/TV Back filter clearing",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.6.0.0_10.11.0.zip",
+        "checksum": "8a1bb3996339b31402a68ae4e90afee7",
+        "timestamp": "2026-11-13T04:51:11Z"
+      },
+      {
+        "version": "0.6.0.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Add Beta Test Custom OpenID Connect (OIDC) SSO section at the bottom of plugin settings (Authorization Code + PKCE S256, RSA/ECDSA JWKS id_token verification, optional allowlist, and one-click Test OIDC Discovery for Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel & Okta)\n- Add \"Surprise Me\" random unwatched title picker in the Cinema Hub subnav with in-modal \"Shuffle Again\"\n- Upgrade \"More Info\" modal with ClearLogo artwork, movie/series taglines, resume progress bar, and interactive clickable Genre, Director & Cast discovery chips\n- UI polish: remove native browser tooltip over the top-right profile pill, honor custom brand initial across badges & mosaic tiles, and refine keyboard/TV Back filter clearing",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.6.0.0_10.9.0.zip",
+        "checksum": "53e0b8b092f17daff420e581511459f8",
+        "timestamp": "2026-11-13T04:51:11Z"
+      },
       {
         "version": "0.5.7.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Default Admin Sign-In fallback to off (opt-in via Dashboard → Plugins → StreamFlix) while preserving initial unconfigured Administrator setup\n- Security hardening: enforce configured Google Client ID & verified email in VerifyGoogle, RFC 7239 Forwarded / proxy header checks for LAN bypass, live disabled-account & admin re-validation, and DOM/CSS sanitization\n- Bug fixes: guard Cinema Hub against stale in-flight profile switches, enforce Google profile lock before PIN verification, and synchronize persistent config shadow backups on every save",
