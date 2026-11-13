@@ -65,7 +65,7 @@
                 <form id="StreamFlixConfigForm">
                     <div class="bfx-head">
                         <div class="bfx-brand">
-                            <div class="bfx-logo">STREAMFLIX</div>
+                            <div class="bfx-logo" id="StreamFlixConfigLogo">STREAMFLIX</div>
                             <div>
                                 <h2>StreamFlix</h2>
                                 <div class="bfx-sub">Netflix-style home, Google sign-in and household profiles for Jellyfin Web <span id="StreamFlixVersionLabel"></span></div>
@@ -119,6 +119,12 @@
                                 <span>Enable the StreamFlix interface</span>
                             </label>
                             <div class="fieldDescription checkboxFieldDescription">Netflix-style home with hero billboard, profile switcher and themed library pages in Jellyfin Web.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom logo text (upper-left corner)</label>
+                            <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="40" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
+                            <div class="fieldDescription">Customizes the red wordmark logo in the upper-left corner (plus the sign-in screen and home labels). Leave blank to use <strong>STREAMFLIX</strong>.</div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -482,6 +488,10 @@
                 ['#GoogleClientId', '#ApprovedGoogleEmails'].forEach(function (sel) {
                     $(sel).addEventListener('input', renderStatus);
                 });
+                $('#CustomBrandName').addEventListener('input', function () {
+                    var val = $('#CustomBrandName').value.trim();
+                    $('#StreamFlixConfigLogo').textContent = (val || 'STREAMFLIX').toUpperCase();
+                });
                 $('#RequireGoogleAuth').addEventListener('change', renderStatus);
 
                 function renderRedirectUris() {
@@ -505,6 +515,8 @@
 
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                         $('#EnableStreamFlixUi').checked = config.EnableStreamFlixUi !== false;
+                        $('#CustomBrandName').value = config.CustomBrandName || '';
+                        $('#StreamFlixConfigLogo').textContent = ((config.CustomBrandName || '').trim() || 'STREAMFLIX').toUpperCase();
                         $('#RequireGoogleAuth').checked = config.RequireGoogleAuth !== false;
                         $('#AutoProvisionJellyfinUsers').checked = config.AutoProvisionJellyfinUsers !== false;
                         $('#SessionLifetimeDays').value = config.SessionLifetimeDays > 0 ? config.SessionLifetimeDays : 30;
@@ -531,6 +543,9 @@
                     // Re-read the stored configuration right before saving so profile changes made elsewhere aren't overwritten
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                         config.EnableStreamFlixUi = $('#EnableStreamFlixUi').checked;
+                        config.CustomBrandName = $('#CustomBrandName').value.trim().slice(0, 40);
+                        $('#CustomBrandName').value = config.CustomBrandName;
+                        $('#StreamFlixConfigLogo').textContent = (config.CustomBrandName || 'STREAMFLIX').toUpperCase();
                         config.RequireGoogleAuth = $('#RequireGoogleAuth').checked;
                         config.AutoProvisionJellyfinUsers = $('#AutoProvisionJellyfinUsers').checked;
                         config.SessionLifetimeDays = days;
@@ -543,6 +558,9 @@
                         Dashboard.processPluginConfigurationUpdateResult(result);
                         renderStatus();
                         loadProfiles();
+                        if (typeof window.__STREAMFLIX_REFRESH_CONFIG__ === 'function') {
+                            window.__STREAMFLIX_REFRESH_CONFIG__();
+                        }
                     }).catch(function () {
                         Dashboard.hideLoadingMsg();
                         toast('Saving failed. Please try again.');

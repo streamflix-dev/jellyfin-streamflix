@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.5.4.0"
+  PLUGIN_VERSION: "0.5.5.0"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, server-verified Google Sign-In & Netflix profiles backed by real Jellyfin users"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with an animated show/film mosaic gate, server-verified Google Sign-In (signed sessions), and Netflix 'Who's watching?' profiles mapped to real Jellyfin users with PIN and per-profile Google account locks."
-  PLUGIN_CHANGELOG: "- Remove non-working Auto-skip intros toggle from the account menu and video player check loop"
+  PLUGIN_CHANGELOG: "- Add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels"
 
 jobs:
   build-and-publish:

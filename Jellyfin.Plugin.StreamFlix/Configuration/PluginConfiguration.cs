@@ -52,6 +52,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public PluginConfiguration()
     {
         EnableStreamFlixUi = true;
+        CustomBrandName = string.Empty;
         RequireGoogleAuth = true;
         AutoProvisionJellyfinUsers = true;
         ProfilesSeeded = false;
@@ -67,6 +68,12 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     public bool EnableStreamFlixUi { get; set; }
+
+    /// <summary>
+    /// Gets or sets optional custom logo/brand text shown in the upper-left corner and across the StreamFlix UI.
+    /// Defaults to "STREAMFLIX" / "StreamFlix" when empty.
+    /// </summary>
+    public string CustomBrandName { get; set; }
 
     public bool RequireGoogleAuth { get; set; }
 

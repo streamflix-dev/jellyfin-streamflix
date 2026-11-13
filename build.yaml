@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.5.4.0"
+version: "0.5.5.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,6 +18,7 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
+  - v0.5.5: add custom logo / brand name setting in plugin configuration for the upper-left corner wordmark and UI labels
   - v0.5.4: remove non-working Auto-skip intros toggle from account menu & player loop
   - v0.5.3: add official StreamFlix plugin card logo (thumb.png) for Dashboard & Catalog
   - v0.5.2: stability & hardening — thread-safe on-disk index.html/branding.xml injection lock, expanded Google OAuth tokeninfo audience verification (supporting issued_to and audience fields), clean HTTP 403 handling on direct session authentication errors, trailing-slash tolerance for /Branding/Css, and cached reflected SetPermission discovery

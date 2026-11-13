@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.5.4';
+    var VERSION = '0.5.5';
     // Household session issued by the server after Google verification ({ token, email, name, picture, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -57,6 +57,7 @@
         version: '',
         serverId: '',
         serverName: 'StreamFlix',
+        customBrandName: '',
         enableStreamFlixUi: true,
         requireGoogleAuth: true,
         googleClientId: '',
@@ -194,6 +195,17 @@
 
     function iconLabel(name, text) {
         return icon(name) + '<span>' + escapeHtml(text) + '</span>';
+    }
+
+    function getBrandName() {
+        var custom = state.config && typeof state.config.customBrandName === 'string'
+            ? state.config.customBrandName.trim()
+            : '';
+        return custom || 'StreamFlix';
+    }
+
+    function getBrandLogoText() {
+        return getBrandName().toUpperCase();
     }
 
     function isRecentlyAdded(item) {
@@ -1185,6 +1197,7 @@
             version: cfg.version || '',
             serverId: cfg.serverId || (state.config && state.config.serverId) || '',
             serverName: cfg.serverName || 'StreamFlix',
+            customBrandName: typeof cfg.customBrandName === 'string' ? cfg.customBrandName.trim() : '',
             enableStreamFlixUi: cfg.enableStreamFlixUi !== false,
             requireGoogleAuth: requireGoogle,
             googleClientId: cfg.googleClientId || '',
@@ -1210,6 +1223,11 @@
         }
 
         saveJson(CACHED_CONFIG_KEY, state.config);
+        var wm = document.querySelector('#streamflix-overlay-root .streamflix-wordmark');
+        if (wm) {
+            wm.textContent = getBrandLogoText();
+        }
+        replaceToolbarLogoInPlace();
         refreshNetflixBackdropWallInPlace();
         return state.config;
     }
@@ -1625,7 +1643,7 @@
             root.innerHTML = ''
                 + buildNetflixBackdropWallHtml()
                 + '<div class="streamflix-topbar" id="streamflix-gate-topbar">'
-                + '  <div class="streamflix-wordmark">STREAMFLIX</div>'
+                + '  <div class="streamflix-wordmark">' + escapeHtml(getBrandLogoText()) + '</div>'
                 + '  <div class="streamflix-topbar-actions" id="streamflix-gate-actions"></div>'
                 + '</div>'
                 + '<div class="streamflix-stage" id="streamflix-stage"></div>';
@@ -2194,7 +2212,7 @@
                 + '<div class="streamflix-center-stage">'
                 + '  <div class="streamflix-auth-card' + (busy ? ' streamflix-busy' : '') + '">'
                 + '    <h1>Sign in</h1>'
-                + '    <p>Use your approved Google account to unlock StreamFlix on this device. You\'ll choose who\'s watching next.</p>'
+                + '    <p>Use your approved Google account to unlock ' + escapeHtml(getBrandName()) + ' on this device. You\'ll choose who\'s watching next.</p>'
                 + (statusText
                     ? '<div class="streamflix-auth-alert"><span class="streamflix-inline-spinner"></span>' + escapeHtml(statusText) + '</div>'
                     : '')
@@ -2395,7 +2413,7 @@
                 ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-google-signout-btn">Sign out</button>'
                 : '')
             + (state.activeProfile && state.activeProfile.accessToken
-                ? '<button type="button" class="streamflix-ghost-btn streamflix-ghost-btn-accent" id="streamflix-resume-session-btn">' + icon('chevronLeft') + '<span>Back to StreamFlix</span></button>'
+                ? '<button type="button" class="streamflix-ghost-btn streamflix-ghost-btn-accent" id="streamflix-resume-session-btn">' + icon('chevronLeft') + '<span>Back to ' + escapeHtml(getBrandName()) + '</span></button>'
                 : '');
 
         var stageHtml = ''
@@ -2610,7 +2628,7 @@
         } else {
             renderProfilePickerGate();
         }
-        showToast('Signed out of StreamFlix on this device.', 'info');
+        showToast('Signed out of ' + getBrandName() + ' on this device.', 'info');
     }
 
     function confirmAndDeleteProfile(profile, verifiedPin) {
@@ -3689,7 +3707,7 @@
             + '<div class="bfx-dd-tiles">' + tilesHtml + '</div>'
             + '<div class="streamflix-dd-divider"></div>'
             + ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>')
-            + ddItem('streamflix-dd-toggle-hub', 'home', 'StreamFlix Home', '', 'bfx-dd-switch-row',
+            + ddItem('streamflix-dd-toggle-hub', 'home', getBrandName() + ' Home', '', 'bfx-dd-switch-row',
                 '<span class="bfx-switch' + (state.cinemaHubEnabled ? ' on' : '') + '" aria-hidden="true"><i></i></span>')
             + (isAdmin ? ddItem('streamflix-dd-dashboard', 'gear', 'Dashboard', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
             + '<div class="streamflix-dd-divider"></div>'
@@ -3738,7 +3756,7 @@
             } else if (state.cinemaHubEnabled) {
                 ensureCinemaHubMounted();
             }
-            showToast('StreamFlix Home ' + (state.cinemaHubEnabled ? 'enabled' : 'disabled') + '.', 'info');
+            showToast(getBrandName() + ' Home ' + (state.cinemaHubEnabled ? 'enabled' : 'disabled') + '.', 'info');
         });
         bind('streamflix-dd-user-prefs', function () {
             window.location.hash = '#/mypreferencesmenu';
@@ -3748,7 +3766,7 @@
         });
         bind('streamflix-dd-signout', function () {
             confirmDialog({
-                title: 'Sign out of StreamFlix?',
+                title: 'Sign out of ' + getBrandName() + '?',
                 message: 'You\'ll need to sign in with Google again on this device.',
                 confirmText: 'Sign Out'
             }).then(function (ok) {
@@ -3798,7 +3816,8 @@
             icons[k].style.setProperty('display', 'none', 'important');
         }
 
-        // Remove any legacy .streamflix-inline-brand child spans if native text nodes exist, or keep exactly ONE text node saying 'STREAMFLIX'
+        // Remove any legacy .streamflix-inline-brand child spans if native text nodes exist, or keep exactly ONE text node with the configured brand logo
+        var brandLogo = getBrandLogoText();
         var inlines = el.querySelectorAll('.streamflix-inline-brand');
         for (var m = 1; m < inlines.length; m++) {
             if (inlines[m].parentNode) {
@@ -3813,12 +3832,12 @@
             var val = (node.nodeValue || '').trim();
             if (val) {
                 if (!foundFirstText) {
-                    if (node.nodeValue !== 'STREAMFLIX') {
-                        node.nodeValue = 'STREAMFLIX';
+                    if (node.nodeValue !== brandLogo) {
+                        node.nodeValue = brandLogo;
                     }
                     foundFirstText = true;
                 } else {
-                    // Clear any secondary text node so it can NEVER double into 'STREAMFLIXSTREAMFLIX'
+                    // Clear any secondary text node so it can NEVER double
                     node.nodeValue = '';
                 }
             }
@@ -3826,7 +3845,7 @@
         if (!foundFirstText && !el.querySelector('.streamflix-inline-brand')) {
             var span = document.createElement('span');
             span.className = 'streamflix-inline-brand';
-            span.textContent = 'STREAMFLIX';
+            span.textContent = brandLogo;
             el.appendChild(span);
         }
     }
@@ -3885,8 +3904,10 @@
                         || href === '/web/#/home.html';
 
                     var hasBrandImg = Boolean(el.querySelector('img'));
+                    var currentBrandLower = getBrandLogoText().toLowerCase();
                     var isBrandText = text === 'jellyfin'
                         || text === 'streamflix'
+                        || (currentBrandLower && text === currentBrandLower)
                         || (srvName && text === srvName);
 
                     if (!styledOne && (isHomeHref || hasBrandImg || isBrandText || el.getAttribute('data-streamflix-corner-brand') === 'true')) {
@@ -3903,11 +3924,12 @@
             var classicLogos = document.querySelectorAll('.skinHeader:not(.osdHeader) .pageTitleWithDefaultLogo, .skinHeader:not(.osdHeader) .pageTitleWithLogo');
             if (classicLogos.length > 0) {
                 var cl = classicLogos[0];
+                var classicBrand = getBrandLogoText();
                 cl.setAttribute('data-streamflix-corner-brand', 'true');
                 cl.style.setProperty('background-image', 'none', 'important');
                 cl.style.setProperty('width', 'auto', 'important');
-                if (cl.textContent !== 'STREAMFLIX') {
-                    cl.innerHTML = '<span class="streamflix-inline-brand">STREAMFLIX</span>';
+                if (cl.textContent !== classicBrand) {
+                    cl.innerHTML = '<span class="streamflix-inline-brand">' + escapeHtml(classicBrand) + '</span>';
                 }
             }
         } catch (e) {}
@@ -6484,7 +6506,7 @@
             }
         } else if (cat === 'movies') {
             if (d.recentMovies.length > 0) {
-                rowsHtml += buildRowHtml('movies-recent', rowTitle('New on StreamFlix'), d.recentMovies.map(buildPosterCardHtml).join(''));
+                rowsHtml += buildRowHtml('movies-recent', rowTitle('New on ' + getBrandName()), d.recentMovies.map(buildPosterCardHtml).join(''));
             }
             rowsHtml += smartRowsHtml(['smart-acclaimed-movies', 'smart-short', 'smart-decade', 'smart-family']);
             rowsHtml += buildGenreCollectionRowsHtml(d.allMovies);
@@ -9160,6 +9182,12 @@
 
     // Public hooks used by the StreamFlix plugin configuration page
     window.__STREAMFLIX_VERSION__ = VERSION;
+    window.__STREAMFLIX_REFRESH_CONFIG__ = function () {
+        return fetchPublicConfig().then(function (cfg) {
+            replaceToolbarLogoInPlace();
+            return cfg;
+        });
+    };
     window.__STREAMFLIX_OPEN_PROFILE_PICKER__ = function (manage) {
         state.manageMode = Boolean(manage);
         closeAccountDropdown();

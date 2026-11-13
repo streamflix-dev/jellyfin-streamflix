@@ -1098,6 +1098,7 @@ public class StreamFlixController : ControllerBase
             version = Plugin.VersionString,
             serverId = _appHost.SystemId,
             serverName = _appHost.FriendlyName,
+            customBrandName = (config.CustomBrandName ?? string.Empty).Trim(),
             enableStreamFlixUi = config.EnableStreamFlixUi,
             requireGoogleAuth = config.RequireGoogleAuth,
             googleClientId = config.GoogleClientId,
