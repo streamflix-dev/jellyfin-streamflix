@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes, Movie Night Matcher & Seerr (v0.7.0)
+   "Who's watching?" profiles, Guest Passes, Movie Night Matcher & Seerr (v0.7.5)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.7.0';
+    var VERSION = '0.7.5';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -78,6 +78,7 @@
         hasGoogleClientSecret: false,
         hasAccess: false,
         isAdmin: false,
+        enableGuestPasses: true,
         isGuestPass: false,
         guestPassLabel: '',
         guestPassExpiresAt: '',
@@ -116,6 +117,7 @@
         legacyProfileToMigrate: legacyProfileToMigrate,
         manageMode: false,
         verifyingGoogle: false,
+        startingOidcRedirect: false,
         activatingProfileId: null,
         sessionVerifiedOnce: false,
         accountDropdownOpen: false,
@@ -1513,6 +1515,10 @@
         );
     }
 
+    function areGuestPassesEnabled() {
+        return !(state.config && state.config.enableGuestPasses === false);
+    }
+
     function isCurrentProfileSeerrAllowed() {
         var cfg = state.config;
         if (!cfg || !cfg.seerrEnabled) {
@@ -1655,6 +1661,7 @@
             hasGoogleClientSecret: Boolean(cfg.hasGoogleClientSecret),
             hasAccess: resolvedAccess,
             isAdmin: Boolean(cfg.isAdmin),
+            enableGuestPasses: cfg.enableGuestPasses !== false,
             isGuestPass: Boolean(cfg.isGuestPass),
             guestPassLabel: typeof cfg.guestPassLabel === 'string' ? cfg.guestPassLabel : '',
             guestPassExpiresAt: cfg.guestPassExpiresAt || null,
@@ -1924,11 +1931,34 @@
         };
     }
 
+    function navigateExternalNoReferrer(url) {
+        try {
+            var a = document.createElement('a');
+            a.href = url;
+            a.rel = 'noreferrer';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () {
+                if (a.parentNode) {
+                    a.parentNode.removeChild(a);
+                }
+            }, 0);
+        } catch (e) {
+            window.location.assign(url);
+        }
+    }
+
     function startOidcRedirect(pendingProfileId, loginHint) {
         if (!state.config || !state.config.enableCustomOidc || !state.config.oidcConfigured) {
             showToast('OpenID Connect isn\'t configured on this server yet.', 'error');
             return;
         }
+        if (state.startingOidcRedirect || state.verifyingGoogle) {
+            return;
+        }
+        state.startingOidcRedirect = true;
+
         try {
             if (pendingProfileId) {
                 sessionStorage.setItem(PENDING_PROFILE_KEY, pendingProfileId);
@@ -1937,16 +1967,40 @@
             }
         } catch (e) {}
 
-        var btn = document.getElementById('streamflix-oidc-login-btn');
-        if (btn) {
-            btn.disabled = true;
-            btn.classList.add('streamflix-btn-loading');
+        var providerLabel = getOidcProviderLabel();
+        if (!hasHouseholdAccess()) {
+            renderGoogleAuthGate('Connecting to ' + providerLabel + '…');
+        } else {
+            var btn = document.getElementById('streamflix-oidc-login-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('streamflix-btn-loading');
+            }
         }
 
-        var qs = '?returnWebBase=' + encodeURIComponent(window.location.pathname || '/web/')
-            + (pendingProfileId ? '&pendingProfileId=' + encodeURIComponent(pendingProfileId) : '')
-            + (loginHint ? '&loginHint=' + encodeURIComponent(loginHint) : '');
-        window.location.assign(apiBase() + '/StreamFlix/Oidc/Start' + qs);
+        apiFetch('/StreamFlix/Oidc/Begin', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                returnWebBase: window.location.pathname || '/web/',
+                pendingProfileId: pendingProfileId || '',
+                loginHint: loginHint || ''
+            })
+        }).then(function (res) {
+            if (!res || !res.authorizeUrl) {
+                throw new Error((res && res.message) || ('Could not start ' + providerLabel + ' sign-in.'));
+            }
+            navigateExternalNoReferrer(res.authorizeUrl);
+        }).catch(function (err) {
+            state.startingOidcRedirect = false;
+            var msg = (err && err.message) || ('Could not start ' + providerLabel + ' sign-in.');
+            if (!hasHouseholdAccess()) {
+                renderGoogleAuthGate(null, msg);
+            } else {
+                showToast(msg, 'error');
+            }
+        });
     }
 
     function completeOidcHandoff() {
@@ -3156,7 +3210,7 @@
 
     function renderGoogleAuthGate(statusText, errorText) {
         var cfg = state.config || DEFAULT_CONFIG;
-        var busy = Boolean(state.verifyingGoogle);
+        var busy = Boolean(state.verifyingGoogle || state.startingOidcRedirect);
         var stageHtml;
         var viewKey = 'auth';
 
@@ -3175,14 +3229,20 @@
         var oidcLabel = getOidcProviderLabel();
         var stdEnabled = Boolean(cfg.allowStandardJellyfinLogin);
         var canAdminFallback = Boolean(cfg.canShowAdminFallback);
+        var guestPassesEnabled = areGuestPassesEnabled();
 
         if (!canAdminFallback && state.adminLoginExpanded) {
             state.adminLoginExpanded = false;
         }
+        if (!guestPassesEnabled && state.guestPassExpanded) {
+            state.guestPassExpanded = false;
+        }
 
-        var guestFootBtnHtml = '<button type="button" class="streamflix-admin-fallback-link streamflix-guest-pass-link" id="streamflix-expand-guest-pass">'
-            + icon('ticket') + '<span>Have a Guest Pass?</span>'
-            + '</button>';
+        var guestFootBtnHtml = guestPassesEnabled
+            ? ('<button type="button" class="streamflix-admin-fallback-link streamflix-guest-pass-link" id="streamflix-expand-guest-pass">'
+                + icon('ticket') + '<span>Have a Guest Pass?</span>'
+                + '</button>')
+            : '';
 
         var alertsHtml = ''
             + (statusText
@@ -3202,7 +3262,7 @@
             + (oidcEnabled
                 ? '<button type="button" class="streamflix-oidc-btn' + (!googleEnabled ? ' streamflix-oidc-btn-primary' : '') + '" id="streamflix-oidc-login-btn"' + (busy ? ' disabled' : '') + '>'
                   + OIDC_SSO_SVG
-                  + '<span>' + (busy ? 'Verifying…' : ('Continue with ' + escapeHtml(oidcLabel))) + '</span>'
+                  + '<span>' + (state.startingOidcRedirect ? 'Redirecting…' : (busy ? 'Verifying…' : ('Continue with ' + escapeHtml(oidcLabel)))) + '</span>'
                   + '</button>'
                 : '')
             + '</div>';
@@ -3255,7 +3315,7 @@
                     passwordPlaceholder: 'Password',
                     adminOnly: true
                 })
-                + '    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>'
+                + (guestFootBtnHtml ? ('    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>') : '')
                 + '    <details class="streamflix-setup-hint">'
                 + '      <summary>Setting up Google OAuth?</summary>'
                 + '      <div class="streamflix-setup-hint-body">'
@@ -3305,7 +3365,7 @@
                     passwordPlaceholder: 'Password',
                     adminOnly: false
                 })
-                + '    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>'
+                + (guestFootBtnHtml ? ('    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>') : '')
                 + '  </div>'
                 + '</div>';
         } else if (!ssoEnabled && stdEnabled) {
@@ -3324,11 +3384,16 @@
                     passwordPlaceholder: 'Password',
                     adminOnly: false
                 })
-                + '    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>'
+                + (guestFootBtnHtml ? ('    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>') : '')
                 + '  </div>'
                 + '</div>';
         } else {
             // SSO Only (Google, OIDC, or both) + Guest Pass + optional subtle Admin Sign-In button/link
+            var adminFootBtnHtml = canAdminFallback
+                ? ('<button type="button" class="streamflix-admin-fallback-link" id="streamflix-expand-admin-login">'
+                    + icon('shield') + '<span>Admin Sign-In</span>'
+                    + '</button>')
+                : '';
             viewKey = 'auth';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
@@ -3337,14 +3402,9 @@
                 + '    <p>' + ssoLeadCopy + '</p>'
                 + alertsHtml
                 + ssoButtonsHtml
-                + '    <div class="streamflix-auth-foot streamflix-auth-foot-row">'
-                + guestFootBtnHtml
-                + (canAdminFallback
-                    ? '<button type="button" class="streamflix-admin-fallback-link" id="streamflix-expand-admin-login">'
-                      + icon('shield') + '<span>Admin Sign-In</span>'
-                      + '</button>'
+                + ((guestFootBtnHtml || adminFootBtnHtml)
+                    ? ('    <div class="streamflix-auth-foot streamflix-auth-foot-row">' + guestFootBtnHtml + adminFootBtnHtml + '    </div>')
                     : '')
-                + '    </div>'
                 + '  </div>'
                 + '</div>';
         }
@@ -5083,7 +5143,7 @@
             + (!isGuest ? ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
             + ddItem('streamflix-dd-toggle-hub', 'home', getBrandName() + ' Home', '', 'bfx-dd-switch-row',
                 '<span class="bfx-switch' + (state.cinemaHubEnabled ? ' on' : '') + '" aria-hidden="true"><i></i></span>')
-            + (isAdmin ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', 'Temporary invite links & QR', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
+            + (isAdmin && areGuestPassesEnabled() ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', 'Temporary invite links & QR', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
             + (isAdmin ? ddItem('streamflix-dd-dashboard', 'gear', 'Dashboard', '', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
             + '<div class="streamflix-dd-divider"></div>'
             + ddItem('streamflix-dd-signout', 'logout', isGuest ? 'Exit Guest Pass' : 'Sign out', '', 'danger');
@@ -10548,6 +10608,10 @@
        7b. v0.7.0 Modals: Temporary Guest Passes, Movie Night Matcher & Seerr Requests
        ---------------------------------------------------------------------- */
     function openGuestPassesModal() {
+        if (!areGuestPassesEnabled()) {
+            showToast('Temporary Guest Passes are turned off in Dashboard → Plugins → StreamFlix.', 'info');
+            return;
+        }
         var passes = [];
         var eligibleProfiles = [];
         var spotlightInfo = null;
@@ -10601,7 +10665,11 @@
             var spotlightHtml = '';
             if (spotlightInfo && spotlightInfo.pass) {
                 var sp = spotlightInfo.pass;
-                var spColor = sanitizeColorHex(sp.profileColorHex, '#E50914');
+                var spColor = sanitizeHexColor(sp.profileColorHex, '#E50914');
+                var spCap = Number(sp.maxRedemptions);
+                var spCapText = spCap > 0
+                    ? ('Up to ' + spCap + ' ' + (spCap === 1 ? 'device' : 'devices'))
+                    : 'Unlimited devices';
                 spotlightHtml = ''
                     + '<div class="bfx-gp-spotlight">'
                     + '  <div class="bfx-gp-qr-box" id="bfx-gp-qr-host" aria-label="Guest Pass QR Code"></div>'
@@ -10615,8 +10683,8 @@
                     + '    </div>'
                     + '    <div class="bfx-gp-spot-meta">'
                     + '      <span class="bfx-gp-prof-pill"><span class="bfx-gp-prof-dot" style="background:' + escapeHtml(spColor) + ';">' + escapeHtml(sp.profileEmoji || '🎟️') + '</span>' + escapeHtml(sp.profileName || 'Guest') + '</span>'
-                    + '      <span>' + icon('clock') + ' ' + escapeHtml(formatRelativeExpiry(sp.expiresAt) || 'Expires soon') + '</span>'
-                    + '      <span>Up to ' + Number(sp.maxRedemptions || 1) + ' ' + (Number(sp.maxRedemptions || 1) === 1 ? 'device' : 'devices') + '</span>'
+                    + '      <span>' + icon('clock') + ' ' + escapeHtml(formatRelativeExpiry(sp.expiresAtUtc || sp.expiresAt) || 'Expires soon') + '</span>'
+                    + '      <span>' + escapeHtml(spCapText) + '</span>'
                     + '    </div>'
                     + '    <div class="bfx-gp-copy-row">'
                     + '      <input type="text" class="streamflix-login-input bfx-gp-copy-input" readonly value="' + escapeHtml(spotlightInfo.shareUrl || '') + '" aria-label="Guest Pass invite link" />'
@@ -10639,8 +10707,12 @@
                 listHtml = passes.map(function (p) {
                     var st = statusMeta(p.status);
                     var isActive = st.cls === 'is-active';
-                    var pCol = sanitizeColorHex(p.profileColorHex, '#2b2b2b');
-                    var relExp = isActive ? formatRelativeExpiry(p.expiresAt) : '';
+                    var pCol = sanitizeHexColor(p.profileColorHex, '#2b2b2b');
+                    var relExp = isActive ? formatRelativeExpiry(p.expiresAtUtc || p.expiresAt) : '';
+                    var pMax = Number(p.maxRedemptions);
+                    var devSummary = pMax > 0
+                        ? ('Devices: ' + Number(p.redemptionCount || 0) + ' / ' + pMax)
+                        : ('Devices: ' + Number(p.redemptionCount || 0) + ' (unlimited)');
                     return ''
                         + '<div class="bfx-gp-row ' + st.cls + '">'
                         + '  <div class="bfx-gp-row-avatar" style="background:' + escapeHtml(pCol) + ';">' + escapeHtml(p.profileEmoji || '🎟️') + '</div>'
@@ -10652,7 +10724,7 @@
                         + '    <div class="bfx-gp-row-sub">'
                         + '      <span>Profile: <strong>' + escapeHtml(p.profileName || 'Profile') + '</strong></span>'
                         + '      <span>•</span>'
-                        + '      <span>Devices: ' + Number(p.redemptionCount || 0) + ' / ' + Number(p.maxRedemptions || 1) + '</span>'
+                        + '      <span>' + escapeHtml(devSummary) + '</span>'
                         + (relExp ? '<span>•</span><span>' + escapeHtml(relExp) + '</span>' : '')
                         + '    </div>'
                         + '  </div>'
@@ -10698,6 +10770,7 @@
                     + '      <option value="3">3 devices</option>'
                     + '      <option value="5">5 devices</option>'
                     + '      <option value="10">10 devices</option>'
+                    + '      <option value="0">Unlimited</option>'
                     + '    </select>'
                     + '  </div>'
                     + '  <div class="bfx-gp-field bfx-gp-field-btn">'
@@ -10744,7 +10817,8 @@
                     var labelVal = (bodyEl.querySelector('#bfx-gp-label').value || '').trim();
                     var profVal = bodyEl.querySelector('#bfx-gp-profile').value;
                     var hoursVal = parseInt(bodyEl.querySelector('#bfx-gp-hours').value, 10) || 24;
-                    var maxVal = parseInt(bodyEl.querySelector('#bfx-gp-max').value, 10) || 2;
+                    var rawMaxVal = parseInt(bodyEl.querySelector('#bfx-gp-max').value, 10);
+                    var maxVal = isNaN(rawMaxVal) ? 2 : rawMaxVal;
                     var createBtn = bodyEl.querySelector('#bfx-gp-create-btn');
                     busyAction = true;
                     if (createBtn) {
@@ -10969,7 +11043,7 @@
 
         function buildWatcherAvatarsHtml(list) {
             return (list || []).map(function (w) {
-                var bg = sanitizeColorHex(w.avatarColorHex || w.color, '#E50914');
+                var bg = sanitizeHexColor(w.avatarColorHex || w.color, '#E50914');
                 var em = w.avatarEmoji || w.icon || (w.name ? w.name.charAt(0).toUpperCase() : '?');
                 return '<span class="bfx-mn-mini-avatar" style="background:' + escapeHtml(bg) + ';" title="' + escapeHtml(w.name || '') + '">' + escapeHtml(em) + '</span>';
             }).join('');
@@ -11087,10 +11161,11 @@
             if (stage === 'setup') {
                 var watcherChipsHtml = allProfiles.map(function (p) {
                     var on = selectedIds.indexOf(p.id) !== -1;
-                    var col = sanitizeColorHex(p.color, '#E50914');
+                    var col = sanitizeHexColor(p.avatarColorHex || p.color, '#E50914');
+                    var avIcon = p.avatarEmoji || p.icon || (p.name ? p.name.charAt(0).toUpperCase() : '?');
                     return ''
                         + '<button type="button" class="bfx-mn-watcher-chip' + (on ? ' is-selected' : '') + '" data-mn-prof="' + escapeHtml(p.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
-                        + '  <span class="bfx-mn-watcher-av" style="background:' + escapeHtml(col) + ';">' + escapeHtml(p.icon || (p.name ? p.name.charAt(0).toUpperCase() : '?')) + '</span>'
+                        + '  <span class="bfx-mn-watcher-av" style="background:' + escapeHtml(col) + ';">' + escapeHtml(avIcon) + '</span>'
                         + '  <span class="bfx-mn-watcher-meta">'
                         + '    <span class="bfx-mn-watcher-name">' + escapeHtml(p.name) + '</span>'
                         + (p.isKids ? '<span class="bfx-mn-kids-tag">KIDS</span>' : '')
@@ -12194,7 +12269,15 @@
             scheduleLifecycleTick(0);
         });
         window.addEventListener('popstate', function () { scheduleLifecycleTick(0); });
-        window.addEventListener('pageshow', function () { scheduleLifecycleTick(0); });
+        window.addEventListener('pageshow', function (ev) {
+            if (ev && ev.persisted && state.startingOidcRedirect) {
+                state.startingOidcRedirect = false;
+                if (!hasHouseholdAccess()) {
+                    renderGoogleAuthGate();
+                }
+            }
+            scheduleLifecycleTick(0);
+        });
         window.addEventListener('focus', function () { scheduleLifecycleTick(0); });
         document.addEventListener('viewshow', function () { scheduleLifecycleTick(0); }, true);
         document.addEventListener('visibilitychange', function () {

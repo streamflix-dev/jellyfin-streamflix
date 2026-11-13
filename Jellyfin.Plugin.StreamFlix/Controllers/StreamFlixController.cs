@@ -91,6 +91,15 @@ public class TestOidcConfigRequest
     public List<string>? ApprovedOidcUsers { get; set; }
 }
 
+public class BeginOidcRequest
+{
+    public string? ReturnWebBase { get; set; }
+
+    public string? PendingProfileId { get; set; }
+
+    public string? LoginHint { get; set; }
+}
+
 public class ActivateProfileRequest
 {
     public string ProfileId { get; set; } = string.Empty;
@@ -227,6 +236,8 @@ public class SaveAdminConfigRequest
     public bool OidcRequireAllowlist { get; set; }
 
     public List<string>? ApprovedOidcUsers { get; set; }
+
+    public bool EnableGuestPasses { get; set; } = true;
 
     public bool EnableSeerr { get; set; }
 
@@ -447,6 +458,7 @@ public class StreamFlixController : ControllerBase
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can update StreamFlix settings." });
         }
 
+        List<string>? guestPassIdsToDisconnect = null;
         await SyncLock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -542,11 +554,33 @@ public class StreamFlixController : ControllerBase
             config.SeerrAllowKids = request.SeerrAllowKids;
             config.SeerrAllowGuests = request.SeerrAllowGuests;
 
+            var wasGuestPassesEnabled = config.EnableGuestPasses;
+            config.EnableGuestPasses = request.EnableGuestPasses;
+
             Plugin.Instance?.SaveConfiguration();
+            if (StreamFlixOidcService.IsConfigured(config))
+            {
+                StreamFlixOidcService.WarmDiscoveryInBackground(config);
+            }
+            if (wasGuestPassesEnabled && !config.EnableGuestPasses && config.GuestPasses != null)
+            {
+                guestPassIdsToDisconnect = config.GuestPasses
+                    .Where(gp => !string.IsNullOrWhiteSpace(gp.Id))
+                    .Select(gp => gp.Id)
+                    .ToList();
+            }
         }
         finally
         {
             SyncLock.Release();
+        }
+
+        if (guestPassIdsToDisconnect != null)
+        {
+            foreach (var gpId in guestPassIdsToDisconnect)
+            {
+                await RevokeGuestJellyfinSessionsAsync(gpId).ConfigureAwait(false);
+            }
         }
 
         Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
@@ -1129,6 +1163,45 @@ public class StreamFlixController : ControllerBase
         });
     }
 
+    [HttpPost("Oidc/Begin")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> BeginOidcSignIn([FromBody] BeginOidcRequest? request)
+    {
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+        var config = Config;
+        var safeWebBase = ResolveSafeRelativeWebPath(request?.ReturnWebBase);
+
+        if (!StreamFlixOidcService.IsConfigured(config))
+        {
+            return BadRequest(new
+            {
+                code = "oidc_disabled",
+                message = "OpenID Connect sign-in is not enabled on this server.",
+            });
+        }
+
+        try
+        {
+            var authUrl = await PrepareOidcAuthorizationSessionAsync(
+                config,
+                safeWebBase,
+                request?.LoginHint,
+                request?.PendingProfileId).ConfigureAwait(false);
+            return Ok(new { authorizeUrl = authUrl });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "StreamFlix: failed to prepare OIDC authorization redirect.");
+            return StatusCode(502, new
+            {
+                code = "oidc_begin_failed",
+                message = ex.Message,
+            });
+        }
+    }
+
     [HttpGet("Oidc/Start")]
     [AllowAnonymous]
     public async Task<ActionResult> StartOidcSignIn(
@@ -1137,6 +1210,7 @@ public class StreamFlixController : ControllerBase
         [FromQuery] string? loginHint = null)
     {
         Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
         var config = Config;
         var safeWebBase = ResolveSafeRelativeWebPath(returnWebBase);
 
@@ -1147,20 +1221,11 @@ public class StreamFlixController : ControllerBase
 
         try
         {
-            var callbackUri = BuildAbsoluteOidcCallbackUri();
-            var (authUrl, signedStateCookie) = await StreamFlixOidcService.CreateAuthorizationRedirectAsync(
+            var authUrl = await PrepareOidcAuthorizationSessionAsync(
                 config,
-                callbackUri,
                 safeWebBase,
                 loginHint,
-                pendingProfileId,
-                HttpContext.RequestAborted).ConfigureAwait(false);
-
-            Response.Cookies.Append(
-                StreamFlixOidcService.StateCookieName,
-                signedStateCookie,
-                BuildOidcCookieOptions(TimeSpan.FromMinutes(10)));
-
+                pendingProfileId).ConfigureAwait(false);
             return Redirect(authUrl);
         }
         catch (Exception ex)
@@ -1168,6 +1233,48 @@ public class StreamFlixController : ControllerBase
             _logger.LogWarning(ex, "StreamFlix: failed to initiate OIDC authorization redirect.");
             return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: ex.Message));
         }
+    }
+
+    private async Task<string> PrepareOidcAuthorizationSessionAsync(
+        PluginConfiguration config,
+        string safeWebBase,
+        string? loginHint,
+        string? pendingProfileId)
+    {
+        var callbackUri = BuildAbsoluteOidcCallbackUri();
+        var (authUrl, stateId, signedStateCookie) = await StreamFlixOidcService.CreateAuthorizationRedirectAsync(
+            config,
+            callbackUri,
+            safeWebBase,
+            loginHint,
+            pendingProfileId,
+            HttpContext.RequestAborted).ConfigureAwait(false);
+
+        // Clean up any legacy root-scoped state cookies (Path=/) and keep at most 2 concurrent per-tab state cookies
+        if (Request.Cookies.ContainsKey(StreamFlixOidcService.StateCookieName))
+        {
+            DeleteLegacyRootCookie(StreamFlixOidcService.StateCookieName);
+            DeleteOidcCookie(StreamFlixOidcService.StateCookieName);
+        }
+
+        var existingScopedStateCookies = Request.Cookies.Keys
+            .Where(k => k.StartsWith(StreamFlixOidcService.StateCookiePrefix, StringComparison.Ordinal))
+            .ToList();
+        if (existingScopedStateCookies.Count >= 2)
+        {
+            foreach (var oldKey in existingScopedStateCookies.Take(existingScopedStateCookies.Count - 1))
+            {
+                DeleteOidcCookie(oldKey);
+            }
+        }
+
+        var stateCookieName = StreamFlixOidcService.GetStateCookieName(stateId);
+        Response.Cookies.Append(
+            stateCookieName,
+            signedStateCookie,
+            BuildOidcCookieOptions(TimeSpan.FromMinutes(10)));
+
+        return authUrl;
     }
 
     [HttpGet("Oidc/Callback")]
@@ -1179,9 +1286,22 @@ public class StreamFlixController : ControllerBase
         [FromQuery(Name = "error_description")] string? errorDescription = null)
     {
         Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
         var config = Config;
-        var rawStateCookie = Request.Cookies[StreamFlixOidcService.StateCookieName];
-        DeleteOidcCookie(StreamFlixOidcService.StateCookieName);
+        var scopedCookieName = StreamFlixOidcService.GetStateCookieName(state);
+        var rawStateCookie = Request.Cookies[scopedCookieName];
+        if (string.IsNullOrEmpty(rawStateCookie)
+            && !string.Equals(scopedCookieName, StreamFlixOidcService.StateCookieName, StringComparison.Ordinal))
+        {
+            rawStateCookie = Request.Cookies[StreamFlixOidcService.StateCookieName];
+        }
+
+        DeleteOidcCookie(scopedCookieName);
+        if (Request.Cookies.ContainsKey(StreamFlixOidcService.StateCookieName))
+        {
+            DeleteOidcCookie(StreamFlixOidcService.StateCookieName);
+            DeleteLegacyRootCookie(StreamFlixOidcService.StateCookieName);
+        }
 
         var statePayload = StreamFlixSessionService.VerifyShortLivedPayload<StreamFlixOidcService.OidcStatePayload>(
             config,
@@ -1259,6 +1379,11 @@ public class StreamFlixController : ControllerBase
                 handoffPayload,
                 TimeSpan.FromSeconds(75));
 
+            if (Request.Cookies.ContainsKey(StreamFlixOidcService.HandoffCookieName))
+            {
+                DeleteLegacyRootCookie(StreamFlixOidcService.HandoffCookieName);
+            }
+
             Response.Cookies.Append(
                 StreamFlixOidcService.HandoffCookieName,
                 signedHandoff,
@@ -1282,6 +1407,7 @@ public class StreamFlixController : ControllerBase
         var config = Config;
         var rawHandoff = Request.Cookies[StreamFlixOidcService.HandoffCookieName];
         DeleteOidcCookie(StreamFlixOidcService.HandoffCookieName);
+        DeleteLegacyRootCookie(StreamFlixOidcService.HandoffCookieName);
 
         var handoff = StreamFlixSessionService.VerifyShortLivedPayload<StreamFlixOidcService.OidcHandoffPayload>(
             config,
@@ -2123,6 +2249,11 @@ public class StreamFlixController : ControllerBase
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can create Guest Passes." });
         }
 
+        if (!config.EnableGuestPasses)
+        {
+            return BadRequest(new { code = "guest_passes_disabled", message = "Temporary Guest Passes are turned off in StreamFlix settings." });
+        }
+
         await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
 
         var profile = FindProfile(config, request.ProfileId);
@@ -2336,6 +2467,11 @@ public class StreamFlixController : ControllerBase
         var config = Config;
         var safeWebBase = ResolveSafeRelativeWebPath(null);
 
+        if (!config.EnableGuestPasses)
+        {
+            return Redirect(BuildGuestReturnUrl(safeWebBase, "Temporary Guest Passes are turned off on this server."));
+        }
+
         var lockKey = "guest|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
         if (StreamFlixSessionService.IsGuestLockedOut(lockKey, out var retryAfter))
         {
@@ -2368,10 +2504,15 @@ public class StreamFlixController : ControllerBase
             handoffPayload,
             TimeSpan.FromSeconds(90));
 
+        if (Request.Cookies.ContainsKey(StreamFlixSessionService.GuestHandoffCookieName))
+        {
+            DeleteLegacyRootCookie(StreamFlixSessionService.GuestHandoffCookieName);
+        }
+
         Response.Cookies.Append(
             StreamFlixSessionService.GuestHandoffCookieName,
             signedCookie,
-            BuildOidcCookieOptions(TimeSpan.FromSeconds(90)));
+            BuildGuestCookieOptions(TimeSpan.FromSeconds(90)));
 
         return Redirect(BuildGuestReturnUrl(safeWebBase, errorMessage: null));
     }
@@ -2384,7 +2525,8 @@ public class StreamFlixController : ControllerBase
         SetNoStoreSecurityHeaders();
         var config = Config;
         var rawCookie = Request.Cookies[StreamFlixSessionService.GuestHandoffCookieName];
-        DeleteOidcCookie(StreamFlixSessionService.GuestHandoffCookieName);
+        DeleteGuestCookie(StreamFlixSessionService.GuestHandoffCookieName);
+        DeleteLegacyRootCookie(StreamFlixSessionService.GuestHandoffCookieName);
 
         var handoff = StreamFlixSessionService.VerifyShortLivedPayload<StreamFlixSessionService.GuestHandoffPayload>(
             config,
@@ -2864,18 +3006,25 @@ public class StreamFlixController : ControllerBase
             }
             else if (string.Equals(session.AuthKind, StreamFlixSessionService.AuthKindGuestPass, StringComparison.Ordinal))
             {
-                var lockedProf = FindProfile(config, session.LockedProfileId);
-                if (lockedProf == null || IsProfileLinkedToAdmin(lockedProf))
+                if (!config.EnableGuestPasses)
                 {
                     session = null;
                 }
-                else if (!string.IsNullOrWhiteSpace(lockedProf.JellyfinUserId)
-                    && Guid.TryParse(lockedProf.JellyfinUserId, out var gpUid))
+                else
                 {
-                    var gpUser = _userManager.GetUserById(gpUid);
-                    if (gpUser != null && (StreamFlixStartupTask.IsUserDisabledCompat(gpUser) || StreamFlixStartupTask.IsUserAdminCompat(gpUser)))
+                    var lockedProf = FindProfile(config, session.LockedProfileId);
+                    if (lockedProf == null || IsProfileLinkedToAdmin(lockedProf))
                     {
                         session = null;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(lockedProf.JellyfinUserId)
+                        && Guid.TryParse(lockedProf.JellyfinUserId, out var gpUid))
+                    {
+                        var gpUser = _userManager.GetUserById(gpUid);
+                        if (gpUser != null && (StreamFlixStartupTask.IsUserDisabledCompat(gpUser) || StreamFlixStartupTask.IsUserAdminCompat(gpUser)))
+                        {
+                            session = null;
+                        }
                     }
                 }
             }
@@ -3005,6 +3154,10 @@ public class StreamFlixController : ControllerBase
         var approvedOidcSnapshot = (config.ApprovedOidcUsers ?? new List<string>()).ToList();
         var oidcConfigured = StreamFlixOidcService.IsConfigured(config);
         var oidcProviderName = StreamFlixOidcService.GetDisplayProviderName(config);
+        if (oidcConfigured && !hasAccess)
+        {
+            StreamFlixOidcService.WarmDiscoveryInBackground(config);
+        }
         var seerrConfigured = StreamFlixSeerrService.IsConfigured(config);
         var seerrEnabled = hasAccess && seerrConfigured && (!isGuestPass || config.SeerrAllowGuests);
         var heroLibrariesSnapshot = (config.HeroLibraryIds ?? new List<string>())
@@ -3039,6 +3192,7 @@ public class StreamFlixController : ControllerBase
             hasGoogleClientSecret = caller.IsAdmin && !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
             hasAccess,
             isAdmin = caller.IsAdmin,
+            enableGuestPasses = config.EnableGuestPasses,
             isGuestPass,
             guestPassLabel = activeGuestPass?.Label,
             guestPassExpiresAt = activeGuestPass?.ExpiresAtUtc ?? caller.Session?.ExpiresAt.ToString("O"),
@@ -3175,6 +3329,12 @@ public class StreamFlixController : ControllerBase
         return string.IsNullOrEmpty(pb) ? "/" : pb;
     }
 
+    private string GetScopedCookiePath(string subPath)
+    {
+        var pb = Request.PathBase.HasValue ? Request.PathBase.Value.TrimEnd('/') : string.Empty;
+        return pb + subPath;
+    }
+
     private CookieOptions BuildOidcCookieOptions(TimeSpan maxAge)
     {
         return new CookieOptions
@@ -3182,13 +3342,50 @@ public class StreamFlixController : ControllerBase
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
             Secure = IsEffectiveHttps(),
-            Path = GetCookieBasePath(),
+            Path = GetScopedCookiePath("/StreamFlix/Oidc"),
+            MaxAge = maxAge,
+            IsEssential = true,
+        };
+    }
+
+    private CookieOptions BuildGuestCookieOptions(TimeSpan maxAge)
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = IsEffectiveHttps(),
+            Path = GetScopedCookiePath("/StreamFlix/Guest"),
             MaxAge = maxAge,
             IsEssential = true,
         };
     }
 
     private void DeleteOidcCookie(string cookieName)
+    {
+        Response.Cookies.Delete(cookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = IsEffectiveHttps(),
+            Path = GetScopedCookiePath("/StreamFlix/Oidc"),
+            IsEssential = true,
+        });
+    }
+
+    private void DeleteGuestCookie(string cookieName)
+    {
+        Response.Cookies.Delete(cookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = IsEffectiveHttps(),
+            Path = GetScopedCookiePath("/StreamFlix/Guest"),
+            IsEssential = true,
+        });
+    }
+
+    private void DeleteLegacyRootCookie(string cookieName)
     {
         Response.Cookies.Delete(cookieName, new CookieOptions
         {
@@ -3706,6 +3903,7 @@ public class StreamFlixController : ControllerBase
             hasOidcClientSecret = !string.IsNullOrWhiteSpace(config.OidcClientSecret),
             oidcRequireAllowlist = config.OidcRequireAllowlist,
             approvedOidcUsers = (config.ApprovedOidcUsers ?? new List<string>()).ToList(),
+            enableGuestPasses = config.EnableGuestPasses,
             enableSeerr = config.EnableSeerr,
             seerrUrl = config.SeerrUrl ?? string.Empty,
             hasSeerrApiKey = !string.IsNullOrWhiteSpace(config.SeerrApiKey),

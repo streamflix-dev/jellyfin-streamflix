@@ -271,6 +271,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || cfg.BypassLoginGateOnLan
             || !cfg.RequireGoogleAuth
             || !cfg.EnableGoogleSignIn
+            || !cfg.EnableGuestPasses
             || !cfg.EnableStreamFlixUi;
     }
 
@@ -453,6 +454,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 OidcClientId = Val(root, nameof(PluginConfiguration.OidcClientId)) ?? string.Empty,
                 OidcClientSecret = Val(root, nameof(PluginConfiguration.OidcClientSecret)) ?? string.Empty,
                 OidcRequireAllowlist = BoolVal(root, nameof(PluginConfiguration.OidcRequireAllowlist), false),
+                EnableGuestPasses = BoolVal(root, nameof(PluginConfiguration.EnableGuestPasses), true),
                 EnableSeerr = BoolVal(root, nameof(PluginConfiguration.EnableSeerr), false),
                 SeerrUrl = Val(root, nameof(PluginConfiguration.SeerrUrl)) ?? string.Empty,
                 SeerrApiKey = Val(root, nameof(PluginConfiguration.SeerrApiKey)) ?? string.Empty,

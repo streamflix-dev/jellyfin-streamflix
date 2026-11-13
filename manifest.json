@@ -3,11 +3,35 @@
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
     "overview": "Netflix-style UI, Household Profiles, Guest Passes, Movie Night Matcher & Seerr Requests for Jellyfin",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, expiring QR Guest Passes, Movie Night Matcher, optional Seerr/Jellyseerr search requests, and 'Who's watching?' profiles mapped to real Jellyfin users.",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, toggleable QR Guest Passes, Movie Night Matcher, optional Seerr/Jellyseerr search requests, and 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
+      {
+        "version": "0.7.5.0",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Simplified Progressive-Disclosure Settings: clean, compact configuration cards that stay collapsed until each sign-in method or feature (Google OAuth, Jellyfin Password, Admin Fallback, LAN Bypass, Guest Passes, Hero Advanced Filters, Seerr, Custom OIDC) is enabled\n- Toggleable Guest Passes & Modal Fixes: add master EnableGuestPasses switch (hiding UI entry points and disconnecting active guest sessions when disabled) and fix sanitizeHexColor / expiry / unlimited-redemption rendering in the Guest Passes & Movie Night Matcher modals\n- First-Attempt OIDC Sign-In Reliability: eliminate cold-start double-navigation and shared-host cookie collisions (HTTP 400 on /Account/Login) via mutex-guarded POST /StreamFlix/Oidc/Begin, /StreamFlix/Oidc path-scoped per-attempt state cookies, background discovery pre-warming, and loopback host diagnostics",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.0_12.0.0.zip",
+        "checksum": "25b927f3f2e5836738488e096f68d823",
+        "timestamp": "2026-11-13T21:47:12Z"
+      },
+      {
+        "version": "0.7.5.0",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Simplified Progressive-Disclosure Settings: clean, compact configuration cards that stay collapsed until each sign-in method or feature (Google OAuth, Jellyfin Password, Admin Fallback, LAN Bypass, Guest Passes, Hero Advanced Filters, Seerr, Custom OIDC) is enabled\n- Toggleable Guest Passes & Modal Fixes: add master EnableGuestPasses switch (hiding UI entry points and disconnecting active guest sessions when disabled) and fix sanitizeHexColor / expiry / unlimited-redemption rendering in the Guest Passes & Movie Night Matcher modals\n- First-Attempt OIDC Sign-In Reliability: eliminate cold-start double-navigation and shared-host cookie collisions (HTTP 400 on /Account/Login) via mutex-guarded POST /StreamFlix/Oidc/Begin, /StreamFlix/Oidc path-scoped per-attempt state cookies, background discovery pre-warming, and loopback host diagnostics",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.0_10.11.0.zip",
+        "checksum": "6cdcc76ebc00d33152b9123236b0b15f",
+        "timestamp": "2026-11-13T21:47:12Z"
+      },
+      {
+        "version": "0.7.5.0",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Simplified Progressive-Disclosure Settings: clean, compact configuration cards that stay collapsed until each sign-in method or feature (Google OAuth, Jellyfin Password, Admin Fallback, LAN Bypass, Guest Passes, Hero Advanced Filters, Seerr, Custom OIDC) is enabled\n- Toggleable Guest Passes & Modal Fixes: add master EnableGuestPasses switch (hiding UI entry points and disconnecting active guest sessions when disabled) and fix sanitizeHexColor / expiry / unlimited-redemption rendering in the Guest Passes & Movie Night Matcher modals\n- First-Attempt OIDC Sign-In Reliability: eliminate cold-start double-navigation and shared-host cookie collisions (HTTP 400 on /Account/Login) via mutex-guarded POST /StreamFlix/Oidc/Begin, /StreamFlix/Oidc path-scoped per-attempt state cookies, background discovery pre-warming, and loopback host diagnostics",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.0_10.9.0.zip",
+        "checksum": "ea7759b84108d96d9c4c41a338a5ab1c",
+        "timestamp": "2026-11-13T21:47:12Z"
+      },
       {
         "version": "0.7.0.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Temporary Guest Passes: create expiring invite links & locally rendered QR codes locked to a single non-admin profile, with redemption caps and instant 1-click session revocation\n- Movie Night Matcher: pick 2+ household profiles to intersect unwatched titles (honoring strictest parental ratings & shared My Lists) and vote through a quick head-to-head tournament bracket\n- Seerr / Jellyseerr / Overseerr Integration: optional server-proxied media search & 1-click Movie / TV Season requests built seamlessly into StreamFlix Live Search\n- Major Security, Stability & Performance Overhaul: strict same-origin auth token guard, secret-masked AdminConfig API, Docker/reverse-proxy X-Forwarded-For rate-limit hardening, OIDC client_secret_basic + post fallback, strict-CSP artwork loading, race-free Live Search, video OSD track/pause fixes, and TV D-pad enhancements",

@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.StreamFlix.Services;
 public static class StreamFlixOidcService
 {
     public const string StateCookieName = "sf_oidc_state";
+    public const string StateCookiePrefix = "sf_oidc_state_";
     public const string HandoffCookieName = "sf_oidc_handoff";
     public const string StateTokenPurpose = "oidc_state";
     public const string HandoffTokenPurpose = "oidc_handoff";
@@ -37,6 +38,7 @@ public static class StreamFlixOidcService
     };
 
     private static readonly ConcurrentDictionary<string, CachedDiscovery> DiscoveryCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Task<OidcDiscoveryDoc>> DiscoveryInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, CachedJwks> JwksCache = new(StringComparer.OrdinalIgnoreCase);
 
     public sealed record OidcStatePayload(
@@ -108,7 +110,53 @@ public static class StreamFlixOidcService
         return trimmed.TrimEnd('/') + "/.well-known/openid-configuration";
     }
 
-    public static async Task<(string AuthRedirectUrl, string SignedStateCookie)> CreateAuthorizationRedirectAsync(
+    public static string GetStateCookieName(string? stateId)
+    {
+        var clean = (stateId ?? string.Empty).Trim().ToLowerInvariant();
+        if (clean.Length >= 10 && clean.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+        {
+            return StateCookiePrefix + clean.Substring(0, 10);
+        }
+
+        return StateCookieName;
+    }
+
+    public static void WarmDiscoveryInBackground(PluginConfiguration config)
+    {
+        if (!IsConfigured(config))
+        {
+            return;
+        }
+
+        var discoveryUrl = BuildDiscoveryUrl(config.OidcIssuerUrl);
+        if (string.IsNullOrEmpty(discoveryUrl))
+        {
+            return;
+        }
+
+        if (DiscoveryCache.TryGetValue(discoveryUrl, out var cached)
+            && DateTimeOffset.UtcNow - cached.FetchedAt < TimeSpan.FromMinutes(8))
+        {
+            return;
+        }
+
+        var issuerSnapshot = config.OidcIssuerUrl;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                var doc = await GetDiscoveryAsync(issuerSnapshot, forceRefresh: false, cts.Token).ConfigureAwait(false);
+                _ = await GetJwksJsonCachedAsync(doc, forceRefresh: false, cts.Token).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort pre-warm; errors are surfaced cleanly when sign-in or TestOidcConfig runs
+            }
+        });
+    }
+
+    public static async Task<(string AuthRedirectUrl, string StateId, string SignedStateCookie)> CreateAuthorizationRedirectAsync(
         PluginConfiguration config,
         string callbackUri,
         string returnWebBase,
@@ -160,7 +208,7 @@ public static class StreamFlixOidcService
             sb.Append("&login_hint=").Append(Uri.EscapeDataString(loginHint.Trim()));
         }
 
-        return (sb.ToString(), signedCookie);
+        return (sb.ToString(), stateId, signedCookie);
     }
 
     public static async Task<VerifiedOidcIdentity> CompleteCallbackAsync(
@@ -380,6 +428,19 @@ public static class StreamFlixOidcService
                 var doc = await GetDiscoveryAsync(issuerInput, forceRefresh: true, cancellationToken).ConfigureAwait(false);
                 checks.Add(new("ok", "OIDC Discovery", $"Connected to issuer '{doc.Issuer}' (authorization + token + JWKS endpoints verified)."));
 
+                if (!string.IsNullOrWhiteSpace(callbackUri)
+                    && Uri.TryCreate(callbackUri.Trim(), UriKind.Absolute, out var cbHostUri)
+                    && Uri.TryCreate(doc.AuthorizationEndpoint, UriKind.Absolute, out var authHostUri)
+                    && cbHostUri.IsLoopback
+                    && authHostUri.IsLoopback
+                    && !string.Equals(cbHostUri.Host, authHostUri.Host, StringComparison.OrdinalIgnoreCase))
+                {
+                    checks.Add(new(
+                        "warn",
+                        "Loopback Cookie Host",
+                        $"Jellyfin is opened on '{cbHostUri.Host}' while the OIDC authorization endpoint uses '{authHostUri.Host}'. Browsers treat localhost and 127.0.0.1 as cross-site, which can cause HTTP 400 anti-forgery errors on some login forms — use '{authHostUri.Host}' for both if needed."));
+                }
+
                 var jwksJson = await FetchJwksJsonAsync(doc.JwksUri, cancellationToken).ConfigureAwait(false);
                 using var parsedJwks = JsonDocument.Parse(jwksJson);
                 var keyCount = parsedJwks.RootElement.TryGetProperty("keys", out var keysArr) && keysArr.ValueKind == JsonValueKind.Array
@@ -425,6 +486,28 @@ public static class StreamFlixOidcService
             return cached.Doc;
         }
 
+        if (!forceRefresh)
+        {
+            var inflight = DiscoveryInFlight.GetOrAdd(
+                discoveryUrl,
+                url => FetchAndCacheDiscoveryCoreAsync(url, CancellationToken.None));
+            try
+            {
+                return await inflight.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                DiscoveryInFlight.TryRemove(new KeyValuePair<string, Task<OidcDiscoveryDoc>>(discoveryUrl, inflight));
+            }
+        }
+
+        return await FetchAndCacheDiscoveryCoreAsync(discoveryUrl, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<OidcDiscoveryDoc> FetchAndCacheDiscoveryCoreAsync(
+        string discoveryUrl,
+        CancellationToken cancellationToken)
+    {
         await ValidateSafeOutboundUrlAsync(discoveryUrl, cancellationToken).ConfigureAwait(false);
         using var resp = await SendGetFollowSafeRedirectsAsync(discoveryUrl, cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)

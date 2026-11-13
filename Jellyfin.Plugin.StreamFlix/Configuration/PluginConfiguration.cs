@@ -113,6 +113,7 @@ public class PluginConfiguration : BasePluginConfiguration
         OidcClientSecret = string.Empty;
         OidcRequireAllowlist = false;
         ApprovedOidcUsers = new List<string>();
+        EnableGuestPasses = true;
         GuestPasses = new List<StreamFlixGuestPass>();
         EnableSeerr = false;
         SeerrUrl = string.Empty;
@@ -266,6 +267,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets optional approved OIDC emails, preferred_usernames, or subjects (one per line).
     /// </summary>
     public List<string> ApprovedOidcUsers { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Temporary Guest Passes (creation, invite links, QR codes, and guest sessions) are enabled.
+    /// </summary>
+    public bool EnableGuestPasses { get; set; }
 
     /// <summary>
     /// Gets or sets temporary, revocable Guest Passes issued by administrators.

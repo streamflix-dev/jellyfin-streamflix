@@ -264,6 +264,12 @@ public static class StreamFlixSessionService
         matchedPass = null;
         failureReason = "Invalid or expired Guest Pass.";
 
+        if (!config.EnableGuestPasses)
+        {
+            failureReason = "Temporary Guest Passes are turned off on this server.";
+            return false;
+        }
+
         var code = ExtractGuestPassCode(rawInput);
         var dashIdx = code.LastIndexOf('-');
         if (dashIdx <= 0 || dashIdx >= code.Length - 8)
@@ -500,7 +506,7 @@ public static class StreamFlixSessionService
 
             if (string.Equals(kind, AuthKindGuestPass, StringComparison.Ordinal))
             {
-                if (string.IsNullOrWhiteSpace(payload.Gp) || string.IsNullOrWhiteSpace(payload.Lp))
+                if (!config.EnableGuestPasses || string.IsNullOrWhiteSpace(payload.Gp) || string.IsNullOrWhiteSpace(payload.Lp))
                 {
                     return null;
                 }

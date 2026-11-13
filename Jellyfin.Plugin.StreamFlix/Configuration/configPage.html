@@ -7,7 +7,8 @@
 <body>
     <div id="StreamFlixConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <style>
-            #StreamFlixConfigPage .bfx-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:22px; }
+            #StreamFlixConfigPage .hide { display:none !important; }
+            #StreamFlixConfigPage .bfx-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:20px; }
             #StreamFlixConfigPage .bfx-brand { display:flex; align-items:center; gap:14px; }
             #StreamFlixConfigPage .bfx-logo { background:#E50914; color:#fff; font-weight:900; font-size:20px; letter-spacing:3px; padding:8px 16px; border-radius:6px; box-shadow:0 6px 20px rgba(229,9,20,.35); }
             #StreamFlixConfigPage .bfx-head h2 { margin:0; font-size:1.35em; }
@@ -21,21 +22,35 @@
             #StreamFlixConfigPage .bfx-btn-danger { background:rgba(229,9,20,.14); color:#ff8a80; border-color:rgba(229,9,20,.6); }
             #StreamFlixConfigPage .bfx-btn-danger:hover:not(:disabled) { background:rgba(229,9,20,.26); border-color:#ff5252; color:#fff; }
             #StreamFlixConfigPage .bfx-btn-sm { padding:5px 9px; font-size:.8em; }
-            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:26px; }
-            #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:14px 16px; }
-            #StreamFlixConfigPage .bfx-card-label { font-size:.75em; text-transform:uppercase; letter-spacing:.08em; opacity:.6; }
-            #StreamFlixConfigPage .bfx-card-value { font-size:1.05em; font-weight:700; margin-top:6px; display:flex; align-items:center; gap:8px; }
-            #StreamFlixConfigPage .bfx-dot { width:9px; height:9px; border-radius:50%; background:#777; flex:none; }
+            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(168px, 1fr)); gap:10px; margin-bottom:22px; }
+            #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:12px 14px; }
+            #StreamFlixConfigPage .bfx-card-label { font-size:.73em; text-transform:uppercase; letter-spacing:.08em; opacity:.58; }
+            #StreamFlixConfigPage .bfx-card-value { font-size:1em; font-weight:700; margin-top:5px; display:flex; align-items:center; gap:8px; }
+            #StreamFlixConfigPage .bfx-dot { width:9px; height:9px; border-radius:50%; background:#666; flex:none; }
             #StreamFlixConfigPage .bfx-dot.ok { background:#46d369; box-shadow:0 0 8px rgba(70,211,105,.6); }
             #StreamFlixConfigPage .bfx-dot.warn { background:#f5b041; box-shadow:0 0 8px rgba(245,176,65,.5); }
             #StreamFlixConfigPage .bfx-dot.bad { background:#E50914; box-shadow:0 0 8px rgba(229,9,20,.6); }
-            #StreamFlixConfigPage .bfx-section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:18px 20px; margin-bottom:22px; }
-            #StreamFlixConfigPage .bfx-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-            #StreamFlixConfigPage .bfx-section h3 { margin:0 0 4px; }
-            #StreamFlixConfigPage .bfx-subbox { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:14px 16px; margin:10px 0 16px; }
-            #StreamFlixConfigPage .bfx-subbox-title { font-size:.82em; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.72; margin-bottom:10px; }
+            #StreamFlixConfigPage .bfx-section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:18px 20px; margin-bottom:18px; }
+            #StreamFlixConfigPage .bfx-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+            #StreamFlixConfigPage .bfx-section h3 { margin:0 0 3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+            #StreamFlixConfigPage .bfx-method-stack { display:flex; flex-direction:column; gap:10px; margin:12px 0 14px; }
+            #StreamFlixConfigPage .bfx-method-card { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.09); border-radius:9px; padding:12px 15px; transition:border-color .16s, background .16s; }
+            #StreamFlixConfigPage .bfx-method-card.is-on { background:rgba(255,255,255,.035); border-color:rgba(255,255,255,.2); }
+            #StreamFlixConfigPage .bfx-method-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+            #StreamFlixConfigPage .bfx-method-top .checkboxContainer { margin:0; flex:1; min-width:220px; }
+            #StreamFlixConfigPage .bfx-method-body { margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
+            #StreamFlixConfigPage .bfx-collapse-body { margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
+            #StreamFlixConfigPage .bfx-pill { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:.7em; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:rgba(255,255,255,.08); color:rgba(255,255,255,.55); flex:none; }
+            #StreamFlixConfigPage .bfx-pill.ok { background:rgba(70,211,105,.18); color:#8de5a6; border:1px solid rgba(70,211,105,.35); }
+            #StreamFlixConfigPage .bfx-pill.warn { background:rgba(245,176,65,.18); color:#ffd280; border:1px solid rgba(245,176,65,.38); }
+            #StreamFlixConfigPage .bfx-details { background:rgba(0,0,0,.26); border:1px solid rgba(255,255,255,.09); border-radius:8px; padding:10px 13px; margin:10px 0 14px; }
+            #StreamFlixConfigPage .bfx-details summary { cursor:pointer; font-weight:600; font-size:.88em; opacity:.88; user-select:none; }
+            #StreamFlixConfigPage .bfx-details[open] summary { margin-bottom:10px; }
+            #StreamFlixConfigPage .bfx-subbox { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:14px 16px; margin:10px 0 14px; }
+            #StreamFlixConfigPage .bfx-subbox-title { font-size:.8em; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.72; margin-bottom:10px; }
             #StreamFlixConfigPage .bfx-grid-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
-            #StreamFlixConfigPage .bfx-grid-4 { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; align-items:end; }
+            #StreamFlixConfigPage .bfx-grid-4 { display:grid; grid-template-columns:repeat(auto-fit, minmax(185px, 1fr)); gap:12px; align-items:end; }
+            #StreamFlixConfigPage .bfx-session-row { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-top:12px; margin-top:6px; border-top:1px solid rgba(255,255,255,.07); }
             #StreamFlixConfigPage .bfx-profiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:12px; }
             #StreamFlixConfigPage .bfx-prof { display:flex; align-items:center; gap:12px; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:10px 12px; transition:border-color .15s, opacity .2s; }
             #StreamFlixConfigPage .bfx-prof:hover { border-color:rgba(255,255,255,.25); }
@@ -61,23 +76,20 @@
             #StreamFlixConfigPage .bfx-secret-row { display:flex; align-items:center; gap:8px; }
             #StreamFlixConfigPage .bfx-secret-row input { flex:1; }
             #StreamFlixConfigPage .bfx-secret-status { font-size:.78em; color:#8de5a6; margin-top:4px; }
-            #StreamFlixConfigPage .bfx-secret-status.hide { display:none; }
-            #StreamFlixConfigPage .bfx-empty { opacity:.6; padding:10px 0; }
-            #StreamFlixConfigPage .bfx-callout { border-left:3px solid #f5b041; background:rgba(245,176,65,.08); padding:10px 12px; border-radius:4px; font-size:.88em; margin:6px 0 14px; }
+            #StreamFlixConfigPage .bfx-empty { opacity:.6; padding:8px 0; }
+            #StreamFlixConfigPage .bfx-callout { border-left:3px solid #f5b041; background:rgba(245,176,65,.08); padding:10px 12px; border-radius:4px; font-size:.88em; margin:8px 0 12px; }
             #StreamFlixConfigPage .bfx-callout.red { border-left-color:#E50914; background:rgba(229,9,20,.08); }
             #StreamFlixConfigPage .bfx-callout.ok { border-left-color:#46d369; background:rgba(70,211,105,.08); }
-            #StreamFlixConfigPage .bfx-callout.hide { display:none; }
             #StreamFlixConfigPage .bfx-uri { display:flex; align-items:center; gap:8px; margin:6px 0; }
             #StreamFlixConfigPage .bfx-uri code { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:5px; font-size:.85em; }
             #StreamFlixConfigPage .bfx-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-            #StreamFlixConfigPage textarea.bfx-textarea { width:100%; box-sizing:border-box; font-family:monospace; padding:10px; min-height:120px; border-radius:6px; }
+            #StreamFlixConfigPage textarea.bfx-textarea { width:100%; box-sizing:border-box; font-family:monospace; padding:10px; min-height:104px; border-radius:6px; }
             #StreamFlixConfigPage .bfx-libs-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; margin-top:8px; }
             #StreamFlixConfigPage .bfx-lib-chip { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:8px 11px; cursor:pointer; user-select:none; font-size:.9em; }
             #StreamFlixConfigPage .bfx-lib-chip:hover { border-color:rgba(255,255,255,.28); background:rgba(255,255,255,.07); }
             #StreamFlixConfigPage .bfx-lib-chip input { accent-color:#E50914; width:16px; height:16px; margin:0; cursor:pointer; }
             #StreamFlixConfigPage .bfx-lib-type { font-size:.72em; opacity:.6; margin-left:auto; text-transform:uppercase; }
-            #StreamFlixConfigPage .bfx-oauth-results { margin-top:12px; background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px 14px; }
-            #StreamFlixConfigPage .bfx-oauth-results.hide { display:none; }
+            #StreamFlixConfigPage .bfx-oauth-results { margin-top:10px; background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:12px 14px; }
             #StreamFlixConfigPage .bfx-oauth-summary { font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
             #StreamFlixConfigPage .bfx-oauth-check { display:flex; align-items:flex-start; gap:10px; padding:6px 0; border-top:1px solid rgba(255,255,255,.07); font-size:.87em; }
             #StreamFlixConfigPage .bfx-oauth-pill { flex:none; min-width:58px; text-align:center; font-size:.72em; font-weight:800; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:.04em; }
@@ -85,11 +97,10 @@
             #StreamFlixConfigPage .bfx-oauth-pill.warn { background:rgba(245,176,65,.22); color:#ffd280; }
             #StreamFlixConfigPage .bfx-oauth-pill.error { background:rgba(229,9,20,.28); color:#ff8a80; }
             #StreamFlixConfigPage .bfx-beta-section { border-color:rgba(245,176,65,.28); background:linear-gradient(180deg, rgba(245,176,65,.045) 0%, rgba(255,255,255,.025) 100%); }
-            #StreamFlixConfigPage .bfx-beta-tag { display:inline-flex; align-items:center; vertical-align:middle; margin-left:8px; padding:2px 8px; border-radius:999px; font-size:.66em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; background:rgba(245,176,65,.18); color:#ffd280; border:1px solid rgba(245,176,65,.42); }
+            #StreamFlixConfigPage .bfx-beta-tag { display:inline-flex; align-items:center; vertical-align:middle; padding:2px 8px; border-radius:999px; font-size:.66em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; background:rgba(245,176,65,.18); color:#ffd280; border:1px solid rgba(245,176,65,.42); }
             #StreamFlixConfigPage .bfx-save-bar { position:sticky; bottom:0; padding:12px 0; background:linear-gradient(to top, rgba(16,16,16,.95) 60%, rgba(16,16,16,0)); z-index:2; }
             #StreamFlixConfigPage .bfx-skeleton { height:66px; border-radius:8px; background:linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%); background-size:200% 100%; animation:bfxShimmer 1.3s ease-in-out infinite; }
             #StreamFlixConfigPage .bfx-confirm-backdrop { position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,.78); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; }
-            #StreamFlixConfigPage .bfx-confirm-backdrop.hide { display:none; }
             #StreamFlixConfigPage .bfx-confirm-dialog { width:100%; max-width:460px; background:#18181c; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:22px 24px; box-shadow:0 26px 70px rgba(0,0,0,.75); color:#fff; }
             #StreamFlixConfigPage .bfx-confirm-dialog h4 { margin:0 0 8px; font-size:1.2em; display:flex; align-items:center; gap:8px; }
             #StreamFlixConfigPage .bfx-confirm-dialog p { margin:0 0 18px; font-size:.92em; line-height:1.5; color:rgba(255,255,255,.78); }
@@ -108,7 +119,7 @@
                             <div class="bfx-logo" id="StreamFlixConfigLogo">STREAMFLIX</div>
                             <div>
                                 <h2>StreamFlix</h2>
-                                <div class="bfx-sub">Netflix-style home, household profiles, expiring Guest Passes, Movie Night Matcher &amp; Seerr requests <span id="StreamFlixVersionLabel"></span></div>
+                                <div class="bfx-sub">Netflix-style UI, household profiles &amp; flexible authentication <span id="StreamFlixVersionLabel"></span></div>
                             </div>
                         </div>
                         <div class="bfx-row">
@@ -119,20 +130,20 @@
 
                     <div class="bfx-cards">
                         <div class="bfx-card">
-                            <div class="bfx-card-label">SSO / OAuth</div>
-                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGoogleDot"></span><span id="StreamFlixStatusGoogle">…</span></div>
-                        </div>
-                        <div class="bfx-card">
                             <div class="bfx-card-label">Household sign-in</div>
                             <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGateDot"></span><span id="StreamFlixStatusGate">…</span></div>
                         </div>
                         <div class="bfx-card">
-                            <div class="bfx-card-label">Seerr requests</div>
-                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusSeerrDot"></span><span id="StreamFlixStatusSeerr">…</span></div>
+                            <div class="bfx-card-label">SSO / OAuth</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGoogleDot"></span><span id="StreamFlixStatusGoogle">…</span></div>
                         </div>
                         <div class="bfx-card">
-                            <div class="bfx-card-label">Active guest passes</div>
-                            <div class="bfx-card-value" id="StreamFlixStatusGuestPasses">0</div>
+                            <div class="bfx-card-label">Guest passes</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGuestDot"></span><span id="StreamFlixStatusGuestPasses">…</span></div>
+                        </div>
+                        <div class="bfx-card">
+                            <div class="bfx-card-label">Seerr requests</div>
+                            <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusSeerrDot"></span><span id="StreamFlixStatusSeerr">…</span></div>
                         </div>
                         <div class="bfx-card">
                             <div class="bfx-card-label">Profiles</div>
@@ -140,184 +151,284 @@
                         </div>
                     </div>
 
+                    <!-- 1. Profiles -->
                     <div class="bfx-section">
                         <div class="bfx-section-head">
                             <div>
                                 <h3>Profiles</h3>
-                                <div class="fieldDescription">Each profile is linked to its own Jellyfin user, so watch history, Continue Watching and favorites stay separate. Add a PIN or lock a profile to a Google/OIDC email from <strong>Manage profiles</strong>.</div>
+                                <div class="fieldDescription">Each profile maps to its own Jellyfin user so Continue Watching, Next Up, and My List stay separate. Set PINs or email locks from <strong>Manage profiles</strong>.</div>
                             </div>
                         </div>
                         <div class="bfx-callout red hide" id="StreamFlixOwnerWarning">
-                            The <strong>Owner</strong> profile is linked to an administrator account but has no PIN or email lock. Anyone signed in to your household can open it — consider protecting it.
+                            The <strong>Owner</strong> profile is linked to an administrator account without a PIN or email lock. Protect it in <strong>Manage profiles</strong> so anyone signed into the household cannot open admin settings.
                         </div>
                         <div class="bfx-profiles" id="StreamFlixProfilesGrid">
                             <div class="bfx-skeleton"></div><div class="bfx-skeleton"></div><div class="bfx-skeleton"></div>
                         </div>
-                    </div>
-
-                    <div class="bfx-section" id="StreamFlixGuestPassesSection">
-                        <div class="bfx-section-head">
-                            <div>
-                                <h3>Temporary Guest Passes</h3>
-                                <div class="fieldDescription">Share an expiring 1-click invite link or scannable QR code locked strictly to one non-administrator profile. Guests cannot switch profiles, edit settings, or pair Quick Connect devices, and revoking a pass ends active playback immediately.</div>
-                            </div>
-                            <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixPurgePassesBtn">Clear expired / revoked</button>
-                        </div>
-
-                        <div class="bfx-subbox">
-                            <div class="bfx-subbox-title">Create New Guest Pass</div>
-                            <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
-                                Create at least one non-administrator viewer or Guest profile in <strong>Manage profiles</strong> above before issuing a Guest Pass.
-                            </div>
-                            <div class="bfx-grid-4">
-                                <div class="inputContainer" style="margin:0;">
-                                    <label class="inputLabel inputLabelUnfocused" for="GuestPassLabel">Pass label (optional)</label>
-                                    <input id="GuestPassLabel" type="text" maxlength="48" is="emby-input" autocomplete="off" placeholder="Weekend Guest" />
-                                </div>
-                                <div class="selectContainer" style="margin:0;">
-                                    <label class="selectLabel" for="GuestPassProfileId">Assigned non-admin profile</label>
-                                    <select id="GuestPassProfileId" is="emby-select" class="emby-select-withcolor emby-select"></select>
-                                </div>
-                                <div class="selectContainer" style="margin:0;">
-                                    <label class="selectLabel" for="GuestPassDurationHours">Expires after</label>
-                                    <select id="GuestPassDurationHours" is="emby-select" class="emby-select-withcolor emby-select">
-                                        <option value="4">4 hours (Movie night)</option>
-                                        <option value="12">12 hours</option>
-                                        <option value="24" selected>24 hours (1 day)</option>
-                                        <option value="48">48 hours (Weekend)</option>
-                                        <option value="72">3 days</option>
-                                        <option value="168">7 days (1 week)</option>
-                                        <option value="336">14 days (2 weeks)</option>
-                                    </select>
-                                </div>
-                                <div class="selectContainer" style="margin:0;">
-                                    <label class="selectLabel" for="GuestPassMaxRedemptions">Device / redemption cap</label>
-                                    <select id="GuestPassMaxRedemptions" is="emby-select" class="emby-select-withcolor emby-select">
-                                        <option value="1">1 device / browser</option>
-                                        <option value="2" selected>Up to 2 devices</option>
-                                        <option value="4">Up to 4 devices</option>
-                                        <option value="10">Up to 10 devices</option>
-                                        <option value="0">Unlimited until expiry</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="bfx-row" style="margin-top:12px;">
-                                <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixCreateGuestPassBtn">+ Generate Guest Pass &amp; QR</button>
-                                <span class="fieldDescription" style="margin:0;">QR codes are generated 100% locally on your Jellyfin server — pass URLs are never sent to external QR services.</span>
-                            </div>
-                        </div>
-
-                        <div class="bfx-passes" id="StreamFlixGuestPassesList">
-                            <div class="bfx-empty">No Guest Passes created yet.</div>
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:14px 0 0;">
+                            <label class="emby-checkbox-label">
+                                <input id="AutoProvisionJellyfinUsers" name="AutoProvisionJellyfinUsers" type="checkbox" is="emby-checkbox" />
+                                <span>Automatically create a dedicated Jellyfin user for each new profile</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Keeps watch state and parental limits independent without manual user creation.</div>
                         </div>
                     </div>
 
+                    <!-- 2. Interface & Sign-In Gate (Progressive Disclosure) -->
                     <div class="bfx-section">
-                        <h3>Access, Branding &amp; Authentication</h3>
+                        <h3>Interface &amp; Sign-In</h3>
+                        <div class="fieldDescription" style="margin-bottom:12px;">Turn on only the sign-in methods you want to use — configuration fields appear automatically when enabled.</div>
+
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
                                 <input id="EnableStreamFlixUi" name="EnableStreamFlixUi" type="checkbox" is="emby-checkbox" />
                                 <span>Enable the StreamFlix interface</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Netflix-style home with hero billboard, Top 10 badges, Movie Night Matcher, keyboard/D-pad remote support, profile switcher, and dark-themed login &amp; library pages.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Applies the dark cinema home, Top 10 rows, Movie Night Matcher, profile switcher, and custom player overlay.</div>
                         </div>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom logo text (upper-left corner)</label>
+                        <div id="StreamFlixUiBrandingBox" class="inputContainer" style="margin-top:6px;">
+                            <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom upper-left logo text (optional)</label>
                             <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
-                            <div class="fieldDescription">Customizes the red wordmark logo in the upper-left corner (plus the sign-in screen and home labels). Leave blank to use <strong>STREAMFLIX</strong>.</div>
+                            <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
                         </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:12px; margin-bottom:6px;">
                             <label class="emby-checkbox-label">
                                 <input id="RequireGoogleAuth" name="RequireGoogleAuth" type="checkbox" is="emby-checkbox" />
                                 <span>Require household sign-in before "Who's watching?"</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Protects the profile picker behind Google Sign-In, Custom OIDC, Standard Jellyfin Login, or Hybrid Mode.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Protects the profile picker behind one or more sign-in methods below.</div>
                         </div>
+
                         <div class="bfx-callout red hide" id="StreamFlixOpenGateWarning">
-                            <strong>Sign-in gate is off.</strong> Anyone who can reach this server can open PIN-free profiles without signing in first. Only disable this on a trusted private network.
+                            <strong>Sign-in gate is off.</strong> Anyone who can reach this server can open PIN-free profiles directly. Only turn this off on a trusted private network.
                         </div>
 
-                        <div class="bfx-subbox" id="StreamFlixAuthModesBox">
-                            <div class="bfx-subbox-title">Sign-In Methods &amp; Local Network (LAN) Rules</div>
+                        <div id="StreamFlixGateMethodsWrap">
+                            <div class="bfx-method-stack">
+                                <!-- Method 1: Google Sign-In -->
+                                <div class="bfx-method-card" id="GoogleMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="EnableGoogleSignIn" name="EnableGoogleSignIn" type="checkbox" is="emby-checkbox" />
+                                                <span>Google Sign-In ("Continue with Google")</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Sign in with approved Google accounts via OAuth 2.0.</div>
+                                        </div>
+                                        <span class="bfx-pill" id="GoogleCardPill">Off</span>
+                                    </div>
 
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="emby-checkbox-label">
-                                    <input id="EnableGoogleSignIn" name="EnableGoogleSignIn" type="checkbox" is="emby-checkbox" />
-                                    <span>Enable "Continue with Google"</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Shows Google OAuth 2.0 sign-in when an OAuth Client ID is configured below. Disable if your server is local-only or you prefer Jellyfin passwords / OIDC exclusively.</div>
+                                    <div class="bfx-method-body hide" id="GoogleConfigBody">
+                                        <div class="bfx-row" style="justify-content:space-between; margin-bottom:10px;">
+                                            <div class="fieldDescription" style="margin:0;">
+                                                Create a <em>Web application</em> OAuth Client ID in <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="button-link">Google Cloud Console → Credentials</a>.
+                                            </div>
+                                            <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixTestOAuthBtn">✓ Test OAuth Config</button>
+                                        </div>
+
+                                        <div class="bfx-oauth-results hide" id="StreamFlixOAuthTestResult" role="status" aria-live="polite"></div>
+
+                                        <div class="inputContainer" style="margin-top:12px;">
+                                            <label class="inputLabel inputLabelUnfocused" for="GoogleClientId">OAuth Client ID</label>
+                                            <input id="GoogleClientId" name="GoogleClientId" type="text" is="emby-input" autocomplete="off" placeholder="your-client-id.apps.googleusercontent.com" />
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label class="inputLabel inputLabelUnfocused" for="ApprovedGoogleEmails">Approved Google accounts</label>
+                                            <textarea id="ApprovedGoogleEmails" name="ApprovedGoogleEmails" rows="4" class="emby-input bfx-textarea" placeholder="user@example.com&#10;member@example.com"></textarea>
+                                            <div class="fieldDescription">One email per line. Only these accounts (plus any email locked to a profile) can unlock StreamFlix with Google.</div>
+                                        </div>
+
+                                        <div class="bfx-callout hide" id="StreamFlixNoAccountsWarning">
+                                            No approved Google accounts listed yet. On a brand-new install the first Google account to sign in is approved automatically; otherwise only accounts locked to a profile can sign in.
+                                        </div>
+
+                                        <details class="bfx-details" id="GoogleAdvancedDetails">
+                                            <summary>Redirect URIs for Google Cloud Console &amp; Optional Client Secret</summary>
+                                            <div class="fieldDescription">Authorized JavaScript origin</div>
+                                            <div class="bfx-uri"><code id="StreamFlixOriginUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOriginUri">Copy</button></div>
+                                            <div class="fieldDescription">Authorized redirect URIs</div>
+                                            <div class="bfx-uri"><code id="StreamFlixRedirectUri1"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri1">Copy</button></div>
+                                            <div class="bfx-uri"><code id="StreamFlixRedirectUri2"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri2">Copy</button></div>
+
+                                            <div class="inputContainer" style="margin:14px 0 0;">
+                                                <label class="inputLabel inputLabelUnfocused" for="GoogleClientSecret">OAuth Client Secret (optional)</label>
+                                                <div class="bfx-secret-row">
+                                                    <input id="GoogleClientSecret" name="GoogleClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                                                    <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearGoogleClientSecretBtn">Clear</button>
+                                                </div>
+                                                <div class="bfx-secret-status hide" id="GoogleClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
+                                                <div class="fieldDescription">Not required for standard Google OAuth sign-in. Stored server-side only.</div>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+
+                                <!-- Method 2: Standard Jellyfin Username & Password -->
+                                <div class="bfx-method-card" id="StandardMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="AllowStandardJellyfinLogin" name="AllowStandardJellyfinLogin" type="checkbox" is="emby-checkbox" />
+                                                <span>Jellyfin Username &amp; Password Login</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Unlock "Who's watching?" with a normal Jellyfin server username &amp; password (standalone or alongside SSO).</div>
+                                        </div>
+                                        <span class="bfx-pill" id="StandardCardPill">Off</span>
+                                    </div>
+
+                                    <div class="bfx-method-body hide" id="StandardConfigBody">
+                                        <div class="bfx-callout ok" style="margin:0;">
+                                            <strong id="StandardModeSummaryTitle">Password sign-in active.</strong>
+                                            <span id="StandardModeSummaryDetail">Any active Jellyfin account from Dashboard → Users can sign in to unlock the profile picker, while profile PINs and email locks still protect individual profiles.</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Method 3: Admin-Only Sign-In Fallback -->
+                                <div class="bfx-method-card" id="AdminFallbackMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
+                                                <span>Admin-Only Password Fallback Link</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Adds a subtle <em>Admin Sign-In</em> link on SSO screens that strictly rejects non-administrator Jellyfin accounts.</div>
+                                        </div>
+                                        <span class="bfx-pill" id="AdminFallbackCardPill">Off</span>
+                                    </div>
+
+                                    <div class="bfx-method-body hide" id="AdminFallbackConfigBody">
+                                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
+                                            <label class="emby-checkbox-label">
+                                                <input id="AdminFallbackLanOnly" name="AdminFallbackLanOnly" type="checkbox" is="emby-checkbox" />
+                                                <span>Restrict "Admin Sign-In" to local network (LAN) IPs only</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Hides and blocks the Admin Sign-In fallback when connecting from external WAN addresses.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Method 4: Local LAN Bypass -->
+                                <div class="bfx-method-card" id="LanBypassMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="BypassLoginGateOnLan" name="BypassLoginGateOnLan" type="checkbox" is="emby-checkbox" />
+                                                <span>Bypass Sign-In Gate on Home Network (LAN)</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Devices on your private LAN jump straight to "Who's watching?", while remote connections still require sign-in.</div>
+                                        </div>
+                                        <span class="bfx-pill" id="LanBypassCardPill">Off</span>
+                                    </div>
+
+                                    <div class="bfx-method-body hide" id="LanBypassConfigBody">
+                                        <div class="fieldDescription" style="margin:0;">
+                                            Profile PINs and email locks remain enforced on LAN. Forwarded external client IPs from reverse proxies are automatically treated as remote WAN traffic.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="emby-checkbox-label">
-                                    <input id="AllowStandardJellyfinLogin" name="AllowStandardJellyfinLogin" type="checkbox" is="emby-checkbox" />
-                                    <span>Allow Standard Jellyfin Login (Hybrid or Standalone Mode)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Adds a dark StreamFlix-themed Jellyfin username &amp; password sign-in form so household members can unlock "Who's watching?" with any Jellyfin account.</div>
+                            <div class="bfx-callout hide" id="StreamFlixNoAuthMethodWarning">
+                                All household sign-in methods (<strong>Google</strong>, <strong>Jellyfin Password</strong>, and <strong>Beta OIDC</strong>) are currently off or unconfigured — only Jellyfin Administrators (and Guest Pass holders, if enabled) will be able to sign in.
                             </div>
 
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="emby-checkbox-label">
-                                    <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
-                                    <span>Show "Admin Sign-In" fallback link on the Sign-In screen</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, shows a subtle <em>Admin Sign-In</em> link so server owners can log in without SSO. Strictly verified on the backend — non-administrator Jellyfin accounts are rejected.</div>
+                            <div class="bfx-session-row">
+                                <div class="inputContainer" style="margin:0; min-width:220px; flex:1; max-width:320px;">
+                                    <label class="inputLabel inputLabelUnfocused" for="SessionLifetimeDays">Stay signed in for (days)</label>
+                                    <input id="SessionLifetimeDays" name="SessionLifetimeDays" type="number" min="1" max="365" step="1" is="emby-input" />
+                                    <div class="fieldDescription">Household session duration per device (1–365 days).</div>
+                                </div>
+                                <div class="bfx-row">
+                                    <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">⚠ Sign out all devices</button>
+                                </div>
                             </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="emby-checkbox-label">
-                                    <input id="AdminFallbackLanOnly" name="AdminFallbackLanOnly" type="checkbox" is="emby-checkbox" />
-                                    <span>Restrict "Admin Sign-In" fallback to local LAN IP addresses only</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Only shows and permits the Admin Sign-In fallback when connecting from private LAN / localhost addresses (hidden and blocked over external WAN).</div>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="BypassLoginGateOnLan" name="BypassLoginGateOnLan" type="checkbox" is="emby-checkbox" />
-                                    <span>Bypass sign-in gate on local network (LAN)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">TVs, HTPCs, and browsers on your home LAN jump straight to "Who's watching?" (profile PINs still apply), while remote WAN connections still require sign-in.</div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-callout hide" id="StreamFlixNoAuthMethodWarning">
-                            All household sign-in methods (<strong>Google</strong>, <strong>Standard Jellyfin Login</strong>, and <strong>Beta OIDC</strong>) are currently off or unconfigured while the sign-in gate is required — only Jellyfin Administrators and valid Guest Pass holders will be able to sign in.
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="AutoProvisionJellyfinUsers" name="AutoProvisionJellyfinUsers" type="checkbox" is="emby-checkbox" />
-                                <span>Create a Jellyfin user for each new profile</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">New profiles automatically get a dedicated (non-admin) Jellyfin user so their watch history is independent.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="SessionLifetimeDays">Stay signed in for (days)</label>
-                            <input id="SessionLifetimeDays" name="SessionLifetimeDays" type="number" min="1" max="365" step="1" is="emby-input" />
-                            <div class="fieldDescription">How long a household sign-in lasts on a device before it has to sign in again (1–365).</div>
-                        </div>
-
-                        <div class="bfx-row" style="margin-top:10px;">
-                            <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">⚠ Sign out all devices</button>
-                            <span class="fieldDescription" style="margin:0;">Asks for confirmation first, then immediately ends every active StreamFlix household &amp; Guest Pass session across all browsers and TVs.</span>
                         </div>
                     </div>
 
-                    <div class="bfx-section">
+                    <!-- 3. Temporary Guest Passes (Toggleable) -->
+                    <div class="bfx-section" id="StreamFlixGuestPassesSection">
+                        <div class="bfx-section-head" style="margin-bottom:6px;">
+                            <div>
+                                <h3>Temporary Guest Passes <span class="bfx-pill" id="GuestPassesSectionPill">Enabled</span></h3>
+                                <div class="fieldDescription">Share an expiring invite link or locally generated QR code locked to one non-admin profile — revocable in one click.</div>
+                            </div>
+                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixPurgePassesBtn">Clear expired / revoked</button>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
+                            <label class="emby-checkbox-label">
+                                <input id="EnableGuestPasses" name="EnableGuestPasses" type="checkbox" is="emby-checkbox" />
+                                <span>Enable Temporary Guest Passes</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Turn off to hide Guest Passes from the Sign-In screen and account menu and block all Guest Pass redemptions &amp; sessions.</div>
+                        </div>
+
+                        <div class="bfx-collapse-body hide" id="GuestPassesConfigBody">
+                            <div class="bfx-subbox" style="margin-top:0;">
+                                <div class="bfx-subbox-title">Create New Guest Pass</div>
+                                <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
+                                    Create at least one non-administrator viewer profile in <strong>Manage profiles</strong> above before issuing a Guest Pass.
+                                </div>
+                                <div class="bfx-grid-4">
+                                    <div class="inputContainer" style="margin:0;">
+                                        <label class="inputLabel inputLabelUnfocused" for="GuestPassLabel">Pass label (optional)</label>
+                                        <input id="GuestPassLabel" type="text" maxlength="48" is="emby-input" autocomplete="off" placeholder="Weekend Guest" />
+                                    </div>
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="GuestPassProfileId">Assigned non-admin profile</label>
+                                        <select id="GuestPassProfileId" is="emby-select" class="emby-select-withcolor emby-select"></select>
+                                    </div>
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="GuestPassDurationHours">Expires after</label>
+                                        <select id="GuestPassDurationHours" is="emby-select" class="emby-select-withcolor emby-select">
+                                            <option value="4">4 hours (Movie night)</option>
+                                            <option value="12">12 hours</option>
+                                            <option value="24" selected>24 hours (1 day)</option>
+                                            <option value="48">48 hours (Weekend)</option>
+                                            <option value="72">3 days</option>
+                                            <option value="168">7 days (1 week)</option>
+                                            <option value="336">14 days (2 weeks)</option>
+                                        </select>
+                                    </div>
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="GuestPassMaxRedemptions">Device / redemption cap</label>
+                                        <select id="GuestPassMaxRedemptions" is="emby-select" class="emby-select-withcolor emby-select">
+                                            <option value="1">1 device / browser</option>
+                                            <option value="2" selected>Up to 2 devices</option>
+                                            <option value="4">Up to 4 devices</option>
+                                            <option value="10">Up to 10 devices</option>
+                                            <option value="0">Unlimited until expiry</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="bfx-row" style="margin-top:12px;">
+                                    <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixCreateGuestPassBtn">+ Generate Guest Pass &amp; QR</button>
+                                    <span class="fieldDescription" style="margin:0;">QR codes are rendered 100% locally on your Jellyfin server.</span>
+                                </div>
+                            </div>
+
+                            <div class="bfx-passes" id="StreamFlixGuestPassesList">
+                                <div class="bfx-empty">No Guest Passes created yet.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Home, Hero Billboard & Top 10 -->
+                    <div class="bfx-section" id="StreamFlixHomeSection">
                         <div class="bfx-section-head">
                             <div>
                                 <h3>Home, Hero Billboard &amp; Top 10</h3>
-                                <div class="fieldDescription">Customize how featured hero banners rotate, which libraries feed the Home billboard, and how the Netflix-style <strong>#1–#10</strong> Top 10 row is ranked.</div>
+                                <div class="fieldDescription">Choose how featured titles and the <strong>#1–#10</strong> row are selected on the StreamFlix Home screen.</div>
                             </div>
                         </div>
 
                         <div class="bfx-grid-2">
-                            <div class="selectContainer">
-                                <label class="selectLabel" for="Top10SelectionMode">Top 10 selection &amp; ranking logic</label>
+                            <div class="selectContainer" style="margin-bottom:8px;">
+                                <label class="selectLabel" for="Top10SelectionMode">Top 10 ranking logic</label>
                                 <select id="Top10SelectionMode" name="Top10SelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
                                     <option value="most_played">Server-Wide Most Popular (Plays &amp; Viewers)</option>
                                     <option value="community_rating">Highest Community Rating (IMDb / TMDb)</option>
@@ -325,10 +436,9 @@
                                     <option value="daily_random">Daily Spotlight (Seeded Daily Random)</option>
                                     <option value="session_random">Session Shuffle (Fresh Each Visit)</option>
                                 </select>
-                                <div class="fieldDescription">Displays bold Netflix-style <strong>#1–#10</strong> rank badges on Top 10 cards and matching hero titles.</div>
                             </div>
 
-                            <div class="selectContainer">
+                            <div class="selectContainer" style="margin-bottom:8px;">
                                 <label class="selectLabel" for="HeroSelectionMode">Hero billboard featured selection</label>
                                 <select id="HeroSelectionMode" name="HeroSelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
                                     <option value="recent">Recently Added &amp; New Releases</option>
@@ -336,207 +446,171 @@
                                     <option value="top_rated">Highest Community Rated</option>
                                     <option value="random">Randomized Library Spotlight</option>
                                 </select>
-                                <div class="fieldDescription">Controls how featured titles are chosen for the Home hero banner.</div>
-                            </div>
-
-                            <div class="selectContainer">
-                                <label class="selectLabel" for="HeroContentType">Hero billboard media type</label>
-                                <select id="HeroContentType" name="HeroContentType" is="emby-select" class="emby-select-withcolor emby-select">
-                                    <option value="all">Movies &amp; TV Series</option>
-                                    <option value="movies">Movies Only</option>
-                                    <option value="series">TV Series Only</option>
-                                </select>
-                                <div class="fieldDescription">Filter which media types appear on the Home tab's hero banner.</div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="HeroRotationSeconds">Hero auto-rotation interval (seconds)</label>
-                                <input id="HeroRotationSeconds" name="HeroRotationSeconds" type="number" min="0" max="120" step="1" is="emby-input" />
-                                <div class="fieldDescription">Set to <strong>0</strong> to disable auto-rotation (manual arrows/dots only). Recommended: 8–15 seconds.</div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="HeroSlideCount">Number of hero slides (1–15)</label>
-                                <input id="HeroSlideCount" name="HeroSlideCount" type="number" min="1" max="15" step="1" is="emby-input" />
-                                <div class="fieldDescription">Maximum number of featured titles to rotate through on the Home hero banner.</div>
                             </div>
                         </div>
 
-                        <div style="margin-top:8px;">
-                            <div class="inputLabel" style="margin-bottom:4px;">Hero billboard library filter (optional)</div>
-                            <div class="fieldDescription">Leave all unchecked to feature titles from every Movie &amp; TV library, or select specific libraries below to curate the hero banner.</div>
-                            <div class="bfx-libs-grid" id="StreamFlixHeroLibrariesList">
-                                <div class="bfx-empty">Loading libraries…</div>
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                            <label class="emby-checkbox-label">
+                                <input id="ShowHeroAdvanced" type="checkbox" is="emby-checkbox" />
+                                <span>Customize hero media filter, slide count, rotation speed &amp; source libraries</span>
+                            </label>
+                        </div>
+
+                        <div class="bfx-collapse-body hide" id="HeroAdvancedBody">
+                            <div class="bfx-grid-2">
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="HeroContentType">Hero billboard media type</label>
+                                    <select id="HeroContentType" name="HeroContentType" is="emby-select" class="emby-select-withcolor emby-select">
+                                        <option value="all">Movies &amp; TV Series</option>
+                                        <option value="movies">Movies Only</option>
+                                        <option value="series">TV Series Only</option>
+                                    </select>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="HeroRotationSeconds">Auto-rotation interval (seconds)</label>
+                                    <input id="HeroRotationSeconds" name="HeroRotationSeconds" type="number" min="0" max="120" step="1" is="emby-input" />
+                                    <div class="fieldDescription">Set to <strong>0</strong> to disable auto-rotation. Default: 9s.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="HeroSlideCount">Number of hero slides (1–15)</label>
+                                    <input id="HeroSlideCount" name="HeroSlideCount" type="number" min="1" max="15" step="1" is="emby-input" />
+                                    <div class="fieldDescription">Maximum featured titles on the Home billboard. Default: 8.</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:6px;">
+                                <div class="inputLabel" style="margin-bottom:4px;">Hero billboard library filter (optional)</div>
+                                <div class="fieldDescription">Leave all unchecked to include every Movie &amp; TV library, or pick specific libraries below.</div>
+                                <div class="bfx-libs-grid" id="StreamFlixHeroLibrariesList">
+                                    <div class="bfx-empty">Loading libraries…</div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- 5. Seerr / Jellyseerr Media Requests (Collapsed Until Enabled) -->
                     <div class="bfx-section" id="StreamFlixSeerrSection">
-                        <div class="bfx-section-head">
+                        <div class="bfx-section-head" style="margin-bottom:6px;">
                             <div>
-                                <h3>Seerr / Jellyseerr Media Requests</h3>
-                                <div class="fieldDescription">
-                                    Connect <strong>Seerr</strong>, <strong>Jellyseerr</strong>, or <strong>Overseerr</strong> so household members can discover and request missing Movies &amp; TV Seasons right inside StreamFlix Live Search — with zero extra navbar clutter and your API key kept strictly server-side.
-                                </div>
+                                <h3>Seerr / Jellyseerr Media Requests <span class="bfx-pill" id="SeerrSectionPill">Off</span></h3>
+                                <div class="fieldDescription">Let household members search and request missing Movies &amp; TV Seasons right inside StreamFlix Live Search.</div>
                             </div>
-                            <button type="button" class="bfx-btn" id="StreamFlixTestSeerrBtn">✓ Test Seerr Connection</button>
+                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixTestSeerrBtn">✓ Test Seerr Connection</button>
                         </div>
 
-                        <div class="bfx-oauth-results hide" id="StreamFlixSeerrTestResult" role="status" aria-live="polite"></div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:14px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
                             <label class="emby-checkbox-label">
                                 <input id="EnableSeerr" name="EnableSeerr" type="checkbox" is="emby-checkbox" />
-                                <span>Enable Seerr / Jellyseerr requests in StreamFlix Search</span>
+                                <span>Enable Seerr / Jellyseerr / Overseerr requests in Search</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Shows an <em>Available to Request</em> section beneath local search matches when searching titles in StreamFlix.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Proxies requests securely through your Jellyfin server so your Seerr API key is never exposed to browsers.</div>
                         </div>
 
-                        <div class="bfx-grid-2">
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="SeerrUrl">Seerr / Jellyseerr URL</label>
-                                <input id="SeerrUrl" name="SeerrUrl" type="text" is="emby-input" autocomplete="off" placeholder="http://localhost:5055" />
-                                <div class="fieldDescription">Base URL reachable from the Jellyfin Server container/host (e.g. <code>http://jellyseerr:5055</code> or <code>https://requests.example.com</code>).</div>
-                            </div>
+                        <div class="bfx-collapse-body hide" id="SeerrConfigBody">
+                            <div class="bfx-oauth-results hide" id="StreamFlixSeerrTestResult" role="status" aria-live="polite" style="margin:0 0 14px;"></div>
 
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="SeerrApiKey">Seerr API Key (Settings → General)</label>
-                                <div class="bfx-secret-row">
-                                    <input id="SeerrApiKey" name="SeerrApiKey" type="password" is="emby-input" autocomplete="new-password" placeholder="Paste X-Api-Key" />
-                                    <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearSeerrApiKeyBtn">Clear</button>
+                            <div class="bfx-grid-2">
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="SeerrUrl">Seerr / Jellyseerr URL</label>
+                                    <input id="SeerrUrl" name="SeerrUrl" type="text" is="emby-input" autocomplete="off" placeholder="http://localhost:5055" />
+                                    <div class="fieldDescription">URL reachable from the Jellyfin Server host/container (e.g. <code>http://jellyseerr:5055</code>).</div>
                                 </div>
-                                <div class="bfx-secret-status hide" id="SeerrApiKeySavedHint">✓ API key stored securely on server (leave blank to keep current key)</div>
-                                <div class="fieldDescription">Stored server-side only and never exposed to browsers.</div>
+
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="SeerrApiKey">Seerr API Key (Settings → General)</label>
+                                    <div class="bfx-secret-row">
+                                        <input id="SeerrApiKey" name="SeerrApiKey" type="password" is="emby-input" autocomplete="new-password" placeholder="Paste X-Api-Key" />
+                                        <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearSeerrApiKeyBtn">Clear</button>
+                                    </div>
+                                    <div class="bfx-secret-status hide" id="SeerrApiKeySavedHint">✓ API key stored securely on server (leave blank to keep current key)</div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="SeerrAllowKids" name="SeerrAllowKids" type="checkbox" is="emby-checkbox" />
-                                <span>Allow Kids profiles to search &amp; submit media requests</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Off by default. When enabled, adult and Horror/Crime TMDB genres are filtered out automatically for Kids profiles.</div>
-                        </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label class="emby-checkbox-label">
+                                    <input id="SeerrAllowKids" name="SeerrAllowKids" type="checkbox" is="emby-checkbox" />
+                                    <span>Allow Kids profiles to search &amp; submit media requests</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Off by default. Filters out adult and Horror/Crime TMDB genres automatically when enabled.</div>
+                            </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
-                            <label class="emby-checkbox-label">
-                                <input id="SeerrAllowGuests" name="SeerrAllowGuests" type="checkbox" is="emby-checkbox" />
-                                <span>Allow Temporary Guest Pass viewers to submit media requests</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Off by default so temporary guests can browse and watch your existing library without queuing new downloads unless permitted.</div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" id="SeerrAllowGuestsRow" style="margin-bottom:0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="SeerrAllowGuests" name="SeerrAllowGuests" type="checkbox" is="emby-checkbox" />
+                                    <span>Allow Temporary Guest Pass viewers to submit media requests</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Off by default so guests can watch your existing library without queuing downloads unless permitted.</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bfx-section">
-                        <div class="bfx-section-head">
-                            <div>
-                                <h3>Google sign-in (OAuth 2.0)</h3>
-                                <div class="fieldDescription">
-                                    In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="button-link">Google Cloud Console → Credentials</a>, create an <strong>OAuth client ID</strong> of type <em>Web application</em> and add the following:
-                                </div>
-                            </div>
-                            <button type="button" class="bfx-btn" id="StreamFlixTestOAuthBtn">✓ Test OAuth Config</button>
-                        </div>
-
-                        <div class="fieldDescription">Authorized JavaScript origin</div>
-                        <div class="bfx-uri"><code id="StreamFlixOriginUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOriginUri">Copy</button></div>
-                        <div class="fieldDescription">Authorized redirect URIs</div>
-                        <div class="bfx-uri"><code id="StreamFlixRedirectUri1"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri1">Copy</button></div>
-                        <div class="bfx-uri"><code id="StreamFlixRedirectUri2"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixRedirectUri2">Copy</button></div>
-
-                        <div class="bfx-oauth-results hide" id="StreamFlixOAuthTestResult" role="status" aria-live="polite"></div>
-
-                        <div class="inputContainer" style="margin-top:18px;">
-                            <label class="inputLabel inputLabelUnfocused" for="GoogleClientId">OAuth Client ID</label>
-                            <input id="GoogleClientId" name="GoogleClientId" type="text" is="emby-input" autocomplete="off" placeholder="your-client-id.apps.googleusercontent.com" />
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="GoogleClientSecret">OAuth Client secret (optional)</label>
-                            <div class="bfx-secret-row">
-                                <input id="GoogleClientSecret" name="GoogleClientSecret" type="password" is="emby-input" autocomplete="new-password" />
-                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearGoogleClientSecretBtn">Clear</button>
-                            </div>
-                            <div class="bfx-secret-status hide" id="GoogleClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
-                            <div class="fieldDescription">Not required for sign-in. Stored only on the server and never sent to browsers.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ApprovedGoogleEmails">Approved Google accounts</label>
-                            <textarea id="ApprovedGoogleEmails" name="ApprovedGoogleEmails" rows="5" class="emby-input bfx-textarea" placeholder="user@example.com&#10;member@example.com"></textarea>
-                            <div class="fieldDescription">One email per line. Only these accounts (plus any account a profile is locked to) can unlock StreamFlix via Google Sign-In.</div>
-                        </div>
-                        <div class="bfx-callout hide" id="StreamFlixNoAccountsWarning">
-                            No approved Google accounts yet. On a brand-new install the first Google account to sign in is approved automatically; otherwise only accounts that a profile is locked to can sign in with Google.
-                        </div>
-                    </div>
-
+                    <!-- 6. Beta Custom OpenID Connect (Collapsed Until Enabled) -->
                     <div class="bfx-section bfx-beta-section" id="StreamFlixBetaOidcSection">
-                        <div class="bfx-section-head">
+                        <div class="bfx-section-head" style="margin-bottom:6px;">
                             <div>
-                                <h3>Custom OpenID Connect (OIDC) <span class="bfx-beta-tag">Beta Test</span></h3>
-                                <div class="fieldDescription">
-                                    Self-hosted &amp; enterprise SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) using Authorization Code + PKCE (<code>S256</code>), automatic <code>client_secret_basic</code> / <code>client_secret_post</code> negotiation, and JWKS cryptographic token verification. Disabled by default.
-                                </div>
+                                <h3>Custom OpenID Connect (OIDC) <span class="bfx-beta-tag">Beta Test</span> <span class="bfx-pill" id="OidcSectionPill">Off</span></h3>
+                                <div class="fieldDescription">Self-hosted &amp; cloud SSO (Authentik, Authelia, Pocket ID, Keycloak, Kanidm, Zitadel, Okta) using Authorization Code + PKCE (<code>S256</code>) and JWKS verification.</div>
                             </div>
-                            <button type="button" class="bfx-btn" id="StreamFlixTestOidcBtn">✓ Test OIDC Discovery</button>
+                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixTestOidcBtn">✓ Test OIDC Discovery</button>
                         </div>
 
-                        <div class="fieldDescription">OIDC Redirect / Callback URI (register this exact URL in your identity provider)</div>
-                        <div class="bfx-uri"><code id="StreamFlixOidcCallbackUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOidcCallbackUri">Copy</button></div>
-
-                        <div class="bfx-oauth-results hide" id="StreamFlixOidcTestResult" role="status" aria-live="polite"></div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:16px;">
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
                             <label class="emby-checkbox-label">
                                 <input id="EnableCustomOidc" name="EnableCustomOidc" type="checkbox" is="emby-checkbox" />
                                 <span>Enable Custom OpenID Connect (OIDC) sign-in (Beta)</span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Adds a themed <strong>Continue with &lt;Provider&gt;</strong> button to the StreamFlix sign-in gate alongside or instead of Google Sign-In and Standard Jellyfin Login.</div>
+                            <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Continue with &lt;Provider&gt;</strong> button to the StreamFlix sign-in gate.</div>
                         </div>
 
-                        <div class="bfx-grid-2">
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidcProviderName">Provider button label</label>
-                                <input id="OidcProviderName" name="OidcProviderName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="Authentik" />
-                                <div class="fieldDescription">Displayed as <em>Continue with &lt;Label&gt;</em> (defaults to <strong>OpenID Connect</strong> if left blank).</div>
+                        <div class="bfx-collapse-body hide" id="OidcConfigBody">
+                            <div class="fieldDescription">OIDC Redirect / Callback URI (register this exact URL in your identity provider)</div>
+                            <div class="bfx-uri"><code id="StreamFlixOidcCallbackUri"></code><button type="button" class="bfx-btn bfx-btn-sm" data-copy="StreamFlixOidcCallbackUri">Copy</button></div>
+
+                            <div class="bfx-oauth-results hide" id="StreamFlixOidcTestResult" role="status" aria-live="polite" style="margin-bottom:14px;"></div>
+
+                            <div class="bfx-grid-2" style="margin-top:12px;">
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="OidcProviderName">Provider button label</label>
+                                    <input id="OidcProviderName" name="OidcProviderName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="Authentik" />
+                                    <div class="fieldDescription">Displayed as <em>Continue with &lt;Label&gt;</em>.</div>
+                                </div>
+
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="OidcClientId">OIDC Client ID</label>
+                                    <input id="OidcClientId" name="OidcClientId" type="text" is="emby-input" autocomplete="off" placeholder="streamflix-web" />
+                                </div>
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidcClientId">OIDC Client ID</label>
-                                <input id="OidcClientId" name="OidcClientId" type="text" is="emby-input" autocomplete="off" placeholder="streamflix-web" />
-                                <div class="fieldDescription">Client ID issued by your OIDC provider for this application.</div>
+                                <label class="inputLabel inputLabelUnfocused" for="OidcIssuerUrl">OIDC Issuer / Discovery URL</label>
+                                <input id="OidcIssuerUrl" name="OidcIssuerUrl" type="text" is="emby-input" autocomplete="off" placeholder="https://auth.example.com/application/o/streamflix/" />
+                                <div class="fieldDescription">Base issuer URL or full <code>/.well-known/openid-configuration</code> URL.</div>
                             </div>
-                        </div>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="OidcIssuerUrl">OIDC Issuer / Discovery URL</label>
-                            <input id="OidcIssuerUrl" name="OidcIssuerUrl" type="text" is="emby-input" autocomplete="off" placeholder="https://auth.example.com/application/o/streamflix/" />
-                            <div class="fieldDescription">Base issuer URL or full <code>/.well-known/openid-configuration</code> URL. External identity providers must use <code>https://</code>.</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="OidcClientSecret">OIDC Client Secret (optional for public PKCE clients)</label>
-                            <div class="bfx-secret-row">
-                                <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
-                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearOidcClientSecretBtn">Clear</button>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidcClientSecret">OIDC Client Secret (optional for public PKCE clients)</label>
+                                <div class="bfx-secret-row">
+                                    <input id="OidcClientSecret" name="OidcClientSecret" type="password" is="emby-input" autocomplete="new-password" />
+                                    <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearOidcClientSecretBtn">Clear</button>
+                                </div>
+                                <div class="bfx-secret-status hide" id="OidcClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
                             </div>
-                            <div class="bfx-secret-status hide" id="OidcClientSecretSavedHint">✓ Client secret stored on server (leave blank to keep)</div>
-                            <div class="fieldDescription">Required for confidential OIDC clients; leave blank for public PKCE-only clients. Stored server-side only and never sent to browsers.</div>
-                        </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="OidcRequireAllowlist" name="OidcRequireAllowlist" type="checkbox" is="emby-checkbox" />
-                                <span>Restrict OIDC sign-in to an approved allowlist</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Leave unchecked if your identity provider already restricts access to this OIDC client. Enable to only allow the emails, usernames, or subjects listed below (plus emails locked to a profile).</div>
-                        </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="OidcRequireAllowlist" name="OidcRequireAllowlist" type="checkbox" is="emby-checkbox" />
+                                    <span>Restrict OIDC sign-in to an approved allowlist</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Enable only if your OIDC provider does not already restrict user assignments for this client.</div>
+                            </div>
 
-                        <div class="inputContainer" style="margin-bottom:0;">
-                            <label class="inputLabel inputLabelUnfocused" for="ApprovedOidcUsers">Approved OIDC emails, usernames, or subjects</label>
-                            <textarea id="ApprovedOidcUsers" name="ApprovedOidcUsers" rows="4" class="emby-input bfx-textarea" style="min-height:88px;" placeholder="user@example.com&#10;household_member"></textarea>
-                            <div class="fieldDescription">One email, username, or OIDC <code>sub</code> identifier per line (used when allowlist enforcement above is checked).</div>
+                            <div class="inputContainer hide" id="OidcAllowlistBody" style="margin:12px 0 0;">
+                                <label class="inputLabel inputLabelUnfocused" for="ApprovedOidcUsers">Approved OIDC emails, usernames, or subjects</label>
+                                <textarea id="ApprovedOidcUsers" name="ApprovedOidcUsers" rows="4" class="emby-input bfx-textarea" style="min-height:88px;" placeholder="user@example.com&#10;household_member"></textarea>
+                                <div class="fieldDescription">One email, username, or OIDC <code>sub</code> identifier per line.</div>
+                            </div>
                         </div>
                     </div>
 
@@ -638,6 +712,15 @@
                     if (window.Dashboard && Dashboard.alert) {
                         Dashboard.alert(message);
                     }
+                }
+
+                function setPill(id, level, text) {
+                    var el = $('#' + id);
+                    if (!el) {
+                        return;
+                    }
+                    el.className = 'bfx-pill' + (level ? ' ' + level : '');
+                    el.textContent = text;
                 }
 
                 function closeConfirmModal(accepted) {
@@ -895,7 +978,55 @@
                     renderStatus();
                 });
 
+                function syncVisibility() {
+                    var uiEnabled = $('#EnableStreamFlixUi').checked;
+                    var requireGate = $('#RequireGoogleAuth').checked;
+                    var enableGoogle = $('#EnableGoogleSignIn').checked;
+                    var allowStandard = $('#AllowStandardJellyfinLogin').checked;
+                    var allowAdminFallback = $('#AllowAdminFallbackLogin').checked;
+                    var lanBypass = $('#BypassLoginGateOnLan').checked;
+                    var enableGuestPasses = $('#EnableGuestPasses').checked;
+                    var showHeroAdv = $('#ShowHeroAdvanced').checked;
+                    var enableSeerr = $('#EnableSeerr').checked;
+                    var enableOidc = $('#EnableCustomOidc').checked;
+                    var oidcAllowlist = $('#OidcRequireAllowlist').checked;
+
+                    $('#StreamFlixUiBrandingBox').classList.toggle('hide', !uiEnabled);
+                    $('#StreamFlixHomeSection').classList.toggle('hide', !uiEnabled);
+
+                    $('#StreamFlixGateMethodsWrap').classList.toggle('hide', !requireGate);
+                    $('#StreamFlixBetaOidcSection').classList.toggle('hide', !requireGate);
+
+                    $('#GoogleMethodCard').classList.toggle('is-on', enableGoogle);
+                    $('#GoogleConfigBody').classList.toggle('hide', !enableGoogle);
+
+                    $('#StandardMethodCard').classList.toggle('is-on', allowStandard);
+                    $('#StandardConfigBody').classList.toggle('hide', !allowStandard);
+
+                    $('#AdminFallbackMethodCard').classList.toggle('is-on', allowAdminFallback);
+                    $('#AdminFallbackConfigBody').classList.toggle('hide', !allowAdminFallback);
+
+                    $('#LanBypassMethodCard').classList.toggle('is-on', lanBypass);
+                    $('#LanBypassConfigBody').classList.toggle('hide', !lanBypass);
+
+                    $('#GuestPassesConfigBody').classList.toggle('hide', !enableGuestPasses);
+                    var hasInactivePasses = guestPasses.some(function (gp) { return (gp.status || 'active') !== 'active'; });
+                    $('#StreamFlixPurgePassesBtn').classList.toggle('hide', !(enableGuestPasses && hasInactivePasses));
+
+                    $('#HeroAdvancedBody').classList.toggle('hide', !showHeroAdv);
+
+                    $('#SeerrConfigBody').classList.toggle('hide', !enableSeerr);
+                    $('#StreamFlixTestSeerrBtn').classList.toggle('hide', !enableSeerr);
+                    $('#SeerrAllowGuestsRow').classList.toggle('hide', !enableGuestPasses);
+
+                    $('#OidcConfigBody').classList.toggle('hide', !enableOidc);
+                    $('#StreamFlixTestOidcBtn').classList.toggle('hide', !enableOidc);
+                    $('#OidcAllowlistBody').classList.toggle('hide', !oidcAllowlist);
+                }
+
                 function renderStatus() {
+                    syncVisibility();
+
                     var clientId = $('#GoogleClientId').value.trim();
                     var requireGate = $('#RequireGoogleAuth').checked;
                     var enableGoogle = $('#EnableGoogleSignIn').checked;
@@ -904,19 +1035,82 @@
                     var oidcReady = enableOidc && Boolean($('#OidcIssuerUrl').value.trim()) && Boolean($('#OidcClientId').value.trim());
                     var oidcLabel = ($('#OidcProviderName').value.trim() || 'OIDC');
                     var allowStandard = $('#AllowStandardJellyfinLogin').checked;
+                    var allowAdminFallback = $('#AllowAdminFallbackLogin').checked;
+                    var adminLanOnly = $('#AdminFallbackLanOnly').checked;
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
+                    var enableGuestPasses = $('#EnableGuestPasses').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
 
                     var enableSeerr = $('#EnableSeerr').checked;
                     var seerrHasUrl = Boolean($('#SeerrUrl').value.trim());
                     var seerrHasKey = Boolean($('#SeerrApiKey').value.trim()) || (secretState.seerrSaved && !secretState.seerrClear);
 
+                    // Method Card Pills
                     if (!enableGoogle) {
-                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', oidcReady ? 'ok' : 'warn', oidcReady ? 'OIDC (' + oidcLabel + ')' : 'Disabled');
+                        setPill('GoogleCardPill', '', 'Off');
                     } else if (clientId) {
-                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', oidcReady ? 'Google + OIDC' : 'Configured');
+                        setPill('GoogleCardPill', 'ok', 'Active');
                     } else {
-                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', oidcReady ? 'warn' : 'bad', oidcReady ? 'OIDC only' : 'Not configured');
+                        setPill('GoogleCardPill', 'warn', 'Needs Client ID');
+                    }
+
+                    if (!allowStandard) {
+                        setPill('StandardCardPill', '', 'Off');
+                    } else if (googleReady || oidcReady) {
+                        setPill('StandardCardPill', 'ok', 'Hybrid');
+                        $('#StandardModeSummaryTitle').textContent = 'Hybrid Mode active (SSO + Jellyfin Password). ';
+                    } else {
+                        setPill('StandardCardPill', 'ok', 'Standalone');
+                        $('#StandardModeSummaryTitle').textContent = 'Standalone Jellyfin Password Login active. ';
+                    }
+
+                    if (!allowAdminFallback) {
+                        setPill('AdminFallbackCardPill', '', 'Off');
+                    } else {
+                        setPill('AdminFallbackCardPill', 'ok', adminLanOnly ? 'LAN Only' : 'Enabled');
+                    }
+
+                    setPill('LanBypassCardPill', lanBypass ? 'ok' : '', lanBypass ? 'Active on LAN' : 'Off');
+
+                    var activePassCount = guestPasses.filter(function (g) { return g.status === 'active'; }).length;
+                    if (!enableGuestPasses) {
+                        setPill('GuestPassesSectionPill', '', 'Off');
+                        setStatus('StreamFlixStatusGuestDot', 'StreamFlixStatusGuestPasses', '', 'Disabled');
+                    } else {
+                        setPill('GuestPassesSectionPill', 'ok', activePassCount > 0 ? (activePassCount + ' Active') : 'Enabled');
+                        setStatus('StreamFlixStatusGuestDot', 'StreamFlixStatusGuestPasses', activePassCount > 0 ? 'ok' : '', activePassCount + ' active');
+                    }
+
+                    if (!enableSeerr) {
+                        setPill('SeerrSectionPill', '', 'Off');
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', '', 'Disabled');
+                    } else if (seerrHasUrl && seerrHasKey) {
+                        setPill('SeerrSectionPill', 'ok', 'Active');
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'ok', 'Active in Search');
+                    } else {
+                        setPill('SeerrSectionPill', 'warn', 'Needs URL & Key');
+                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'warn', 'Needs URL & API key');
+                    }
+
+                    if (!enableOidc) {
+                        setPill('OidcSectionPill', '', 'Off');
+                    } else if (oidcReady) {
+                        setPill('OidcSectionPill', 'ok', 'Active');
+                    } else {
+                        setPill('OidcSectionPill', 'warn', 'Needs Issuer & ID');
+                    }
+
+                    // Top Status Strip
+                    if (!enableGoogle && !enableOidc) {
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', '', 'Disabled');
+                    } else if (googleReady && oidcReady) {
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', 'Google + ' + oidcLabel);
+                    } else if (googleReady) {
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', 'Google OAuth');
+                    } else if (oidcReady) {
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'ok', oidcLabel + ' (OIDC)');
+                    } else {
+                        setStatus('StreamFlixStatusGoogleDot', 'StreamFlixStatusGoogle', 'warn', 'Needs setup');
                     }
 
                     if (!requireGate) {
@@ -928,23 +1122,13 @@
                     } else if (oidcReady) {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? oidcLabel + ' + LAN bypass' : oidcLabel + ' (Beta)');
                     } else if (allowStandard) {
-                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Jellyfin + LAN bypass' : 'Jellyfin login');
+                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Jellyfin + LAN bypass' : 'Jellyfin password');
                     } else if (googleReady) {
-                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Google + LAN bypass' : 'Google required');
+                        setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'ok', lanBypass ? 'Google + LAN bypass' : 'Google sign-in');
                     } else {
                         setStatus('StreamFlixStatusGateDot', 'StreamFlixStatusGate', 'warn', 'Admin setup mode');
                     }
 
-                    if (!enableSeerr) {
-                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', '', 'Disabled');
-                    } else if (seerrHasUrl && seerrHasKey) {
-                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'ok', 'Active in Search');
-                    } else {
-                        setStatus('StreamFlixStatusSeerrDot', 'StreamFlixStatusSeerr', 'warn', 'Needs URL & API key');
-                    }
-
-                    var activePassCount = guestPasses.filter(function (g) { return g.status === 'active'; }).length;
-                    $('#StreamFlixStatusGuestPasses').textContent = String(activePassCount);
                     $('#StreamFlixStatusProfiles').textContent = String(profiles.length);
 
                     $('#StreamFlixOpenGateWarning').classList.toggle('hide', requireGate);
@@ -1159,18 +1343,23 @@
                 }
 
                 $('#StreamFlixCreateGuestPassBtn').addEventListener('click', function () {
+                    if (!$('#EnableGuestPasses').checked) {
+                        toast('Save settings with Temporary Guest Passes enabled first.');
+                        return;
+                    }
                     var profileId = $('#GuestPassProfileId').value;
                     if (!profileId) {
                         toast('Choose a non-administrator profile first.');
                         return;
                     }
                     var btn = $('#StreamFlixCreateGuestPassBtn');
+                    var rawMax = parseInt($('#GuestPassMaxRedemptions').value, 10);
                     btn.disabled = true;
                     streamflixApi('POST', 'GuestPasses/Create', {
                         label: $('#GuestPassLabel').value.trim(),
                         profileId: profileId,
                         durationHours: parseInt($('#GuestPassDurationHours').value, 10) || 24,
-                        maxRedemptions: parseInt($('#GuestPassMaxRedemptions').value, 10) || 0
+                        maxRedemptions: isNaN(rawMax) ? 2 : rawMax
                     }).then(function (res) {
                         btn.disabled = false;
                         $('#GuestPassLabel').value = '';
@@ -1481,7 +1670,20 @@
                     var val = $('#CustomBrandName').value.trim();
                     $('#StreamFlixConfigLogo').textContent = (val || 'STREAMFLIX').toUpperCase();
                 });
-                ['#RequireGoogleAuth', '#EnableGoogleSignIn', '#AllowStandardJellyfinLogin', '#AllowAdminFallbackLogin', '#AdminFallbackLanOnly', '#BypassLoginGateOnLan', '#EnableCustomOidc', '#OidcRequireAllowlist', '#EnableSeerr'].forEach(function (sel) {
+                [
+                    '#EnableStreamFlixUi',
+                    '#RequireGoogleAuth',
+                    '#EnableGoogleSignIn',
+                    '#AllowStandardJellyfinLogin',
+                    '#AllowAdminFallbackLogin',
+                    '#AdminFallbackLanOnly',
+                    '#BypassLoginGateOnLan',
+                    '#EnableGuestPasses',
+                    '#ShowHeroAdvanced',
+                    '#EnableSeerr',
+                    '#EnableCustomOidc',
+                    '#OidcRequireAllowlist'
+                ].forEach(function (sel) {
                     $(sel).addEventListener('change', renderStatus);
                 });
 
@@ -1517,20 +1719,27 @@
                     $('#AdminFallbackLanOnly').checked = Boolean(cfg.adminFallbackLanOnly);
                     $('#BypassLoginGateOnLan').checked = Boolean(cfg.bypassLoginGateOnLan);
                     $('#AutoProvisionJellyfinUsers').checked = cfg.autoProvisionJellyfinUsers !== false;
+                    $('#EnableGuestPasses').checked = cfg.enableGuestPasses !== false;
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
                     $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
                     $('#HeroSelectionMode').value = cfg.heroSelectionMode || 'recent';
-                    $('#HeroContentType').value = cfg.heroContentType || 'all';
-                    $('#HeroRotationSeconds').value = (typeof cfg.heroRotationSeconds === 'number' && cfg.heroRotationSeconds >= 0) ? cfg.heroRotationSeconds : 9;
-                    $('#HeroSlideCount').value = cfg.heroSlideCount > 0 ? cfg.heroSlideCount : 8;
+                    var heroType = cfg.heroContentType || 'all';
+                    var heroRot = (typeof cfg.heroRotationSeconds === 'number' && cfg.heroRotationSeconds >= 0) ? cfg.heroRotationSeconds : 9;
+                    var heroSlides = cfg.heroSlideCount > 0 ? cfg.heroSlideCount : 8;
+                    $('#HeroContentType').value = heroType;
+                    $('#HeroRotationSeconds').value = heroRot;
+                    $('#HeroSlideCount').value = heroSlides;
                     selectedHeroLibIds = Array.isArray(cfg.heroLibraryIds) ? cfg.heroLibraryIds.slice() : [];
+                    $('#ShowHeroAdvanced').checked = Boolean(heroType !== 'all' || heroRot !== 9 || heroSlides !== 8 || selectedHeroLibIds.length > 0);
                     renderHeroLibraries();
 
-                    $('#GoogleClientId').value = cfg.googleClientId || '';
+                    var gClientId = cfg.googleClientId || '';
+                    $('#GoogleClientId').value = gClientId;
                     $('#GoogleClientSecret').value = '';
                     secretState.googleSaved = Boolean(cfg.hasGoogleClientSecret);
                     secretState.googleClear = false;
                     $('#ApprovedGoogleEmails').value = (cfg.approvedGoogleAccounts || []).join('\n');
+                    $('#GoogleAdvancedDetails').open = !gClientId;
 
                     $('#EnableCustomOidc').checked = Boolean(cfg.enableCustomOidc);
                     $('#OidcProviderName').value = cfg.oidcProviderName || '';
@@ -1615,6 +1824,7 @@
                         adminFallbackLanOnly: $('#AdminFallbackLanOnly').checked,
                         bypassLoginGateOnLan: $('#BypassLoginGateOnLan').checked,
                         autoProvisionJellyfinUsers: $('#AutoProvisionJellyfinUsers').checked,
+                        enableGuestPasses: $('#EnableGuestPasses').checked,
                         googleClientId: $('#GoogleClientId').value.trim(),
                         googleClientSecret: googleSecretTyped || '__KEEP__',
                         clearGoogleClientSecret: Boolean(secretState.googleClear && !googleSecretTyped),
