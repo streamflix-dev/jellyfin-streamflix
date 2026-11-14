@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes, Movie Night Matcher & Seerr (v0.7.5.1)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.7.5.2)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.7.5.1';
+    var VERSION = '0.7.5.2';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var OAUTH_STATE_KEY = 'streamflix_oauth_state';
@@ -993,6 +993,24 @@
             }
 
             return nativeFetch(input, init).then(function (res) {
+                if (isSameOrigin && res && res.status === 401 && state.activeProfile && state.activeProfile.accessToken) {
+                    var lowUrl = String(urlStr || '').toLowerCase();
+                    if (lowUrl.indexOf('/streamflix/') === -1 && lowUrl.indexOf('/sessions/logout') === -1) {
+                        clearLocalJellyfinAuth();
+                        state.activeProfile = null;
+                        state.sessionVerifiedOnce = false;
+                        try {
+                            localStorage.removeItem(PROFILE_KEY);
+                            localStorage.removeItem(LEGACY_PROFILE_KEY);
+                        } catch (e401) {}
+                        fetchPublicConfig().then(function () {
+                            scheduleLifecycleTick(0);
+                        }).catch(function () {
+                            scheduleLifecycleTick(0);
+                        });
+                    }
+                }
+
                 if (!isSameOrigin || method !== 'GET' || !res || !res.ok) {
                     return res;
                 }
@@ -1457,6 +1475,7 @@
             hasPin: Boolean(p.hasPin),
             pinLength: typeof p.pinLength === 'number' ? p.pinLength : 0,
             googleLocked: googleLocked,
+            accountLockKind: String(p.accountLockKind || '').toLowerCase(),
             googleAccountEmail: p.googleAccountEmail || '',
             googleAccountHint: p.googleAccountHint || '',
             googleLockSatisfied: googleLocked ? Boolean(p.googleLockSatisfied) : true,
@@ -1717,6 +1736,19 @@
                     saveJson(GOOGLE_KEY, state.googleUser);
                 }
             }
+        }
+
+        if (!resolvedAccess) {
+            if (state.activeProfile) {
+                state.activeProfile = null;
+                state.sessionVerifiedOnce = false;
+                try {
+                    localStorage.removeItem(PROFILE_KEY);
+                    localStorage.removeItem(LEGACY_PROFILE_KEY);
+                } catch (eProf) {}
+            }
+            clearLocalJellyfinAuth();
+            scheduleLifecycleTick(0);
         }
 
         if (state.config.assetVersion) {
@@ -2460,6 +2492,72 @@
        ---------------------------------------------------------------------- */
     var GOOGLE_G_SVG = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
     var OIDC_SSO_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="12" r="4.2"/><path d="M12.7 12H21M18 12v3M21 12v2.2"/></svg>';
+    var JELLYFIN_USER_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>';
+    var GOOGLE_BADGE_SVG = '<svg width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+    var OIDC_BADGE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="12" r="4.2"/><path d="M12.7 12H21M18 12v3M21 12v2.2"/></svg>';
+    var JELLYFIN_BADGE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>';
+
+    function getProfileLockMeta(p) {
+        var cfg = state.config || {};
+        var googleOn = Boolean(cfg.enableGoogleSignIn !== false && cfg.googleConfigured);
+        var oidcOn = Boolean(cfg.enableCustomOidc && cfg.oidcConfigured);
+        var stdOn = Boolean(cfg.allowStandardJellyfinLogin);
+        var rawKind = String((p && p.accountLockKind) || '').toLowerCase();
+        var rawVal = String((p && p.googleAccountEmail) || '').trim();
+        var isEmailLike = !rawVal || rawVal.indexOf('@') !== -1;
+
+        var kind = rawKind;
+        if (kind === 'jellyfin') {
+            kind = 'jellyfin';
+        } else if (kind === 'oidc') {
+            kind = (!oidcOn && googleOn && isEmailLike) ? 'google' : 'oidc';
+        } else if (kind === 'google') {
+            kind = (!googleOn && oidcOn) ? 'oidc' : 'google';
+        } else if (kind === 'sso') {
+            kind = (oidcOn && !googleOn) ? 'oidc' : ((googleOn && !oidcOn) ? 'google' : 'sso');
+        } else if (rawVal && !isEmailLike) {
+            kind = oidcOn ? 'oidc' : 'jellyfin';
+        } else if (oidcOn && !googleOn) {
+            kind = 'oidc';
+        } else if (googleOn && oidcOn) {
+            kind = 'sso';
+        } else if (!googleOn && !oidcOn && stdOn) {
+            kind = 'jellyfin';
+        } else {
+            kind = 'google';
+        }
+
+        if (kind === 'jellyfin') {
+            return {
+                kind: 'jellyfin',
+                badgeClass: 'is-jellyfin',
+                badgeSvg: JELLYFIN_BADGE_SVG,
+                providerLabel: 'Jellyfin'
+            };
+        }
+        if (kind === 'oidc') {
+            return {
+                kind: 'oidc',
+                badgeClass: 'is-oidc',
+                badgeSvg: OIDC_BADGE_SVG,
+                providerLabel: getOidcProviderLabel()
+            };
+        }
+        if (kind === 'sso') {
+            return {
+                kind: 'sso',
+                badgeClass: 'is-oidc',
+                badgeSvg: OIDC_BADGE_SVG,
+                providerLabel: 'SSO'
+            };
+        }
+        return {
+            kind: 'google',
+            badgeClass: 'is-google',
+            badgeSvg: GOOGLE_BADGE_SVG,
+            providerLabel: 'Google'
+        };
+    }
 
     function prefersReducedMotion() {
         try {
@@ -3184,9 +3282,15 @@
                     });
                 }
 
+                var pendingId = takePendingProfileId();
                 return fetchPublicConfig().then(function () {
                     renderProfilePickerGate();
-                    showToast('Signed in as ' + (res.username || username), 'success');
+                    var pending = pendingId ? findProfileById(pendingId) : null;
+                    if (pending) {
+                        handleSelectProfile(pending);
+                    } else {
+                        showToast('Signed in as ' + (res.username || username), 'success');
+                    }
                 });
             }).catch(function (err) {
                 busy = false;
@@ -3665,13 +3769,17 @@
         var cardsHtml = profiles.map(function (p, idx) {
             var lockedOut = p.googleLocked && !p.googleLockSatisfied;
             var lockLabel = p.googleAccountEmail || p.googleAccountHint || '';
+            var lockMeta = p.googleLocked ? getProfileLockMeta(p) : null;
+            var lockBadgeTitle = lockMeta
+                ? ('Locked to ' + lockMeta.providerLabel + (lockLabel ? ': ' + lockLabel : ' account'))
+                : '';
             var badges = ''
                 + (p.hasPin ? '<span class="streamflix-tile-badge" title="PIN protected">' + icon('lock') + '</span>' : '')
-                + (p.googleLocked ? '<span class="streamflix-tile-badge streamflix-tile-badge-g" title="Locked to ' + escapeHtml(lockLabel) + '">G</span>' : '');
+                + (lockMeta ? '<span class="streamflix-tile-badge streamflix-tile-badge-lock ' + lockMeta.badgeClass + '" title="' + escapeHtml(lockBadgeTitle) + '">' + lockMeta.badgeSvg + '</span>' : '');
             var roleBadge = p.isAdmin ? 'Admin' : (p.isKids ? 'Kids' : 'Profile');
             var linkedUserLabel = p.jellyfinUsername || p.name;
             var canDelete = profiles.length > 1 && (!(p.isOwner || p.isAdmin) || isAdmin);
-            var title = lockedOut ? ('Locked to ' + lockLabel) : (manage ? 'Edit ' + p.name : 'Open ' + p.name);
+            var title = lockedOut ? (lockBadgeTitle || ('Locked to ' + lockLabel)) : (manage ? 'Edit ' + p.name : 'Open ' + p.name);
 
             return ''
                 + '<div class="streamflix-profile-tile' + (lockedOut ? ' streamflix-tile-locked' : '') + '" tabindex="0" role="button" style="--i:' + idx + ';--pc:' + escapeHtml(p.color || '#E50914') + ';"'
@@ -3917,26 +4025,7 @@
         }
     }
 
-    function signOutHousehold() {
-        var token = getActiveToken();
-        if (token) {
-            // Best effort: revoke this device's Jellyfin token so a shared device doesn't keep a live session
-            try {
-                var authVal = getEmbyAuthHeader(token);
-                (nativeFetch || window.fetch)(apiBase() + '/Sessions/Logout', {
-                    method: 'POST',
-                    headers: { 'Authorization': authVal, 'X-Emby-Authorization': authVal, 'X-Emby-Token': token }
-                }).catch(function () {});
-            } catch (e) {}
-        }
-        clearHouseholdSession();
-        state.activeProfile = null;
-        state.legacyProfileToMigrate = null;
-        state.manageMode = false;
-        state.adminLoginExpanded = false;
-        state.guestPassExpanded = false;
-        localStorage.removeItem(PROFILE_KEY);
-        localStorage.removeItem(LEGACY_PROFILE_KEY);
+    function clearLocalJellyfinAuth() {
         try {
             var rawCreds = localStorage.getItem('jellyfin_credentials');
             if (rawCreds) {
@@ -3960,6 +4049,33 @@
                 }
             }
         } catch (eCreds) {}
+    }
+
+    function signOutHousehold(opts) {
+        var options = (opts && typeof opts === 'object') ? opts : {};
+        var token = getActiveToken();
+        if (token && !options.skipServerLogout) {
+            // Best effort: revoke this device's Jellyfin token so a shared device doesn't keep a live session
+            try {
+                var authVal = getEmbyAuthHeader(token);
+                (nativeFetch || window.fetch)(apiBase() + '/Sessions/Logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': authVal, 'X-Emby-Authorization': authVal, 'X-Emby-Token': token }
+                }).catch(function () {});
+            } catch (e) {}
+        }
+        clearHouseholdSession();
+        state.activeProfile = null;
+        state.sessionVerifiedOnce = false;
+        state.legacyProfileToMigrate = null;
+        state.manageMode = false;
+        state.adminLoginExpanded = false;
+        state.guestPassExpanded = false;
+        try {
+            localStorage.removeItem(PROFILE_KEY);
+            localStorage.removeItem(LEGACY_PROFILE_KEY);
+        } catch (eRem) {}
+        clearLocalJellyfinAuth();
 
         var openAccess = isOpenWithoutLogin(state.config);
         state.browseFilter = null;
@@ -3982,13 +4098,17 @@
         }
         closeAccountDropdown();
         ensureHeaderWidgets();
-        if (!openAccess) {
-            renderGoogleAuthGate();
-        } else {
-            fetchPublicConfig().then(rerenderPickerIfOpen).catch(function () {});
-            renderProfilePickerGate();
+        if (!options.skipGateRender) {
+            if (!openAccess) {
+                renderGoogleAuthGate();
+            } else {
+                fetchPublicConfig().then(rerenderPickerIfOpen).catch(function () {});
+                renderProfilePickerGate();
+            }
         }
-        showToast('Signed out of ' + getBrandName() + ' on this device.', 'info');
+        if (!options.silent) {
+            showToast('Signed out of ' + getBrandName() + ' on this device.', 'info');
+        }
     }
 
     function confirmAndDeleteProfile(profile, verifiedPin) {
@@ -4085,6 +4205,9 @@
             if (err.data && err.data.requiredEmailHint) {
                 profile.googleAccountHint = err.data.requiredEmailHint;
             }
+            if (err.data && err.data.accountLockKind) {
+                profile.accountLockKind = String(err.data.accountLockKind).toLowerCase();
+            }
             profile.googleLocked = true;
             profile.googleLockSatisfied = false;
             openGoogleLockPrompt(profile);
@@ -4122,29 +4245,43 @@
         var cfg = state.config || {};
         var googleEnabled = Boolean(cfg.enableGoogleSignIn !== false && cfg.googleConfigured);
         var oidcEnabled = Boolean(cfg.enableCustomOidc && cfg.oidcConfigured);
+        var stdEnabled = Boolean(cfg.allowStandardJellyfinLogin);
         var oidcLabel = getOidcProviderLabel();
-        var defaultHint = (googleEnabled && oidcEnabled)
-            ? 'a specific SSO account'
-            : (oidcEnabled ? ('a specific ' + oidcLabel + ' account') : 'a specific Google account');
+        var lockMeta = getProfileLockMeta(profile);
+        var defaultHint = 'a specific ' + lockMeta.providerLabel + ' account';
         var hint = profile.googleAccountEmail || profile.googleAccountHint || defaultHint;
         var signedInAs = state.googleUser && (state.googleUser.email || state.googleUser.username);
-        var lockBadgeChar = (oidcEnabled && !googleEnabled) ? (oidcLabel.charAt(0).toUpperCase() || 'S') : 'G';
-        var lockHeading = (oidcEnabled && !googleEnabled)
-            ? ('Locked to ' + escapeHtml(oidcLabel))
-            : (oidcEnabled ? 'Locked to an SSO account' : 'Locked to a Google account');
+        var lockHeading = lockMeta.kind === 'jellyfin'
+            ? 'Locked to a Jellyfin account'
+            : (lockMeta.kind === 'oidc'
+                ? ('Locked to ' + escapeHtml(oidcLabel))
+                : (lockMeta.kind === 'sso' ? 'Locked to an SSO account' : 'Locked to a Google account'));
+
+        var showGoogle = googleEnabled && (lockMeta.kind === 'google' || lockMeta.kind === 'sso');
+        var showOidc = oidcEnabled && (lockMeta.kind === 'oidc' || lockMeta.kind === 'sso');
+        var showJellyfin = stdEnabled && lockMeta.kind === 'jellyfin';
+        if (!showGoogle && !showOidc && !showJellyfin) {
+            showGoogle = googleEnabled;
+            showOidc = oidcEnabled;
+            showJellyfin = stdEnabled;
+        }
+
         var ssoBtnsHtml = '<div class="streamflix-sso-stack">'
-            + ((googleEnabled || !oidcEnabled)
+            + (showGoogle
                 ? '<button type="button" class="streamflix-google-btn" data-act="google">' + GOOGLE_G_SVG + '<span>Continue with Google</span></button>'
                 : '')
-            + (oidcEnabled
-                ? '<button type="button" class="streamflix-oidc-btn' + (!googleEnabled ? ' streamflix-oidc-btn-primary' : '') + '" data-act="oidc">' + OIDC_SSO_SVG + '<span>Continue with ' + escapeHtml(oidcLabel) + '</span></button>'
+            + (showOidc
+                ? '<button type="button" class="streamflix-oidc-btn' + (!showGoogle ? ' streamflix-oidc-btn-primary' : '') + '" data-act="oidc">' + OIDC_SSO_SVG + '<span>Continue with ' + escapeHtml(oidcLabel) + '</span></button>'
+                : '')
+            + (showJellyfin
+                ? '<button type="button" class="streamflix-oidc-btn' + (!showGoogle && !showOidc ? ' streamflix-oidc-btn-primary' : '') + '" data-act="jellyfin">' + JELLYFIN_USER_SVG + '<span>Sign in with Jellyfin Account</span></button>'
                 : '')
             + '</div>';
 
         var m = openModal(''
-            + '<div class="streamflix-pin-avatar" style="background:' + escapeHtml(profile.color || '#E50914') + ';">'
+            + '<div class="streamflix-pin-avatar" style="background:' + escapeHtml(sanitizeHexColor(profile.color, '#E50914')) + ';">'
             + escapeHtml(profile.icon || '🎬')
-            + '<span class="streamflix-glock-badge">' + escapeHtml(lockBadgeChar) + '</span>'
+            + '<span class="streamflix-glock-badge ' + lockMeta.badgeClass + '">' + lockMeta.badgeSvg + '</span>'
             + '</div>'
             + '<h2>' + lockHeading + '</h2>'
             + '<p class="streamflix-modal-text"><strong>' + escapeHtml(profile.name) + '</strong> can only be opened by <strong>' + escapeHtml(hint) + '</strong>.'
@@ -4167,6 +4304,20 @@
             oBtn.addEventListener('click', function () {
                 m.close();
                 startOidcRedirect(profile.id, profile.googleAccountEmail || '');
+            });
+        }
+        var jfBtn = m.modal.querySelector('[data-act="jellyfin"]');
+        if (jfBtn) {
+            jfBtn.addEventListener('click', function () {
+                try {
+                    sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
+                } catch (e) {}
+                clearHouseholdSession();
+                if (state.config) {
+                    state.config.hasAccess = false;
+                }
+                m.close();
+                renderGoogleAuthGate();
             });
         }
     }
@@ -4240,6 +4391,7 @@
             maxParentalRating: MATURITY_LEVELS[0].value,
             hasPin: false,
             googleLocked: false,
+            accountLockKind: '',
             jellyfinUserId: '__CREATE__'
         };
 
@@ -4282,57 +4434,108 @@
                 + '  </div>'
                 + '</div>');
 
-        // Google account lock options
-        var sessionEmail = (state.googleUser && state.googleUser.email) ? String(state.googleUser.email).toLowerCase() : '';
-        var currentLock = draft.googleAccountEmail ? String(draft.googleAccountEmail).toLowerCase() : '';
+        // Account lock options (Google email, OIDC email/username, or Jellyfin username)
+        var oidcLockActive = Boolean(state.config && state.config.enableCustomOidc && state.config.oidcConfigured);
+        var googleLockActive = Boolean(state.config && state.config.enableGoogleSignIn !== false && state.config.googleConfigured);
+        var stdLockActive = Boolean(state.config && state.config.allowStandardJellyfinLogin);
+        var oidcProviderLbl = getOidcProviderLabel();
+
+        var sessionKind = (state.googleUser && state.googleUser.authKind) ? String(state.googleUser.authKind).toLowerCase() : '';
+        var sessionEmail = (state.googleUser && state.googleUser.email) ? String(state.googleUser.email).trim().toLowerCase() : '';
+        var sessionUser = (state.googleUser && state.googleUser.username) ? String(state.googleUser.username).trim() : '';
+
+        var currentLockRaw = draft.googleAccountEmail ? String(draft.googleAccountEmail).trim() : '';
+        var currentLockVal = currentLockRaw.indexOf('@') !== -1 ? currentLockRaw.toLowerCase() : currentLockRaw;
+        var currentLockMeta = getProfileLockMeta(draft);
+        var currentLockKind = currentLockMeta.kind === 'sso' ? (oidcLockActive && !googleLockActive ? 'oidc' : 'google') : currentLockMeta.kind;
+
         var lockOptions = [{ value: '', label: 'Anyone in this household' }];
         var seenLock = { '': true };
-        var addLockOption = function (email, label) {
-            if (!email || seenLock[email]) {
-                return;
-            }
-            seenLock[email] = true;
-            lockOptions.push({ value: email, label: label || ('Only ' + email) });
+        var formatLockPrefix = function (k) {
+            if (k === 'jellyfin') { return 'Jellyfin: '; }
+            if (k === 'oidc') { return oidcProviderLbl + ': '; }
+            return 'Google: ';
         };
-        if (draft.googleLocked && !currentLock) {
-            lockOptions.push({ value: '__KEEP__', label: 'Only ' + (draft.googleAccountHint || 'the current Google account') + ' (keep)' });
+        var addLockOption = function (kind, ident, customLabel) {
+            var cleanIdent = String(ident || '').trim();
+            if (!cleanIdent) {
+                return '';
+            }
+            if (cleanIdent.indexOf('@') !== -1) {
+                cleanIdent = cleanIdent.toLowerCase();
+            }
+            var normKind = (kind === 'oidc' || kind === 'jellyfin') ? kind : 'google';
+            var optVal = normKind + '|' + cleanIdent;
+            var dedupeKey = normKind + '|' + cleanIdent.toLowerCase();
+            if (seenLock[dedupeKey]) {
+                return optVal;
+            }
+            seenLock[dedupeKey] = true;
+            lockOptions.push({
+                value: optVal,
+                label: customLabel || ('Only ' + formatLockPrefix(normKind) + cleanIdent)
+            });
+            return optVal;
+        };
+
+        var selectedLock = '';
+        if (draft.googleLocked && !currentLockVal) {
+            lockOptions.push({
+                value: '__KEEP__',
+                label: 'Only ' + formatLockPrefix(currentLockKind) + (draft.googleAccountHint || 'current account') + ' (keep)'
+            });
+            selectedLock = '__KEEP__';
+        } else if (currentLockVal) {
+            var isCurrentYou = (currentLockKind === 'jellyfin' && sessionUser && sessionUser.toLowerCase() === currentLockVal.toLowerCase())
+                || (currentLockKind !== 'jellyfin' && ((sessionEmail && sessionEmail === currentLockVal.toLowerCase()) || (sessionKind === 'oidc' && sessionUser && sessionUser.toLowerCase() === currentLockVal.toLowerCase())));
+            selectedLock = addLockOption(currentLockKind, currentLockVal, 'Only ' + formatLockPrefix(currentLockKind) + currentLockVal + (isCurrentYou ? ' (you)' : ''));
         }
-        if (currentLock) {
-            addLockOption(currentLock, 'Only ' + currentLock + (currentLock === sessionEmail ? ' (you)' : ''));
+
+        if (sessionKind === 'oidc') {
+            var oidcIdent = sessionEmail || sessionUser;
+            if (oidcIdent) {
+                addLockOption('oidc', oidcIdent, 'Only ' + formatLockPrefix('oidc') + oidcIdent + ' (you)');
+            }
+        } else if (sessionKind === 'jellyfin' || sessionKind === 'jellyfin_admin') {
+            if (sessionUser) {
+                addLockOption('jellyfin', sessionUser, 'Only ' + formatLockPrefix('jellyfin') + sessionUser + ' (you)');
+            }
+        } else if (sessionEmail) {
+            var defSsoKind = (oidcLockActive && !googleLockActive) ? 'oidc' : 'google';
+            addLockOption(defSsoKind, sessionEmail, 'Only ' + formatLockPrefix(defSsoKind) + sessionEmail + ' (you)');
         }
-        if (sessionEmail) {
-            addLockOption(sessionEmail, 'Only ' + sessionEmail + ' (you)');
-        }
+
         if (isAdmin && state.config && Array.isArray(state.config.approvedGoogleAccounts)) {
             state.config.approvedGoogleAccounts.forEach(function (em) {
-                addLockOption(String(em || '').trim().toLowerCase());
+                addLockOption('google', em);
             });
         }
         if (isAdmin && state.config && Array.isArray(state.config.approvedOidcUsers)) {
-            state.config.approvedOidcUsers.forEach(function (em) {
-                var cleanOidc = String(em || '').trim().toLowerCase();
-                if (cleanOidc.indexOf('@') !== -1) {
-                    addLockOption(cleanOidc);
+            state.config.approvedOidcUsers.forEach(function (u) {
+                addLockOption('oidc', u);
+            });
+        }
+        if (isAdmin && stdLockActive && Array.isArray(serverUsers)) {
+            serverUsers.forEach(function (su) {
+                if (su && su.name) {
+                    addLockOption('jellyfin', su.name);
                 }
             });
         }
-        var oidcLockActive = Boolean(state.config && state.config.enableCustomOidc && state.config.oidcConfigured);
-        var googleLockActive = Boolean(state.config && state.config.enableGoogleSignIn !== false && state.config.googleConfigured);
-        var lockFieldLabel = oidcLockActive
-            ? (googleLockActive ? 'Google / SSO Account Lock' : (getOidcProviderLabel() + ' Account Lock'))
-            : 'Google Account Lock';
-        var selectedLock = currentLock || (draft.googleLocked ? '__KEEP__' : '');
+
+        var enabledMethodCount = (googleLockActive ? 1 : 0) + (oidcLockActive ? 1 : 0) + (stdLockActive ? 1 : 0);
+        var lockFieldLabel = enabledMethodCount > 1
+            ? 'Account Lock'
+            : (oidcLockActive
+                ? (oidcProviderLbl + ' Account Lock')
+                : (stdLockActive && !googleLockActive ? 'Jellyfin Account Lock' : 'Google Account Lock'));
         var lockOptionsHtml = lockOptions.map(function (o) {
             return '<option value="' + escapeHtml(o.value) + '"' + (o.value === selectedLock ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>';
         }).join('');
         var lockSelectable = lockOptions.length > 1;
         var lockFieldHint = lockSelectable
-            ? (oidcLockActive
-                ? 'Locked profiles can only be opened after signing in with that verified email account.'
-                : 'Locked profiles can only be opened after signing in with that Google account.')
-            : (oidcLockActive
-                ? ('Sign in with ' + (googleLockActive ? 'Google or ' + getOidcProviderLabel() : getOidcProviderLabel()) + ' to lock this profile to your account.')
-                : 'Sign in with Google to lock this profile to your account.');
+            ? 'Locked profiles can only be opened after signing in with that specific account.'
+            : 'Sign in with your personal account to lock this profile to yourself.';
 
         var colorSwatchesHtml = AVATAR_COLORS.map(function (c) {
             var sel = c.toLowerCase() === (draft.color || '').toLowerCase() ? ' selected' : '';
@@ -4354,7 +4557,7 @@
 
         var m = openModal(''
             + '<div class="streamflix-editor-head">'
-            + '  <div class="streamflix-editor-preview" id="streamflix-prof-preview" style="background:' + escapeHtml(draft.color) + ';">' + escapeHtml(draft.icon) + '</div>'
+            + '  <div class="streamflix-editor-preview" id="streamflix-prof-preview" style="background:' + escapeHtml(sanitizeHexColor(draft.color, '#E50914')) + ';">' + escapeHtml(draft.icon) + '</div>'
             + '  <div class="streamflix-editor-head-copy">'
             + '    <div class="streamflix-editor-title-row">'
             + '      <h2>' + (isNew ? 'Add Profile' : 'Edit Profile') + '</h2>'
@@ -4519,7 +4722,7 @@
             var optIsAdmin = Boolean(opt && opt.getAttribute('data-is-admin') === '1');
             jfUserNote.classList.toggle('is-warn', optIsAdmin);
             jfUserNote.textContent = optIsAdmin
-                ? 'Administrator account — grants full server & Dashboard access. Protect this profile with a PIN or Google lock.'
+                ? 'Administrator account — grants full server & Dashboard access. Protect this profile with a PIN or account lock.'
                 : 'Stores watch history, Continue Watching & library access. Only administrators can change this.';
         };
         if (jfUserSelect) {
@@ -4574,6 +4777,22 @@
                 return;
             }
             var lockVal = modal.querySelector('#streamflix-prof-google').value;
+            var parsedLockEmail = null;
+            var parsedLockKind = null;
+            if (lockVal !== '__KEEP__') {
+                if (!lockVal) {
+                    parsedLockEmail = '';
+                    parsedLockKind = '';
+                } else {
+                    var pipeIdx = lockVal.indexOf('|');
+                    if (pipeIdx !== -1) {
+                        parsedLockKind = lockVal.slice(0, pipeIdx);
+                        parsedLockEmail = lockVal.slice(pipeIdx + 1);
+                    } else {
+                        parsedLockEmail = lockVal;
+                    }
+                }
+            }
             var resolvedJfUserId = jfUserSelect
                 ? jfUserSelect.value
                 : (isNew ? '__CREATE__' : (draft.jellyfinUserId || ''));
@@ -4588,7 +4807,8 @@
                 jellyfinUserId: resolvedJfUserId,
                 jellyfinUsername: isNew ? nameVal : (draft.jellyfinUsername || nameVal),
                 currentPin: verifiedPin || null,
-                googleAccountEmail: lockVal === '__KEEP__' ? null : lockVal
+                googleAccountEmail: parsedLockEmail,
+                accountLockKind: parsedLockKind
             };
 
             errEl.textContent = '';
@@ -5084,10 +5304,18 @@
         var otherProfiles = isGuest ? [] : profiles.filter(function (p) { return p.id !== active.id; });
         var quickProfilesHtml = otherProfiles.map(function (p) {
             var lockedOut = p.googleLocked && !p.googleLockSatisfied;
+            var lockMeta = p.googleLocked ? getProfileLockMeta(p) : null;
+            var lockHint = p.googleAccountEmail || p.googleAccountHint || '';
+            var rowTitle = lockedOut
+                ? ('Locked to ' + (lockMeta ? lockMeta.providerLabel : 'another') + (lockHint ? ' (' + lockHint + ')' : ' account'))
+                : ('Switch to ' + p.name);
+            var lockBadgeHtml = lockMeta
+                ? '<span class="bfx-dd-prof-lock is-acct ' + lockMeta.badgeClass + '">' + lockMeta.badgeSvg + '</span>'
+                : (p.hasPin ? '<span class="bfx-dd-prof-lock">•••</span>' : '');
             return ''
-                + '<button type="button" class="bfx-dd-prof' + (lockedOut ? ' is-locked' : '') + '" data-quick-switch-id="' + escapeHtml(p.id) + '" title="' + escapeHtml(lockedOut ? 'Locked to another Google account' : 'Switch to ' + p.name) + '">'
+                + '<button type="button" class="bfx-dd-prof' + (lockedOut ? ' is-locked' : '') + '" data-quick-switch-id="' + escapeHtml(p.id) + '" title="' + escapeHtml(rowTitle) + '">'
                 + '  <span class="bfx-dd-prof-av" style="background:' + escapeHtml(p.color || '#E50914') + ';">' + escapeHtml(p.icon || '🎬')
-                + (p.hasPin || p.googleLocked ? '<span class="bfx-dd-prof-lock">' + (p.googleLocked ? 'G' : '•••') + '</span>' : '')
+                + lockBadgeHtml
                 + '</span>'
                 + '  <span class="bfx-dd-prof-name">' + escapeHtml(p.name) + '</span>'
                 + '</button>';
@@ -5103,7 +5331,6 @@
 
         var castBtnNative = findNativeHeaderButton('cast');
         var castInfo = getNativeCastState();
-        var canMovieNight = !isGuest && profiles.length >= 2;
 
         var ddTile = function (id, iconName, label, hint, extraClass) {
             return '<button type="button" role="menuitem" class="bfx-dd-tile' + (extraClass ? ' ' + extraClass : '') + '" id="' + id + '" title="' + escapeHtml(hint) + '">'
@@ -5113,8 +5340,7 @@
         };
         var tilesHtml = ''
             + (castBtnNative ? ddTile('streamflix-dd-cast', 'cast', castInfo.connected ? 'Casting' : 'Cast', castInfo.connected ? ('Connected to ' + (castInfo.deviceName || 'another device')) : 'Play on a TV, Chromecast or another device', 'is-cast' + (castInfo.connected ? ' is-live' : '')) : '')
-            + (!isGuest ? ddTile('streamflix-dd-quick-connect', 'tv', 'Quick Connect', 'Sign in on a TV or another device with a 6-digit code', 'is-qc') : '')
-            + (canMovieNight ? ddTile('streamflix-dd-movie-night', 'trophy', 'Movie Night', 'Pick a movie or show together across profiles', 'is-party') : '');
+            + (!isGuest ? ddTile('streamflix-dd-quick-connect', 'tv', 'Quick Connect', 'Sign in on a TV or another device with a 6-digit code', 'is-qc') : '');
 
         var dd = document.createElement('div');
         dd.id = 'streamflix-account-dropdown';
@@ -5177,9 +5403,6 @@
         });
         bind('streamflix-dd-quick-connect', function () {
             openQuickConnectModal();
-        });
-        bind('streamflix-dd-movie-night', function () {
-            openMovieNightModal();
         });
         bind('streamflix-dd-guest-passes', function () {
             openGuestPassesModal();
@@ -10033,7 +10256,6 @@
         var brandInitial = getBrandLogoText().charAt(0) || 'S';
         var modalTopRank = getTop10Rank(item && item.Id);
         var modalLogoUrl = getItemLogoUrl(item, 720);
-        var showMovieNightBtn = Boolean(opts.fromSurprise && !isGuestPassSession() && getProfiles().length >= 2);
 
         var typeBadge = item.Type === 'Series'
             ? 'SERIES'
@@ -10102,9 +10324,6 @@
             + '          <button type="button" class="streamflix-hero-play" id="streamflix-modal-play-btn">' + playBtnInitialLabel + '</button>'
             + (opts.fromSurprise
                 ? '          <button type="button" class="streamflix-hero-secondary streamflix-modal-reshuffle" id="streamflix-modal-reshuffle-btn" title="Pick another random title">' + iconLabel('shuffle', 'Shuffle Again') + '</button>'
-                : '')
-            + (showMovieNightBtn
-                ? '          <button type="button" class="streamflix-hero-secondary streamflix-modal-movienight" id="streamflix-modal-movienight-btn" title="Match titles across multiple household profiles">' + iconLabel('trophy', 'Movie Night') + '</button>'
                 : '')
             + '          <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-modal-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="My List">' + icon(isFav ? 'check' : 'plus') + '</button>'
             + '          <button type="button" class="streamflix-hero-icon-btn' + (isPlayed ? ' active' : '') + '" id="streamflix-modal-watched-btn" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>'
@@ -10240,14 +10459,6 @@
         if (reshuffleBtn) {
             reshuffleBtn.addEventListener('click', function () {
                 triggerSurpriseMe();
-            });
-        }
-
-        var movieNightBtn = qModal('#streamflix-modal-movienight-btn');
-        if (movieNightBtn) {
-            movieNightBtn.addEventListener('click', function () {
-                closeModal(true);
-                openMovieNightModal();
             });
         }
 
@@ -10605,7 +10816,7 @@
     }
 
     /* ----------------------------------------------------------------------
-       7b. v0.7.0 Modals: Temporary Guest Passes, Movie Night Matcher & Seerr Requests
+       7b. v0.7.0+ Modals: Temporary Guest Passes & Seerr Requests
        ---------------------------------------------------------------------- */
     function openGuestPassesModal() {
         if (!areGuestPassesEnabled()) {
@@ -10699,7 +10910,6 @@
                     + '</div>';
             }
 
-            var hasInactive = passes.some(function (p) { return String(p.status || '').toLowerCase() !== 'active'; });
             var listHtml = '';
             if (!passes.length) {
                 listHtml = '<div class="bfx-gp-empty">No Guest Passes created yet. Generate one above when friends or family visit.</div>';
@@ -10707,8 +10917,9 @@
                 listHtml = passes.map(function (p) {
                     var st = statusMeta(p.status);
                     var isActive = st.cls === 'is-active';
+                    var canRevoke = isActive || st.cls === 'is-exhausted';
                     var pCol = sanitizeHexColor(p.profileColorHex, '#2b2b2b');
-                    var relExp = isActive ? formatRelativeExpiry(p.expiresAtUtc || p.expiresAt) : '';
+                    var relExp = canRevoke ? formatRelativeExpiry(p.expiresAtUtc || p.expiresAt) : '';
                     var pMax = Number(p.maxRedemptions);
                     var devSummary = pMax > 0
                         ? ('Devices: ' + Number(p.redemptionCount || 0) + ' / ' + pMax)
@@ -10731,7 +10942,9 @@
                         + '  <div class="bfx-gp-row-actions">'
                         + (isActive
                             ? '<button type="button" class="streamflix-ghost-btn bfx-btn-xs" data-gp-share="' + escapeHtml(p.id) + '">' + iconLabel('qr', 'Share / QR') + '</button>'
-                            + '<button type="button" class="streamflix-btn-danger bfx-btn-xs" data-gp-revoke="' + escapeHtml(p.id) + '">Revoke</button>'
+                            : '')
+                        + (canRevoke
+                            ? '<button type="button" class="streamflix-btn-danger bfx-btn-xs" data-gp-revoke="' + escapeHtml(p.id) + '">Revoke</button>'
                             : '')
                         + '  </div>'
                         + '</div>';
@@ -10780,8 +10993,7 @@
                     : '<div class="streamflix-auth-alert streamflix-auth-alert-error" style="margin-bottom:16px;">Create at least one non-Administrator household profile first — Guest Passes never grant access to Administrator accounts.</div>')
                 + spotlightHtml
                 + '<div class="bfx-gp-list-head">'
-                + '  <span>Passes (' + passes.length + ')</span>'
-                + (hasInactive ? '<button type="button" class="streamflix-ghost-btn bfx-btn-xs" id="bfx-gp-purge-btn">Clear Inactive</button>' : '')
+                + '  <span>Active Passes (' + passes.length + ')</span>'
                 + '</div>'
                 + '<div class="bfx-gp-list">' + listHtml + '</div>';
 
@@ -10894,7 +11106,7 @@
                             spotlightInfo = null;
                         }
                         var term = Number((res && res.terminatedSessions) || 0);
-                        showToast(term > 0 ? ('Guest Pass revoked (' + term + ' active session' + (term === 1 ? '' : 's') + ' signed out).') : 'Guest Pass revoked.', 'info');
+                        showToast(term > 0 ? ('Guest Pass deleted (' + term + ' active session' + (term === 1 ? '' : 's') + ' signed out).') : 'Guest Pass deleted.', 'info');
                         renderBody();
                     }).catch(function (err) {
                         busyAction = false;
@@ -10903,32 +11115,6 @@
                     });
                 });
             });
-
-            var purgeBtn = bodyEl.querySelector('#bfx-gp-purge-btn');
-            if (purgeBtn) {
-                purgeBtn.addEventListener('click', function () {
-                    if (busyAction) {
-                        return;
-                    }
-                    busyAction = true;
-                    purgeBtn.disabled = true;
-                    apiFetch('/StreamFlix/GuestPasses/Purge', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: '{}'
-                    }).then(function (res) {
-                        busyAction = false;
-                        if (res && Array.isArray(res.passes)) {
-                            passes = res.passes;
-                        }
-                        showToast('Cleared inactive Guest Passes.', 'info');
-                        renderBody();
-                    }).catch(function () {
-                        busyAction = false;
-                        purgeBtn.disabled = false;
-                    });
-                });
-            }
         }
 
         apiFetch('/StreamFlix/GuestPasses')
@@ -10947,479 +11133,6 @@
                     }
                 }
             });
-    }
-
-    function collectKnownLibraryGenres() {
-        var map = {};
-        var pools = [
-            state.hubData && state.hubData.allMovies,
-            state.hubData && state.hubData.allSeries
-        ];
-        pools.forEach(function (arr) {
-            if (!Array.isArray(arr)) {
-                return;
-            }
-            arr.forEach(function (it) {
-                if (it && Array.isArray(it.Genres)) {
-                    it.Genres.forEach(function (g) {
-                        var trimmed = String(g || '').trim();
-                        if (trimmed) {
-                            map[trimmed] = true;
-                        }
-                    });
-                }
-            });
-        });
-        return Object.keys(map).sort(function (a, b) { return a.localeCompare(b); });
-    }
-
-    function openMovieNightModal() {
-        if (isGuestPassSession()) {
-            return;
-        }
-        var allProfiles = getProfiles();
-        if (allProfiles.length < 2) {
-            showToast('Add at least 2 household profiles to play Movie Night Matcher.', 'info');
-            return;
-        }
-
-        var selectedIds = [];
-        var activeId = state.activeProfile && state.activeProfile.id;
-        if (activeId && findProfileById(activeId)) {
-            selectedIds.push(activeId);
-        }
-        for (var i = 0; i < allProfiles.length && selectedIds.length < 2; i++) {
-            if (selectedIds.indexOf(allProfiles[i].id) === -1) {
-                selectedIds.push(allProfiles[i].id);
-            }
-        }
-
-        var filterMediaType = 'all';
-        var filterMaxRuntime = 0;
-        var filterGenre = '';
-        var filterOnlyUnwatched = true;
-        var knownGenres = collectKnownLibraryGenres();
-        var setupError = '';
-        var fetchingCandidates = false;
-
-        var stage = 'setup'; // 'setup' | 'bracket' | 'winner'
-        var watchers = [];
-        var currentRound = [];
-        var nextRound = [];
-        var pairIndex = 0;
-        var matchNumber = 1;
-        var totalMatches = 0;
-        var winner = null;
-
-        function onBracketShortcut(ev) {
-            if (stage !== 'bracket' || ev.altKey || ev.ctrlKey || ev.metaKey || isEditableTarget(ev.target)) {
-                return;
-            }
-            if (ev.key === '1') {
-                ev.preventDefault();
-                pickContender(0);
-            } else if (ev.key === '2') {
-                ev.preventDefault();
-                pickContender(1);
-            }
-        }
-
-        var m = openModal('<div id="bfx-mn-root"></div>', {
-            className: 'streamflix-modal-lg bfx-mn-modal',
-            onClose: function () {
-                document.removeEventListener('keydown', onBracketShortcut);
-            }
-        });
-        document.addEventListener('keydown', onBracketShortcut);
-
-        function candidateImageUrls(c) {
-            var base = apiBase();
-            var eid = encodeURIComponent(c.id);
-            return {
-                backdrop: base + '/Items/' + eid + '/Images/' + (c.hasBackdrop ? 'Backdrop/0?maxWidth=960&quality=85' : 'Primary?maxWidth=640&quality=85'),
-                logo: c.hasLogo ? (base + '/Items/' + eid + '/Images/Logo?maxWidth=520&quality=90') : ''
-            };
-        }
-
-        function buildWatcherAvatarsHtml(list) {
-            return (list || []).map(function (w) {
-                var bg = sanitizeHexColor(w.avatarColorHex || w.color, '#E50914');
-                var em = w.avatarEmoji || w.icon || (w.name ? w.name.charAt(0).toUpperCase() : '?');
-                return '<span class="bfx-mn-mini-avatar" style="background:' + escapeHtml(bg) + ';" title="' + escapeHtml(w.name || '') + '">' + escapeHtml(em) + '</span>';
-            }).join('');
-        }
-
-        function formatFavoritedRibbon(c) {
-            var favs = Array.isArray(c.favoritedBy) ? c.favoritedBy.filter(Boolean) : [];
-            if (!favs.length) {
-                return '';
-            }
-            var label = favs.length === 1
-                ? ('On ' + favs[0] + '\'s List')
-                : ('Shared on ' + favs.slice(0, 2).join(' & ') + (favs.length > 2 ? ' +' + (favs.length - 2) : '') + '\'s Lists');
-            return '<div class="bfx-mn-fav-ribbon">' + icon('star') + ' <span>' + escapeHtml(label) + '</span></div>';
-        }
-
-        function startMatchupRequest() {
-            if (fetchingCandidates || selectedIds.length < 2) {
-                return;
-            }
-            fetchingCandidates = true;
-            setupError = '';
-            render();
-
-            apiFetch('/StreamFlix/MovieNight/Candidates', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    profileIds: selectedIds,
-                    mediaType: filterMediaType,
-                    genre: filterGenre,
-                    maxRuntimeMinutes: filterMaxRuntime,
-                    onlyUnwatched: filterOnlyUnwatched,
-                    count: 8
-                })
-            }).then(function (res) {
-                fetchingCandidates = false;
-                if (res && Array.isArray(res.availableGenres) && res.availableGenres.length > knownGenres.length) {
-                    knownGenres = res.availableGenres.slice();
-                }
-                watchers = (res && Array.isArray(res.watchers)) ? res.watchers : [];
-                var cands = (res && Array.isArray(res.candidates)) ? res.candidates : [];
-                if (!cands.length) {
-                    setupError = filterOnlyUnwatched
-                        ? 'No titles matched every watcher\'s parental limits that nobody has watched yet. Try unchecking "Unwatched by everyone" or broadening filters.'
-                        : 'No library titles matched those filters across the selected profiles.';
-                    render();
-                    return;
-                }
-                if (cands.length === 1) {
-                    winner = cands[0];
-                    stage = 'winner';
-                    render();
-                    return;
-                }
-                currentRound = cands.slice();
-                nextRound = [];
-                pairIndex = 0;
-                matchNumber = 1;
-                totalMatches = cands.length - 1;
-                winner = null;
-                stage = 'bracket';
-                render();
-            }).catch(function (err) {
-                fetchingCandidates = false;
-                setupError = (err && err.message) || 'Could not build Movie Night bracket.';
-                render();
-            });
-        }
-
-        function pickContender(sideIdx) {
-            var idx = pairIndex * 2 + sideIdx;
-            var chosen = currentRound[idx];
-            if (!chosen) {
-                return;
-            }
-            nextRound.push(chosen);
-            pairIndex += 1;
-            matchNumber += 1;
-
-            if (pairIndex * 2 >= currentRound.length) {
-                // Odd leftover advances automatically if server ever returned an odd count
-                if (pairIndex * 2 < currentRound.length + 1 && currentRound.length % 2 === 1) {
-                    nextRound.push(currentRound[currentRound.length - 1]);
-                }
-                if (nextRound.length === 1) {
-                    winner = nextRound[0];
-                    stage = 'winner';
-                    render();
-                    return;
-                }
-                currentRound = nextRound.slice();
-                nextRound = [];
-                pairIndex = 0;
-            }
-            render();
-        }
-
-        function roundTitle() {
-            var n = currentRound.length;
-            if (n <= 2) { return 'Final Showdown'; }
-            if (n <= 4) { return 'Semifinals'; }
-            return 'Quarterfinals';
-        }
-
-        function render() {
-            if (m.isClosed()) {
-                return;
-            }
-            var root = m.modal.querySelector('#bfx-mn-root');
-            if (!root) {
-                return;
-            }
-
-            if (stage === 'setup') {
-                var watcherChipsHtml = allProfiles.map(function (p) {
-                    var on = selectedIds.indexOf(p.id) !== -1;
-                    var col = sanitizeHexColor(p.avatarColorHex || p.color, '#E50914');
-                    var avIcon = p.avatarEmoji || p.icon || (p.name ? p.name.charAt(0).toUpperCase() : '?');
-                    return ''
-                        + '<button type="button" class="bfx-mn-watcher-chip' + (on ? ' is-selected' : '') + '" data-mn-prof="' + escapeHtml(p.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
-                        + '  <span class="bfx-mn-watcher-av" style="background:' + escapeHtml(col) + ';">' + escapeHtml(avIcon) + '</span>'
-                        + '  <span class="bfx-mn-watcher-meta">'
-                        + '    <span class="bfx-mn-watcher-name">' + escapeHtml(p.name) + '</span>'
-                        + (p.isKids ? '<span class="bfx-mn-kids-tag">KIDS</span>' : '')
-                        + '  </span>'
-                        + '  <span class="bfx-mn-watcher-check">' + (on ? icon('check') : '') + '</span>'
-                        + '</button>';
-                }).join('');
-
-                var genreOptionsHtml = '<option value="">All Genres</option>' + knownGenres.map(function (g) {
-                    return '<option value="' + escapeHtml(g) + '"' + (filterGenre === g ? ' selected' : '') + '>' + escapeHtml(g) + '</option>';
-                }).join('');
-
-                root.innerHTML = ''
-                    + '<div class="bfx-modal-top">'
-                    + '  <div class="bfx-modal-top-title">'
-                    + '    <span class="bfx-modal-kicker">' + icon('trophy') + ' <span>HOUSEHOLD SHOWDOWN</span></span>'
-                    + '    <h2>Movie Night Matcher</h2>'
-                    + '    <p class="streamflix-modal-text">Select 2–6 profiles watching together. StreamFlix respects the strictest parental rating, boosts shared <em>My Lists</em>, and runs a quick A-vs-B bracket.</p>'
-                    + '  </div>'
-                    + '  <button type="button" class="streamflix-detail-close bfx-modal-close-inline" data-act="close" aria-label="Close">' + icon('close') + '</button>'
-                    + '</div>'
-                    + (setupError ? '<div class="streamflix-auth-alert streamflix-auth-alert-error" style="margin-bottom:14px;">' + escapeHtml(setupError) + '</div>' : '')
-                    + '<div class="bfx-mn-section">'
-                    + '  <div class="bfx-mn-label">Who\'s watching tonight? <span>(' + selectedIds.length + ' selected — choose 2 to 6)</span></div>'
-                    + '  <div class="bfx-mn-watchers">' + watcherChipsHtml + '</div>'
-                    + '</div>'
-                    + '<div class="bfx-mn-filters">'
-                    + '  <div class="bfx-mn-filter-group">'
-                    + '    <div class="bfx-mn-label">Format</div>'
-                    + '    <div class="bfx-mn-pills">'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMediaType === 'all' ? ' active' : '') + '" data-mn-type="all">Movies &amp; Shows</button>'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMediaType === 'Movie' ? ' active' : '') + '" data-mn-type="Movie">Movies Only</button>'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMediaType === 'Series' ? ' active' : '') + '" data-mn-type="Series">Shows Only</button>'
-                    + '    </div>'
-                    + '  </div>'
-                    + '  <div class="bfx-mn-filter-group">'
-                    + '    <div class="bfx-mn-label">Max Runtime</div>'
-                    + '    <div class="bfx-mn-pills">'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMaxRuntime === 0 ? ' active' : '') + '" data-mn-rt="0">Any</button>'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMaxRuntime === 100 ? ' active' : '') + '" data-mn-rt="100">&lt; 100m</button>'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMaxRuntime === 120 ? ' active' : '') + '" data-mn-rt="120">&lt; 2h</button>'
-                    + '      <button type="button" class="bfx-mn-pill' + (filterMaxRuntime === 150 ? ' active' : '') + '" data-mn-rt="150">&lt; 2.5h</button>'
-                    + '    </div>'
-                    + '  </div>'
-                    + '  <div class="bfx-mn-filter-group">'
-                    + '    <div class="bfx-mn-label">Genre</div>'
-                    + '    <select id="bfx-mn-genre" class="streamflix-select">' + genreOptionsHtml + '</select>'
-                    + '  </div>'
-                    + '</div>'
-                    + '<label class="bfx-mn-check-row">'
-                    + '  <input type="checkbox" id="bfx-mn-unwatched"' + (filterOnlyUnwatched ? ' checked' : '') + ' />'
-                    + '  <span>Only pick titles <strong>nobody in the group has watched yet</strong></span>'
-                    + '</label>'
-                    + '<div class="streamflix-modal-actions streamflix-modal-actions-end" style="margin-top:20px;">'
-                    + '  <button type="button" class="streamflix-ghost-btn" data-act="close">Cancel</button>'
-                    + '  <button type="button" class="streamflix-btn-primary" id="bfx-mn-start-btn"' + ((selectedIds.length < 2 || fetchingCandidates) ? ' disabled' : '') + '>'
-                    + (fetchingCandidates ? 'Finding Matches…' : iconLabel('trophy', 'Start Matchup'))
-                    + '  </button>'
-                    + '</div>';
-
-                Array.prototype.forEach.call(root.querySelectorAll('[data-act="close"]'), function (b) {
-                    b.addEventListener('click', function () { m.close(false); });
-                });
-                Array.prototype.forEach.call(root.querySelectorAll('[data-mn-prof]'), function (chip) {
-                    chip.addEventListener('click', function () {
-                        var pid = chip.getAttribute('data-mn-prof');
-                        var idx = selectedIds.indexOf(pid);
-                        if (idx !== -1) {
-                            selectedIds.splice(idx, 1);
-                        } else if (selectedIds.length < 6) {
-                            selectedIds.push(pid);
-                        } else {
-                            showToast('Select up to 6 profiles per Movie Night.', 'info');
-                            return;
-                        }
-                        setupError = '';
-                        render();
-                    });
-                });
-                Array.prototype.forEach.call(root.querySelectorAll('[data-mn-type]'), function (btn) {
-                    btn.addEventListener('click', function () {
-                        filterMediaType = btn.getAttribute('data-mn-type') || 'all';
-                        render();
-                    });
-                });
-                Array.prototype.forEach.call(root.querySelectorAll('[data-mn-rt]'), function (btn) {
-                    btn.addEventListener('click', function () {
-                        filterMaxRuntime = parseInt(btn.getAttribute('data-mn-rt'), 10) || 0;
-                        render();
-                    });
-                });
-                var genreSel = root.querySelector('#bfx-mn-genre');
-                if (genreSel) {
-                    genreSel.addEventListener('change', function () {
-                        filterGenre = genreSel.value || '';
-                    });
-                }
-                var unwatchedBox = root.querySelector('#bfx-mn-unwatched');
-                if (unwatchedBox) {
-                    unwatchedBox.addEventListener('change', function () {
-                        filterOnlyUnwatched = Boolean(unwatchedBox.checked);
-                    });
-                }
-                var startBtn = root.querySelector('#bfx-mn-start-btn');
-                if (startBtn) {
-                    startBtn.addEventListener('click', startMatchupRequest);
-                }
-                return;
-            }
-
-            if (stage === 'bracket') {
-                var left = currentRound[pairIndex * 2];
-                var right = currentRound[pairIndex * 2 + 1];
-                if (!left || !right) {
-                    return;
-                }
-                var pct = totalMatches > 0 ? Math.min(100, Math.round(((matchNumber - 1) / totalMatches) * 100)) : 50;
-
-                var renderContenderHtml = function (c, sideIdx) {
-                    var imgs = candidateImageUrls(c);
-                    var ratingStr = c.communityRating ? Number(c.communityRating).toFixed(1) : '';
-                    var rtStr = c.runTimeMinutes ? (c.runTimeMinutes + 'm') : '';
-                    var gStr = Array.isArray(c.genres) && c.genres.length ? c.genres.slice(0, 3).join(' • ') : '';
-                    return ''
-                        + '<button type="button" class="bfx-mn-contender" data-mn-pick="' + sideIdx + '">'
-                        + '  <div class="bfx-mn-contender-art">'
-                        + '    <img src="' + escapeHtml(imgs.backdrop) + '" alt="" data-bfx-img="fade" />'
-                        + '    <div class="bfx-mn-contender-scrim"></div>'
-                        + formatFavoritedRibbon(c)
-                        + '    <span class="bfx-mn-key-hint">' + (sideIdx + 1) + '</span>'
-                        + '  </div>'
-                        + '  <div class="bfx-mn-contender-body">'
-                        + '    <div class="bfx-mn-contender-title-wrap' + (imgs.logo ? ' has-logo' : '') + '">'
-                        + (imgs.logo ? '<img class="bfx-mn-contender-logo" src="' + escapeHtml(imgs.logo) + '" alt="" data-bfx-logo-fallback="detail" />' : '')
-                        + '      <h3 class="bfx-mn-contender-title">' + escapeHtml(c.name || 'Untitled') + '</h3>'
-                        + '    </div>'
-                        + '    <div class="bfx-mn-contender-meta">'
-                        + (ratingStr ? '<span class="streamflix-hero-rating">' + icon('star') + escapeHtml(ratingStr) + '</span>' : '')
-                        + (c.year ? '<span>' + escapeHtml(String(c.year)) + '</span>' : '')
-                        + (c.officialRating ? '<span class="streamflix-maturity-pill">' + escapeHtml(c.officialRating) + '</span>' : '')
-                        + (rtStr ? '<span>' + escapeHtml(rtStr) + '</span>' : '')
-                        + '<span class="bfx-mn-type-tag">' + escapeHtml(c.type === 'Series' ? 'SERIES' : 'MOVIE') + '</span>'
-                        + '    </div>'
-                        + (gStr ? '<div class="bfx-mn-contender-genres">' + escapeHtml(gStr) + '</div>' : '')
-                        + '    <p class="bfx-mn-contender-desc">' + escapeHtml(c.overview || c.tagline || 'Tap to advance this title to the next round.') + '</p>'
-                        + '    <div class="bfx-mn-pick-cta">Vote for This Title</div>'
-                        + '  </div>'
-                        + '</button>';
-                };
-
-                root.innerHTML = ''
-                    + '<div class="bfx-mn-bracket-top">'
-                    + '  <button type="button" class="streamflix-ghost-btn bfx-btn-xs" id="bfx-mn-back-setup">Change Filters</button>'
-                    + '  <div class="bfx-mn-round-center">'
-                    + '    <span class="bfx-mn-round-kicker">' + escapeHtml(roundTitle()) + ' • Match ' + matchNumber + ' of ' + totalMatches + '</span>'
-                    + '    <div class="bfx-mn-progress"><span style="width:' + pct + '%;"></span></div>'
-                    + '  </div>'
-                    + '  <div class="bfx-mn-top-right">'
-                    + '    <div class="bfx-mn-mini-stack">' + buildWatcherAvatarsHtml(watchers) + '</div>'
-                    + '    <button type="button" class="streamflix-detail-close bfx-modal-close-inline" data-act="close" aria-label="Close">' + icon('close') + '</button>'
-                    + '  </div>'
-                    + '</div>'
-                    + '<div class="bfx-mn-arena">'
-                    + renderContenderHtml(left, 0)
-                    + '  <div class="bfx-mn-vs" aria-hidden="true"><span>VS</span></div>'
-                    + renderContenderHtml(right, 1)
-                    + '</div>';
-
-                hydrateCompleteImages(root);
-                root.querySelector('[data-act="close"]').addEventListener('click', function () { m.close(false); });
-                root.querySelector('#bfx-mn-back-setup').addEventListener('click', function () {
-                    stage = 'setup';
-                    render();
-                });
-                Array.prototype.forEach.call(root.querySelectorAll('[data-mn-pick]'), function (cardBtn) {
-                    cardBtn.addEventListener('click', function () {
-                        var sIdx = parseInt(cardBtn.getAttribute('data-mn-pick'), 10) || 0;
-                        pickContender(sIdx);
-                    });
-                });
-                if (isTvOrDpadActive()) {
-                    var firstCard = root.querySelector('[data-mn-pick="0"]');
-                    if (firstCard) {
-                        setTimeout(function () { try { firstCard.focus({ preventScroll: true }); } catch (e) {} }, 25);
-                    }
-                }
-                return;
-            }
-
-            if (stage === 'winner' && winner) {
-                var wImgs = candidateImageUrls(winner);
-                var wBg = safeCssUrl(wImgs.backdrop);
-                var wRating = winner.communityRating ? Number(winner.communityRating).toFixed(1) : '';
-                var wRuntime = winner.runTimeMinutes ? (winner.runTimeMinutes + 'm') : '';
-                var wGenres = Array.isArray(winner.genres) ? winner.genres.slice(0, 4).join(' • ') : '';
-
-                root.innerHTML = ''
-                    + '<div class="bfx-mn-winner">'
-                    + '  <div class="bfx-mn-winner-hero"' + (wBg ? ' style="background-image:url(\'' + escapeHtml(wBg) + '\');"' : '') + '>'
-                    + '    <button type="button" class="streamflix-detail-close" data-act="close" aria-label="Close">' + icon('close') + '</button>'
-                    + '    <div class="bfx-mn-winner-content">'
-                    + '      <div class="bfx-mn-winner-ribbon">' + icon('trophy') + ' <span>TONIGHT\'S WINNER</span></div>'
-                    + '      <div class="bfx-mn-contender-title-wrap' + (wImgs.logo ? ' has-logo' : '') + '">'
-                    + (wImgs.logo ? '<img class="bfx-mn-winner-logo" src="' + escapeHtml(wImgs.logo) + '" alt="" data-bfx-logo-fallback="detail" />' : '')
-                    + '        <h2 class="bfx-mn-winner-title">' + escapeHtml(winner.name || 'Winner') + '</h2>'
-                    + '      </div>'
-                    + '      <div class="bfx-mn-contender-meta">'
-                    + (wRating ? '<span class="streamflix-hero-rating">' + icon('star') + escapeHtml(wRating) + '</span>' : '')
-                    + (winner.year ? '<span>' + escapeHtml(String(winner.year)) + '</span>' : '')
-                    + (winner.officialRating ? '<span class="streamflix-maturity-pill">' + escapeHtml(winner.officialRating) + '</span>' : '')
-                    + (wRuntime ? '<span>' + escapeHtml(wRuntime) + '</span>' : '')
-                    + (wGenres ? '<span>' + escapeHtml(wGenres) + '</span>' : '')
-                    + '      </div>'
-                    + '      <p class="bfx-mn-winner-overview">' + escapeHtml(winner.overview || winner.tagline || '') + '</p>'
-                    + '      <div class="streamflix-hero-actions">'
-                    + '        <button type="button" class="streamflix-hero-play" id="bfx-mn-play-winner">' + iconLabel('play', 'Play Now') + '</button>'
-                    + '        <button type="button" class="streamflix-hero-secondary" id="bfx-mn-info-winner">' + iconLabel('info', 'More Info') + '</button>'
-                    + '        <button type="button" class="streamflix-hero-secondary" id="bfx-mn-rematch">' + iconLabel('shuffle', 'New Bracket') + '</button>'
-                    + '      </div>'
-                    + '    </div>'
-                    + '  </div>'
-                    + '  <div class="bfx-mn-winner-foot">'
-                    + '    <div class="bfx-mn-mini-stack">' + buildWatcherAvatarsHtml(watchers) + '</div>'
-                    + '    <button type="button" class="streamflix-ghost-btn bfx-btn-xs" id="bfx-mn-edit-watchers">Change Watchers &amp; Filters</button>'
-                    + '  </div>'
-                    + '</div>';
-
-                hydrateCompleteImages(root);
-                root.querySelector('[data-act="close"]').addEventListener('click', function () { m.close(false); });
-                root.querySelector('#bfx-mn-play-winner').addEventListener('click', function () {
-                    var targetWinner = winner;
-                    m.close(true);
-                    playItemImmediately({ Id: targetWinner.id, Name: targetWinner.name, Type: targetWinner.type || 'Movie' });
-                });
-                root.querySelector('#bfx-mn-info-winner').addEventListener('click', function () {
-                    var targetId = winner.id;
-                    m.close(true);
-                    openHeroDetailModalById(targetId);
-                });
-                root.querySelector('#bfx-mn-rematch').addEventListener('click', function () {
-                    startMatchupRequest();
-                });
-                root.querySelector('#bfx-mn-edit-watchers').addEventListener('click', function () {
-                    stage = 'setup';
-                    render();
-                });
-                var playWinBtn = root.querySelector('#bfx-mn-play-winner');
-                if (playWinBtn && isTvOrDpadActive()) {
-                    setTimeout(function () { try { playWinBtn.focus({ preventScroll: true }); } catch (e) {} }, 25);
-                }
-            }
-        }
-
-        render();
     }
 
     function openSeerrRequestModal(seerrItem) {
@@ -13004,7 +12717,9 @@
         });
     };
     window.__STREAMFLIX_OPEN_GUEST_PASSES__ = openGuestPassesModal;
-    window.__STREAMFLIX_OPEN_MOVIE_NIGHT__ = openMovieNightModal;
+    window.__STREAMFLIX_SIGN_OUT_LOCAL__ = function (skipGateRender) {
+        signOutHousehold({ skipServerLogout: true, silent: true, skipGateRender: Boolean(skipGateRender) });
+    };
 
     function bootstrap() {
         installStrictCspImageHandlers();

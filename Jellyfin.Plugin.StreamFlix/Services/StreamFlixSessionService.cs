@@ -63,7 +63,7 @@ public static class StreamFlixSessionService
         string CreatedAt);
 
     /// <summary>
-    /// Returns true when the email is on the allowlist or is the Google lock of any profile.
+    /// Returns true when the email is on the allowlist or is the Google/SSO lock of any profile.
     /// </summary>
     public static bool IsEmailApproved(PluginConfiguration config, string? email)
     {
@@ -77,11 +77,15 @@ public static class StreamFlixSessionService
                 .Any(a => string.Equals(a?.Trim(), normalized, StringComparison.OrdinalIgnoreCase))
             || (config.Profiles ?? new())
                 .Any(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail)
+                    && (string.IsNullOrWhiteSpace(p.AccountLockKind)
+                        || string.Equals(p.AccountLockKind.Trim(), "google", StringComparison.OrdinalIgnoreCase))
                     && string.Equals(p.GoogleAccountEmail.Trim(), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
     /// Returns true when the OIDC user is permitted under current OIDC allowlist configuration.
+    /// Email-formatted allowlist entries and profile locks only match a verified <paramref name="email"/>,
+    /// never an unverified <paramref name="username"/> claim.
     /// </summary>
     public static bool IsOidcUserApproved(PluginConfiguration config, string? email, string? username, string? subject)
     {
@@ -93,7 +97,7 @@ public static class StreamFlixSessionService
         }
 
         var approved = config.ApprovedOidcUsers ?? new();
-        bool MatchesAllowlist(string? candidate)
+        bool MatchesAllowlist(string? candidate, bool allowEmailEntries)
         {
             if (string.IsNullOrWhiteSpace(candidate))
             {
@@ -101,10 +105,31 @@ public static class StreamFlixSessionService
             }
 
             var norm = candidate.Trim();
-            return approved.Any(a => string.Equals(a?.Trim(), norm, StringComparison.OrdinalIgnoreCase));
+            if (!allowEmailEntries && norm.Contains('@'))
+            {
+                return false;
+            }
+
+            return approved.Any(a =>
+            {
+                if (string.IsNullOrWhiteSpace(a))
+                {
+                    return false;
+                }
+
+                var cleanEntry = a.Trim();
+                if (!allowEmailEntries && cleanEntry.Contains('@'))
+                {
+                    return false;
+                }
+
+                return string.Equals(cleanEntry, norm, StringComparison.OrdinalIgnoreCase);
+            });
         }
 
-        if (MatchesAllowlist(email) || MatchesAllowlist(username) || MatchesAllowlist(subject))
+        if (MatchesAllowlist(email, allowEmailEntries: true)
+            || MatchesAllowlist(username, allowEmailEntries: false)
+            || MatchesAllowlist(subject, allowEmailEntries: false))
         {
             return true;
         }
@@ -112,9 +137,41 @@ public static class StreamFlixSessionService
         if (!string.IsNullOrWhiteSpace(email))
         {
             var normEmail = email.Trim();
-            return (config.Profiles ?? new())
+            if ((config.Profiles ?? new())
                 .Any(p => !string.IsNullOrWhiteSpace(p.GoogleAccountEmail)
-                    && string.Equals(p.GoogleAccountEmail.Trim(), normEmail, StringComparison.OrdinalIgnoreCase));
+                    && (string.IsNullOrWhiteSpace(p.AccountLockKind)
+                        || string.Equals(p.AccountLockKind.Trim(), "oidc", StringComparison.OrdinalIgnoreCase))
+                    && string.Equals(p.GoogleAccountEmail.Trim(), normEmail, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(username) || !string.IsNullOrWhiteSpace(subject))
+        {
+            var normUser = (username ?? string.Empty).Trim();
+            var normSub = (subject ?? string.Empty).Trim();
+            if ((config.Profiles ?? new())
+                .Any(p =>
+                {
+                    if (string.IsNullOrWhiteSpace(p.GoogleAccountEmail)
+                        || !string.Equals(p.AccountLockKind?.Trim(), "oidc", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    var target = p.GoogleAccountEmail.Trim();
+                    if (target.Contains('@'))
+                    {
+                        return false;
+                    }
+
+                    return (!string.IsNullOrEmpty(normUser) && !normUser.Contains('@') && string.Equals(target, normUser, StringComparison.OrdinalIgnoreCase))
+                        || (!string.IsNullOrEmpty(normSub) && string.Equals(target, normSub, StringComparison.OrdinalIgnoreCase));
+                }))
+            {
+                return true;
+            }
         }
 
         return false;
@@ -726,14 +783,17 @@ public static class StreamFlixSessionService
             return string.Empty;
         }
 
-        var at = email.IndexOf('@');
+        var trimmed = email.Trim();
+        var at = trimmed.IndexOf('@');
         if (at <= 0)
         {
-            return "•••";
+            return trimmed.Length <= 2
+                ? (trimmed.Length == 2 ? trimmed[0] + "•••" : "•••")
+                : trimmed[0] + "•••" + trimmed[^1];
         }
 
-        var local = email.Substring(0, at);
-        var domain = email.Substring(at);
+        var local = trimmed.Substring(0, at);
+        var domain = trimmed.Substring(at);
         return local.Length <= 2
             ? local[0] + "•••" + domain
             : local[0] + "•••" + local[^1] + domain;

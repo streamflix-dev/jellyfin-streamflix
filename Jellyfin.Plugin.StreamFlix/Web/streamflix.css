@@ -2468,13 +2468,34 @@ html body #itemDetailPage .itemName {
     color: #fff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
+.streamflix-tile-badge-lock,
 .streamflix-tile-badge-g,
 .streamflix-glock-badge,
 .streamflix-dd-g {
-    background: #fff;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.14);
     color: #4285F4;
     font-weight: 900;
     font-family: Arial, sans-serif;
+}
+.streamflix-tile-badge-lock svg,
+.streamflix-glock-badge svg {
+    display: block;
+    flex-shrink: 0;
+}
+.streamflix-glock-badge svg {
+    width: 16px;
+    height: 16px;
+}
+.streamflix-tile-badge-lock.is-oidc,
+.streamflix-glock-badge.is-oidc,
+.bfx-dd-prof-lock.is-acct.is-oidc {
+    color: #4f46e5;
+}
+.streamflix-tile-badge-lock.is-jellyfin,
+.streamflix-glock-badge.is-jellyfin,
+.bfx-dd-prof-lock.is-acct.is-jellyfin {
+    color: #0095cc;
 }
 .streamflix-dd-g {
     display: inline-flex;
@@ -3058,6 +3079,22 @@ body:not(.streamflix-on-home) header.MuiAppBar-root {
     line-height: 15px;
     text-align: center;
     box-sizing: border-box;
+}
+.bfx-dd-prof-lock.is-acct {
+    width: 18px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    color: #4285F4;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.bfx-dd-prof-lock.is-acct svg {
+    width: 11px;
+    height: 11px;
+    display: block;
 }
 .bfx-dd-prof-name {
     max-width: 62px;
@@ -4168,7 +4205,6 @@ body.bfx-header-tucked:not(.streamflix-in-video-player) .headerSelectedPlayer { 
 }
 .bfx-dd-tile-ico .bfx-icon { width: 19px; height: 19px; }
 .bfx-dd-tile.is-cast .bfx-dd-tile-ico { background: linear-gradient(135deg, #2a9d8f 0%, #1f6feb 100%); }
-.bfx-dd-tile.is-party .bfx-dd-tile-ico { background: linear-gradient(135deg, #ff7a59 0%, #e50914 100%); }
 .bfx-dd-tile.is-qc .bfx-dd-tile-ico { background: linear-gradient(135deg, #7b5cff 0%, #00a4dc 100%); }
 .bfx-dd-tile.is-live { border-color: rgba(70, 211, 105, 0.45); background: rgba(70, 211, 105, 0.08); }
 .bfx-dd-tile.is-live .bfx-dd-tile-ico { background: #46d369; color: #06240f; }
@@ -7302,7 +7338,7 @@ html.layout-tv .streamflix-surprise-btn {
 }
 
 /* ==========================================================================
-   v0.7.0 — Guest Passes, Movie Night Matcher, Seerr Requests & Hardening
+   v0.7.0+ — Guest Passes, Seerr Requests & Hardening
    ========================================================================== */
 
 /* Strict-CSP image fallback: smoothly reveal underlying card title plate when artwork 404s */
@@ -7735,445 +7771,6 @@ html.layout-tv .streamflix-surprise-btn {
     border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
-/* ---------- Movie Night Matcher Modal ---------- */
-.streamflix-modal.bfx-mn-modal {
-    max-width: 920px;
-}
-.bfx-mn-section {
-    margin-bottom: 18px;
-}
-.bfx-mn-label {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.7px;
-    text-transform: uppercase;
-    color: #b3b3b3;
-    margin-bottom: 8px;
-}
-.bfx-mn-label span {
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0;
-    color: #808080;
-}
-.bfx-mn-watchers {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-    gap: 10px;
-}
-.bfx-mn-watcher-chip {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    border-radius: 11px;
-    border: 1.5px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.04);
-    color: #e5e5e5;
-    cursor: pointer;
-    text-align: left;
-    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-.bfx-mn-watcher-chip:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.28);
-}
-.bfx-mn-watcher-chip.is-selected {
-    background: rgba(229, 9, 20, 0.15);
-    border-color: var(--streamflix-red);
-    color: #ffffff;
-}
-.bfx-mn-watcher-av {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 19px;
-    flex-shrink: 0;
-}
-.bfx-mn-watcher-meta {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.bfx-mn-watcher-name {
-    font-size: 13.5px;
-    font-weight: 800;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.bfx-mn-kids-tag {
-    font-size: 9.5px;
-    font-weight: 900;
-    letter-spacing: 0.7px;
-    color: #38bdf8;
-}
-.bfx-mn-watcher-check {
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #ffffff;
-}
-.bfx-mn-watcher-check svg {
-    width: 15px;
-    height: 15px;
-}
-.bfx-mn-filters {
-    display: grid;
-    grid-template-columns: 1.2fr 1.2fr 1fr;
-    gap: 14px;
-    padding: 14px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: 14px;
-}
-.bfx-mn-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.bfx-mn-pill {
-    height: 34px;
-    padding: 0 11px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.05);
-    color: #d4d4d4;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.14s ease;
-}
-.bfx-mn-pill:hover {
-    border-color: rgba(255, 255, 255, 0.32);
-    color: #ffffff;
-}
-.bfx-mn-pill.active {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-}
-.bfx-mn-check-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    font-size: 13.5px;
-    color: #d4d4d4;
-    cursor: pointer;
-}
-.bfx-mn-check-row input[type="checkbox"] {
-    width: 17px;
-    height: 17px;
-    accent-color: var(--streamflix-red);
-}
-.bfx-mn-bracket-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-.bfx-mn-round-center {
-    flex: 1;
-    max-width: 340px;
-    text-align: center;
-}
-.bfx-mn-round-kicker {
-    display: block;
-    font-size: 11.5px;
-    font-weight: 800;
-    letter-spacing: 0.9px;
-    text-transform: uppercase;
-    color: #f5f5f5;
-    margin-bottom: 6px;
-}
-.bfx-mn-progress {
-    height: 5px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    overflow: hidden;
-}
-.bfx-mn-progress span {
-    display: block;
-    height: 100%;
-    background: var(--streamflix-red);
-    transition: width 0.25s ease;
-}
-.bfx-mn-top-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.bfx-mn-mini-stack {
-    display: inline-flex;
-    align-items: center;
-}
-.bfx-mn-mini-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid #181818;
-    margin-left: -6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
-.bfx-mn-mini-avatar:first-child {
-    margin-left: 0;
-}
-.bfx-mn-arena {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 14px;
-    align-items: stretch;
-}
-.bfx-mn-vs {
-    align-self: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: #1f1f1f;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 0.8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
-}
-.bfx-mn-contender {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-    padding: 0;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #1d1d1d;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    cursor: pointer;
-    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-.bfx-mn-contender:hover,
-.bfx-mn-contender:focus-visible {
-    transform: translateY(-3px);
-    border-color: var(--streamflix-red);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(229, 9, 20, 0.35);
-    outline: none;
-}
-.bfx-mn-contender-art {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background: #262626;
-    overflow: hidden;
-}
-.bfx-mn-contender-art img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    opacity: 0;
-    transition: opacity 0.28s ease;
-}
-.bfx-mn-contender-art img.is-loaded {
-    opacity: 1;
-}
-.bfx-mn-contender-scrim {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(29, 29, 29, 0.92) 100%);
-}
-.bfx-mn-fav-ribbon {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(245, 158, 11, 0.92);
-    color: #111111;
-    font-size: 11px;
-    font-weight: 800;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-}
-.bfx-mn-fav-ribbon svg {
-    width: 12px;
-    height: 12px;
-}
-.bfx-mn-key-hint {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 2;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.68);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    color: #e5e5e5;
-    font-size: 11.5px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.bfx-mn-contender-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 14px 16px 16px 16px;
-    gap: 8px;
-}
-.bfx-mn-contender-title-wrap.has-logo .bfx-mn-contender-title,
-.bfx-mn-contender-title-wrap.has-logo .bfx-mn-winner-title {
-    display: none;
-}
-.bfx-mn-contender-logo {
-    max-width: 210px;
-    max-height: 52px;
-    object-fit: contain;
-    display: block;
-}
-.bfx-mn-contender-title {
-    margin: 0;
-    font-size: 19px;
-    font-weight: 900;
-    line-height: 1.2;
-}
-.bfx-mn-contender-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: #cfcfcf;
-}
-.bfx-mn-type-tag {
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.1);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.7px;
-}
-.bfx-mn-contender-genres {
-    font-size: 12px;
-    font-weight: 700;
-    color: #9ca3af;
-}
-.bfx-mn-contender-desc {
-    margin: 0;
-    font-size: 12.5px;
-    line-height: 1.48;
-    color: #b3b3b3;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1;
-}
-.bfx-mn-pick-cta {
-    margin-top: 6px;
-    padding: 9px 12px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    text-align: center;
-    font-size: 12.5px;
-    font-weight: 800;
-    color: #ffffff;
-    transition: background 0.15s ease;
-}
-.bfx-mn-contender:hover .bfx-mn-pick-cta,
-.bfx-mn-contender:focus-visible .bfx-mn-pick-cta {
-    background: var(--streamflix-red);
-}
-.bfx-mn-winner-hero {
-    position: relative;
-    min-height: 340px;
-    border-radius: 14px;
-    overflow: hidden;
-    background-color: #1c1c1c;
-    background-size: cover;
-    background-position: center 22%;
-    display: flex;
-    align-items: flex-end;
-    padding: 28px;
-}
-.bfx-mn-winner-hero::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(16, 16, 16, 0.2) 0%, rgba(16, 16, 16, 0.85) 68%, #161616 100%);
-}
-.bfx-mn-winner-content {
-    position: relative;
-    z-index: 2;
-    max-width: 640px;
-}
-.bfx-mn-winner-ribbon {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: #111111;
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    margin-bottom: 12px;
-}
-.bfx-mn-winner-ribbon svg {
-    width: 14px;
-    height: 14px;
-}
-.bfx-mn-winner-logo {
-    max-width: 280px;
-    max-height: 74px;
-    object-fit: contain;
-    display: block;
-    margin-bottom: 10px;
-}
-.bfx-mn-winner-title {
-    margin: 0 0 10px 0;
-    font-size: clamp(1.7rem, 3.5vw, 2.4rem);
-    font-weight: 900;
-    color: #ffffff;
-}
-.bfx-mn-winner-overview {
-    margin: 10px 0 18px 0;
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: #d4d4d4;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-.bfx-mn-winner-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 14px;
-}
-
 /* ---------- Seerr Search Cards & Request Modal ---------- */
 .bfx-seerr-section .streamflix-row-header {
     display: flex;
@@ -8417,23 +8014,4 @@ html.layout-tv .streamflix-surprise-btn {
     .bfx-gp-spot-meta {
         justify-content: center;
     }
-    .bfx-mn-filters {
-        grid-template-columns: 1fr;
-    }
-    .bfx-mn-arena {
-        grid-template-columns: 1fr;
-    }
-    .bfx-mn-vs {
-        margin: -6px auto;
-        z-index: 3;
-    }
-    .bfx-mn-key-hint,
-    .streamflix-modal-movienight span {
-        display: none;
-    }
-}
-
-body.bfx-tv-mode .bfx-mn-key-hint,
-html.layout-tv .bfx-mn-key-hint {
-    display: none;
 }

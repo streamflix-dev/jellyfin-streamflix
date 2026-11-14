@@ -28,10 +28,16 @@ public class StreamFlixProfileConfig
     public string? PinCode { get; set; }
 
     /// <summary>
-    /// Gets or sets an optional Google account that this profile is locked to. When set, the profile can only be
-    /// opened by a browser that has signed in with this exact Google account (verified server-side).
+    /// Gets or sets an optional account identifier (email or username) that this profile is locked to.
+    /// Kept under the XML property name <c>GoogleAccountEmail</c> for backward compatibility.
     /// </summary>
     public string? GoogleAccountEmail { get; set; }
+
+    /// <summary>
+    /// Gets or sets the optional authentication provider kind for <see cref="GoogleAccountEmail"/>:
+    /// <c>google</c>, <c>oidc</c>, <c>jellyfin</c>, or empty/null for automatic SSO email resolution.
+    /// </summary>
+    public string? AccountLockKind { get; set; }
 
     public bool AutoplayNextEpisode { get; set; } = true;
 
@@ -40,6 +46,12 @@ public class StreamFlixProfileConfig
     public string? JellyfinUserId { get; set; }
 
     public string? JellyfinUsername { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the linked Jellyfin Server User was automatically provisioned by StreamFlix
+    /// (rather than created manually by the server owner in Jellyfin Dashboard -> Users).
+    /// </summary>
+    public bool IsPluginCreatedJellyfinUser { get; set; }
 }
 
 /// <summary>

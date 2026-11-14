@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.StreamFlix.Configuration;
@@ -87,6 +88,91 @@ public class StreamFlixStartupTask : IScheduledTask
         }
 
         progress.Report(100);
+    }
+
+    /// <summary>
+    /// Creates a dedicated non-administrator Jellyfin Server User for a StreamFlix profile and immediately assigns a
+    /// cryptographically randomized 256-bit password so plugin-provisioned accounts are never left with a blank password.
+    /// Pre-existing / user-created Jellyfin accounts are never touched by this method.
+    /// </summary>
+    public static async Task<JUser> CreatePluginManagedUserAsync(
+        IUserManager userManager,
+        string username,
+        ILogger? logger = null)
+    {
+        var user = await userManager.CreateUserAsync(username).ConfigureAwait(false);
+        await RandomizePluginUserPasswordAsync(userManager, user, logger).ConfigureAwait(false);
+        return userManager.GetUserById(user.Id) ?? user;
+    }
+
+    /// <summary>
+    /// Assigns a cryptographically randomized 256-bit password to a plugin-created Jellyfin user via <see cref="IUserManager.ChangePassword"/>.
+    /// </summary>
+    public static async Task RandomizePluginUserPasswordAsync(
+        IUserManager userManager,
+        JUser user,
+        ILogger? logger = null)
+    {
+        if (user == null || IsUserAdminCompat(user))
+        {
+            return;
+        }
+
+        var randomPassword = "Sfx!" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_') + "9a";
+
+        try
+        {
+            var byGuid = typeof(IUserManager).GetMethod("ChangePassword", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Guid), typeof(string) }, null)
+                ?? userManager.GetType().GetMethod("ChangePassword", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Guid), typeof(string) }, null);
+            if (byGuid != null)
+            {
+                if (byGuid.Invoke(userManager, new object[] { user.Id, randomPassword }) is Task tGuid)
+                {
+                    await tGuid.ConfigureAwait(false);
+                    return;
+                }
+            }
+
+            var byUser = typeof(IUserManager).GetMethod("ChangePassword", BindingFlags.Public | BindingFlags.Instance, null, new[] { user.GetType(), typeof(string) }, null)
+                ?? userManager.GetType().GetMethod("ChangePassword", BindingFlags.Public | BindingFlags.Instance, null, new[] { user.GetType(), typeof(string) }, null);
+            if (byUser != null)
+            {
+                if (byUser.Invoke(userManager, new object[] { user, randomPassword }) is Task tUser)
+                {
+                    await tUser.ConfigureAwait(false);
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "StreamFlix: could not assign randomized password to plugin-created Jellyfin user '{Username}'.", user.Username);
+        }
+    }
+
+    private static bool UserHasEmptyPasswordCompat(object? user)
+    {
+        if (user == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var pwdProp = user.GetType().GetProperty("Password", BindingFlags.Public | BindingFlags.Instance);
+            if (pwdProp != null)
+            {
+                return string.IsNullOrEmpty(pwdProp.GetValue(user) as string);
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -614,6 +700,10 @@ public class StreamFlixStartupTask : IScheduledTask
 
                         // Safe match only: never an administrator account, never an account used by another profile.
                         user = FindSafeUserByName(userManager, config, profile, desiredName, profile.Name);
+                        if (user != null)
+                        {
+                            profile.IsPluginCreatedJellyfinUser = false;
+                        }
 
                         // Never silently fall back to the administrator account: a Kids/Guest profile whose user was
                         // deleted would otherwise inherit full admin rights with no parental controls.
@@ -621,8 +711,9 @@ public class StreamFlixStartupTask : IScheduledTask
                         {
                             try
                             {
-                                user = await userManager.CreateUserAsync(GetAvailableUsername(userManager, desiredName)).ConfigureAwait(false);
-                                logger?.LogInformation("StreamFlix: created Jellyfin Server User '{Username}' for profile '{ProfileName}'.", user.Username, profile.Name);
+                                user = await CreatePluginManagedUserAsync(userManager, GetAvailableUsername(userManager, desiredName), logger).ConfigureAwait(false);
+                                profile.IsPluginCreatedJellyfinUser = true;
+                                logger?.LogInformation("StreamFlix: created Jellyfin Server User '{Username}' with randomized password for profile '{ProfileName}'.", user.Username, profile.Name);
                             }
                             catch (Exception ex)
                             {
@@ -638,6 +729,15 @@ public class StreamFlixStartupTask : IScheduledTask
                     profile.JellyfinUsername = user.Username;
 
                     var isPrimaryAdminUser = (primaryAdmin != null && user.Id == primaryAdmin.Id) || IsUserAdminCompat(user);
+                    if (isPrimaryAdminUser)
+                    {
+                        profile.IsPluginCreatedJellyfinUser = false;
+                    }
+                    else if (profile.IsPluginCreatedJellyfinUser && UserHasEmptyPasswordCompat(user))
+                    {
+                        await RandomizePluginUserPasswordAsync(userManager, user, logger).ConfigureAwait(false);
+                        user = userManager.GetUserById(user.Id) ?? user;
+                    }
                     var needsUpdate = false;
 
                     if (isPrimaryAdminUser)

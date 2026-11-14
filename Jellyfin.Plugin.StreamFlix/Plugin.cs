@@ -521,10 +521,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         MaturityRating = Val(pEl, nameof(StreamFlixProfileConfig.MaturityRating)) ?? "TV-MA / R (All Maturity Levels)",
                         PinCode = Val(pEl, nameof(StreamFlixProfileConfig.PinCode)),
                         GoogleAccountEmail = Val(pEl, nameof(StreamFlixProfileConfig.GoogleAccountEmail)),
+                        AccountLockKind = Val(pEl, nameof(StreamFlixProfileConfig.AccountLockKind)),
                         AutoplayNextEpisode = BoolVal(pEl, nameof(StreamFlixProfileConfig.AutoplayNextEpisode), true),
                         AutoplayPreviews = BoolVal(pEl, nameof(StreamFlixProfileConfig.AutoplayPreviews), true),
                         JellyfinUserId = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUserId)),
                         JellyfinUsername = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUsername)),
+                        IsPluginCreatedJellyfinUser = BoolVal(pEl, nameof(StreamFlixProfileConfig.IsPluginCreatedJellyfinUser), false),
                     });
                 }
             }

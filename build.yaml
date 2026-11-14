@@ -1,21 +1,22 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.7.5.1"
+version: "0.7.5.2"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
-overview: "Netflix-style UI, Household Profiles, Guest Passes, Movie Night Matcher & Seerr Requests for Jellyfin"
+overview: "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin"
 description: >
   Transforms Jellyfin Web into StreamFlix with a Netflix #141414 dark cinema UI,
   flexible authentication (server-verified Google Sign-In, Beta Custom OpenID Connect SSO,
   themed Standard/Hybrid Jellyfin login, opt-in Administrator-only fallback, Local LAN bypass,
-  and toggleable QR Guest Passes), Movie Night Matcher, optional Seerr/Jellyseerr search requests,
+  and toggleable QR Guest Passes), optional Seerr/Jellyseerr search requests,
   and Netflix "Who's watching?" profiles backed by real Jellyfin Server Users.
 category: "General"
 imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png"
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - Unified Sign-In Methods List: move Custom OpenID Connect (OIDC) directly into the Sign-In Methods card stack alongside Google Sign-In, Jellyfin Password, Admin Fallback, and Local LAN Bypass with progressive-disclosure expansion
-  - Mandatory Household Sign-In Security: remove the option to completely disable household authentication before "Who's watching?" across the Settings UI, client gate, and backend API (explicit private-network LAN Bypass remains available)
+  - Multi-Auth Profile Lock Badges: dynamically show Google, OIDC/SSO, or Jellyfin account-lock icons across profile tiles, menus, and settings, with support for Google, OIDC, and Jellyfin account locks
+  - Sign Out All Devices & Security Hardening: revoke all Jellyfin device tokens alongside StreamFlix sessions on Sign Out All Devices, assign cryptographically randomized 256-bit passwords strictly to plugin-created Jellyfin accounts, block unverified OIDC username email spoofing, and require verified sessions for non-admin account locks
+  - Streamlined Menu & Auto-Deleting Guest Passes: remove Movie Night Matcher clutter so Cast and Quick Connect fit cleanly, and automatically delete revoked or expired Guest Passes alongside their Jellyfin tokens
