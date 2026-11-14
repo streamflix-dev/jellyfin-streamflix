@@ -13,24 +13,24 @@
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- Multi-Auth Profile Lock Badges: dynamically show Google, OIDC/SSO, or Jellyfin account-lock icons across profile tiles, menus, and settings, with support for Google, OIDC, and Jellyfin account locks\n- Sign Out All Devices & Security Hardening: revoke all Jellyfin device tokens alongside StreamFlix sessions on Sign Out All Devices, assign cryptographically randomized 256-bit passwords strictly to plugin-created Jellyfin accounts, block unverified OIDC username email spoofing, and require verified sessions for non-admin account locks\n- Streamlined Menu & Auto-Deleting Guest Passes: remove Movie Night Matcher clutter so Cast and Quick Connect fit cleanly, and automatically delete revoked or expired Guest Passes alongside their Jellyfin tokens",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.2_12.0.0.zip",
-        "checksum": "0bc95ffa366b4d56539d4ef16f1dd489",
-        "timestamp": "2026-11-14T05:08:10Z"
+        "checksum": "e1409b2576a2e3d8b5a9c24316b7d7c1",
+        "timestamp": "2026-11-14T05:08:25Z"
       },
       {
         "version": "0.7.5.2",
         "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- Multi-Auth Profile Lock Badges: dynamically show Google, OIDC/SSO, or Jellyfin account-lock icons across profile tiles, menus, and settings, with support for Google, OIDC, and Jellyfin account locks\n- Sign Out All Devices & Security Hardening: revoke all Jellyfin device tokens alongside StreamFlix sessions on Sign Out All Devices, assign cryptographically randomized 256-bit passwords strictly to plugin-created Jellyfin accounts, block unverified OIDC username email spoofing, and require verified sessions for non-admin account locks\n- Streamlined Menu & Auto-Deleting Guest Passes: remove Movie Night Matcher clutter so Cast and Quick Connect fit cleanly, and automatically delete revoked or expired Guest Passes alongside their Jellyfin tokens",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.2_10.11.0.zip",
-        "checksum": "bc50f65fd95adf7c56cd4884630b74f4",
-        "timestamp": "2026-11-14T05:08:10Z"
+        "checksum": "436a74c339e2a773e14f617a94644b87",
+        "timestamp": "2026-11-14T05:08:25Z"
       },
       {
         "version": "0.7.5.2",
         "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- Multi-Auth Profile Lock Badges: dynamically show Google, OIDC/SSO, or Jellyfin account-lock icons across profile tiles, menus, and settings, with support for Google, OIDC, and Jellyfin account locks\n- Sign Out All Devices & Security Hardening: revoke all Jellyfin device tokens alongside StreamFlix sessions on Sign Out All Devices, assign cryptographically randomized 256-bit passwords strictly to plugin-created Jellyfin accounts, block unverified OIDC username email spoofing, and require verified sessions for non-admin account locks\n- Streamlined Menu & Auto-Deleting Guest Passes: remove Movie Night Matcher clutter so Cast and Quick Connect fit cleanly, and automatically delete revoked or expired Guest Passes alongside their Jellyfin tokens",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/dist/Jellyfin.Plugin.StreamFlix_0.7.5.2_10.9.0.zip",
-        "checksum": "ce237cdb17df2e9f16c5cc0375479f09",
-        "timestamp": "2026-11-14T05:08:10Z"
+        "checksum": "86a93c4b90f94336d948f7c129369a16",
+        "timestamp": "2026-11-14T05:08:25Z"
       },
       {
         "version": "0.7.5.1",
