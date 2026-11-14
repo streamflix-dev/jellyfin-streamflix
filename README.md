@@ -2,7 +2,7 @@
 
 # StreamFlix for Jellyfin
 
-**A Netflix-style web UI, server-verified Google Sign-In gate, and household profiles backed by real Jellyfin users.**
+**A Netflix-style web UI, flexible household sign-in gate (Google OAuth, OIDC, Jellyfin & QR Guest Passes), native Seerr requests, and household profiles backed by real Jellyfin users.**
 
 [![Version](https://img.shields.io/badge/version-0.7.5.2-E50914?style=flat-square)](manifest.json)
 [![Jellyfin](https://img.shields.io/badge/Jellyfin-10.9%20%E2%80%93%2012.x-00A4DC?style=flat-square)](manifest.json)
@@ -27,14 +27,14 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/sign-in.jpg" alt="StreamFlix Google Sign-In Gate" />
+      <img src="docs/screenshots/sign-in.jpg" alt="StreamFlix Household Sign-In Gate" />
       <br />
-      <sub><b>2. Household Google Sign-In</b> — Clean pre-login gate with zero library exposure</sub>
+      <sub><b>2. Household Sign-In Gate</b> — Clean pre-login gate (Google, OIDC &amp; Jellyfin login) with zero library exposure</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/profile-picker.jpg" alt="StreamFlix Who's Watching Profile Picker" />
       <br />
-      <sub><b>3. Who's Watching?</b> — Animated library mosaic with per-member profiles, Kids badges &amp; Google locks</sub>
+      <sub><b>3. Who's Watching?</b> — Animated library mosaic with per-member profiles, Kids badges &amp; account/PIN locks</sub>
     </td>
   </tr>
   <tr>
@@ -72,12 +72,12 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/edit-profile.jpg" alt="StreamFlix Edit Profile Modal" />
       <br />
-      <sub><b>9. Profile Customization &amp; Security</b> — 64 avatars, 14 accent colors, maturity ratings, Kids mode, Google lock &amp; PIN</sub>
+      <sub><b>9. Profile Customization &amp; Security</b> — 64 avatars, 14 accent colors, maturity ratings, Kids mode, multi-auth account lock &amp; PIN</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/admin-settings.png" alt="StreamFlix Admin Dashboard Settings" />
       <br />
-      <sub><b>10. Plugin Administration</b> — OAuth status, Jellyfin user mapping, custom branding &amp; authentication controls</sub>
+      <sub><b>10. Plugin Administration</b> — Progressive sign-in methods, Guest Passes, Seerr integration, user mapping &amp; custom branding</sub>
     </td>
   </tr>
 </table>
@@ -91,11 +91,11 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 ## Highlights
 
 ### Flexible Household Sign-In, Guest Passes & Security
-- **Google OAuth, Custom OIDC (Beta), Standard Login, or Hybrid Mode.** Household sign-in is always enforced before *"Who's watching?"*. Require server-verified Google Sign-In (with one-click **Test OAuth Config** validation), connect a self-hosted or cloud **OpenID Connect (OIDC)** provider directly in the **Sign-In Methods** list (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc. via Authorization Code + PKCE `S256` and RSA/ECDSA JWKS verification), enable a Netflix-themed **Standard Jellyfin Account** sign-in form, or bypass the login gate automatically on trusted **Local LAN** connections.
-- **Temporary Guest Passes with local SVG QR codes.** Generate expiring invite links and zero-dependency, server-rendered QR codes locked to a single non-administrator profile with configurable duration (`4h`–`30d`) and device limits. Link-preview bots cannot burn redemptions, guests cannot switch into other profiles, and revoking or expiring a pass deletes it automatically and terminates active Jellyfin sessions immediately.
-- **Opt-in Admin Sign-In fallback (off by default).** Server owners can optionally enable an **Admin Sign-In** link on the sign-in gate in plugin settings. It strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional LAN-only restriction.
-- **Profile-level locks, randomized plugin passwords & hardened config.** Protect any profile with a **4–8 digit PIN** (with target-scoped brute-force lockout) and/or lock it to a **specific Google, OIDC, or Jellyfin account** (displaying a matching provider badge). Dedicated Jellyfin users created by StreamFlix receive a cryptographically randomized 256-bit password automatically (while manually created Jellyfin accounts are never modified), sensitive secrets stay server-side, and plugin configuration is mirrored atomically to persistent Jellyfin data storage.
-- **Admin-only user linking.** Only Jellyfin administrators can view server accounts, edit admin-linked profiles, manage Guest Passes, sign out all devices, or change which Jellyfin user backs a profile.
+- **Google OAuth, Custom OIDC (Beta), Jellyfin Login, or Hybrid Mode.** Household sign-in is always enforced before *"Who's watching?"*. Enable one or more progressive-disclosure **Sign-In Methods** — server-verified **Google Sign-In** (with one-click **Test OAuth Config**), self-hosted or cloud **Custom OpenID Connect (OIDC)** (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc. via Authorization Code + PKCE `S256`, RSA/ECDSA JWKS verification, and one-click **Test OIDC Discovery**), **Jellyfin Username & Password Login**, or **Bypass Sign-In Gate on Home Network (LAN)**.
+- **Temporary Guest Passes with local SVG QR codes.** Generate expiring invite links and zero-dependency, server-rendered QR codes locked to a single non-administrator profile with configurable duration (`4h`–`30d`) and device limits. Link-preview bots cannot burn redemptions, guests cannot switch into other profiles, and revoking or expiring a pass automatically deletes it and terminates active Jellyfin sessions immediately.
+- **Opt-in Admin-Only Password Fallback (off by default).** Optionally add a subtle **Admin Sign-In** link on SSO screens that strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional **LAN-only** IP restriction.
+- **Multi-auth profile locks & randomized plugin passwords.** Protect any profile with a **4–8 digit PIN** (with target-scoped brute-force lockout) and/or lock it to a **Google email, OIDC email/username, or Jellyfin username** — displaying a matching provider badge on the profile tile. Dedicated Jellyfin users created by StreamFlix receive a cryptographically randomized 256-bit password automatically (while manually created Jellyfin accounts are never modified), secrets stay strictly server-side, and plugin configuration is mirrored atomically to persistent Jellyfin storage.
+- **Admin-only user management & global device sign-out.** Only Jellyfin administrators can view server accounts, edit admin-linked profiles, manage Guest Passes, change which Jellyfin user backs a profile, or trigger **Sign out all devices** (revoking both StreamFlix household sessions and every Jellyfin device `AccessToken` across browsers, mobile apps, and Smart TVs).
 
 ### Real Multi-User Profiles
 - **Separate history for everyone.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, and parental controls** completely independent.
@@ -145,16 +145,19 @@ The plugin repository manifest includes builds for all supported Jellyfin releas
 ## Setup
 
 1. Sign in to Jellyfin as an administrator and open **Dashboard → Plugins → StreamFlix**.
-2. In [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials), create an **OAuth 2.0 Client ID** (*Web application*) and add the **Authorized JavaScript origins** and **Authorized redirect URIs** shown on the StreamFlix configuration page.
-3. Paste your **Google Client ID**, enter your **Approved Google accounts** (one email per line), and click **Save**.
-   *(On a fresh install with an empty allowlist, the first Google account to sign in is approved automatically.)*
-4. Open **Manage Profiles** from the profile picker (or plugin settings) to create household profiles, link them to Jellyfin users, and configure PINs or Google account locks.
+2. Under **Sign-In Methods**, toggle on one or more ways for your household to unlock *"Who's watching?"* (configuration fields expand automatically when enabled):
+   - **Google Sign-In:** Create a *Web application* **OAuth 2.0 Client ID** in [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) with the **Authorized JavaScript origins** and **Authorized redirect URIs** shown on the settings page, paste your **Client ID**, enter **Approved Google accounts** *(on a fresh install with an empty allowlist, the first Google account to sign in is approved automatically)*, and click **Test OAuth Config**.
+   - **Custom OpenID Connect (OIDC):** Register the displayed **OIDC Redirect / Callback URI** in your identity provider (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc.), enter your **Issuer / Discovery URL** and **Client ID** (plus optional Client Secret or allowlist), and click **Test OIDC Discovery**.
+   - **Jellyfin Username & Password Login:** Allow any active Jellyfin server user to unlock the profile picker with their normal Jellyfin credentials — standalone or alongside Google/OIDC.
+   - **Bypass Sign-In Gate on Home Network (LAN):** Let devices on private LAN subnets jump straight to *"Who's watching?"* while still enforcing authentication on remote WAN connections.
+3. *(Optional)* Connect **Seerr / Jellyseerr / Overseerr** for live-search media requests, or generate **Temporary Guest Passes** (QR code / invite link) locked to a specific non-admin profile.
+4. Click **Save**, then open **Manage Profiles** from the profile picker (or plugin settings) to create household profiles, link them to Jellyfin users, and configure **4–8 digit PINs** or **Google / OIDC / Jellyfin account locks**.
 
 > [!TIP]
-> If you link a profile to your Jellyfin administrator account, protect it with a **PIN** or **Google account lock** so other household members cannot switch into it.
+> Always protect any profile linked to your Jellyfin administrator account with a **PIN** or an **account lock** (Google email, OIDC identity, or Jellyfin username) so other household members cannot switch into it.
 
 > [!NOTE]
-> Don't use Google OAuth or running a local-only server? Enable **Standard Jellyfin Login** (or **Bypass Login Gate on Local Network**) in **Dashboard → Plugins → StreamFlix** to go straight to the Netflix-style UI and *"Who's watching?"* profile picker without Google Sign-In. Server owners can also opt in to showing an **Admin Sign-In** link on the Google gate (disabled by default) as a direct administrator fallback.
+> For security, household sign-in before *"Who's watching?"* cannot be disabled globally for remote connections. If you run SSO-only (`Google` or `OIDC`), you can optionally enable the **Admin-Only Password Fallback Link** (and restrict it to LAN IPs) as an emergency administrator login path.
 
 ---
 
@@ -181,17 +184,17 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
     ├── Plugin.cs                        # Plugin entry point & throttled index.html injection
     ├── PluginServiceRegistrator.cs      # DI registration for services & startup filter
     ├── Configuration/
-    │   ├── PluginConfiguration.cs       # Profiles, Google OAuth & session configuration
+    │   ├── PluginConfiguration.cs       # Profiles, multi-auth, Guest Pass & Seerr config
     │   └── configPage.html              # Admin UI (Dashboard → Plugins → StreamFlix)
     ├── Controllers/
-    │   └── StreamFlixController.cs      # Auth, session, profile & asset endpoints
+    │   └── StreamFlixController.cs      # Auth, OIDC, Guest Pass, Seerr & profile endpoints
     ├── Services/
     │   ├── StreamFlixOidcService.cs     # OIDC Relying Party (PKCE S256, discovery & JWKS verification)
     │   ├── StreamFlixQrCode.cs          # Zero-dependency ISO/IEC 18004 SVG QR code encoder
     │   ├── StreamFlixSeerrService.cs    # SSRF-hardened Seerr / Jellyseerr / Overseerr API client
     │   ├── StreamFlixSessionService.cs  # HMAC household/guest sessions & rate-limit tracking
     │   ├── StreamFlixStartupFilter.cs   # Request-time index.html script/style injection
-    │   └── StreamFlixStartupTask.cs     # Jellyfin user provisioning & profile linking
+    │   └── StreamFlixStartupTask.cs     # Jellyfin user provisioning, password hardening & linking
     └── Web/
         ├── streamflix.css               # Cinema theme, responsive/TV layouts & animations
         └── streamflix.js                # Sign-in gate, profile picker, home hub & player UI
