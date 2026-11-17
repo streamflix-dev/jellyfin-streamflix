@@ -89,7 +89,7 @@
             showToast('Sign in to download media.', 'error');
             return;
         }
-        var url = apiBase() + '/Items/' + encodeURIComponent(itemId) + '/Download?api_key=' + encodeURIComponent(tok);
+        var url = apiBase() + '/Items/' + encodeURIComponent(itemId) + '/Download?Apikey=' + encodeURIComponent(tok);
         var a = document.createElement('a');
         a.href = url;
         a.download = '';

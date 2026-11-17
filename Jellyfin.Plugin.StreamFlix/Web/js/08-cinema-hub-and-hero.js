@@ -8,10 +8,13 @@
     }
 
     function getJellyfinAuthContext() {
+        var ac = typeof resolveActiveApiClient === 'function' ? resolveActiveApiClient() : window.ApiClient;
         var userId = (state.activeProfile && state.activeProfile.jellyfinUserId)
-            || (window.ApiClient && typeof window.ApiClient.getCurrentUserId === 'function' ? window.ApiClient.getCurrentUserId() : null);
+            || getActiveUserId()
+            || (ac && typeof ac.getCurrentUserId === 'function' ? ac.getCurrentUserId() : null);
         var token = (state.activeProfile && state.activeProfile.accessToken)
-            || (window.ApiClient && typeof window.ApiClient.accessToken === 'function' ? window.ApiClient.accessToken() : null);
+            || getActiveToken()
+            || (ac && typeof ac.accessToken === 'function' ? ac.accessToken() : null);
         return { userId: userId, token: token };
     }
 

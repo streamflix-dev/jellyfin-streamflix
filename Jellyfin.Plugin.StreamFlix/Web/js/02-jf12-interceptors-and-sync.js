@@ -436,6 +436,9 @@
     }
 
     function syncAutomaticWebGpuPlayerPreference(forceMode, targetItemId) {
+        if (typeof isJellyfinMediaPlayerApp === 'function' && isJellyfinMediaPlayerApp()) {
+            return 'native';
+        }
         if (!isWebGpuPluginInstalled()) {
             webGpuRuntimeState.lastChosenMode = 'html';
             return 'html';

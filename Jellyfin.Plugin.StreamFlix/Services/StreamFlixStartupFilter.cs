@@ -53,18 +53,8 @@ public class StreamFlixStartupFilter : IStartupFilter
             return;
         }
 
-        // Never hijack /Branding/Css: native desktop/TV/mobile clients (such as Jellyfin Media Player for Windows)
-        // fetch /Branding/Css without loading /StreamFlix/ClientScript, whereas web clients load ClientStyles via index.html.
-        // Also skip StreamFlix HTML injection for Jellyfin Media Player desktop native shell so its mpv/tile shell runs natively.
-        var ua = context.Request.Headers.UserAgent.ToString();
-        if (!string.IsNullOrEmpty(ua)
-            && (ua.Contains("JellyfinMediaPlayer", StringComparison.OrdinalIgnoreCase)
-                || ua.Contains("JMP/", StringComparison.OrdinalIgnoreCase)))
-        {
-            await nextMw().ConfigureAwait(false);
-            return;
-        }
-
+        // Note: /Branding/Css is intentionally left untouched so bundled-CSS-only clients never receive CSS without ClientScript,
+        // while Jellyfin Web and Jellyfin Media Player (Server web mode) receive the full StreamFlix UI via index.html below.
         if (!IsIndexRequest(reqPath))
         {
             await nextMw().ConfigureAwait(false);

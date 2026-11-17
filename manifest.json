@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.4",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.4 Release Candidate (Dev Test Channel): Restore full StreamFlix Cinema UI in Jellyfin Media Player for Windows while fixing idle .videoPlayerContainer detection, ServerConnections auth resolution, and preserving JMP's native mpv player (#16); update direct media download URLs to use Jellyfin's native ?Apikey= parameter (#18, #10); plus clean disable recovery (#17), household profile security (#11, #8, #3), Tailscale LAN support (#12), cold-load speedup (#13), Visible Jellyfin Libraries nav fix (#14), and Seerr Tracker fix (#15).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.4_12.0.0.zip",
+        "checksum": "e2063bcd73cc414a2c7e738865cd6a24",
+        "timestamp": "2026-11-17T20:21:52Z"
+      },
+      {
+        "version": "0.9.8.4",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.4 Release Candidate (Dev Test Channel): Restore full StreamFlix Cinema UI in Jellyfin Media Player for Windows while fixing idle .videoPlayerContainer detection, ServerConnections auth resolution, and preserving JMP's native mpv player (#16); update direct media download URLs to use Jellyfin's native ?Apikey= parameter (#18, #10); plus clean disable recovery (#17), household profile security (#11, #8, #3), Tailscale LAN support (#12), cold-load speedup (#13), Visible Jellyfin Libraries nav fix (#14), and Seerr Tracker fix (#15).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.4_10.11.0.zip",
+        "checksum": "2582e30e82c9fb0cc4cfe3a9c25349c2",
+        "timestamp": "2026-11-17T20:21:52Z"
+      },
+      {
+        "version": "0.9.8.4",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.4 Release Candidate (Dev Test Channel): Restore full StreamFlix Cinema UI in Jellyfin Media Player for Windows while fixing idle .videoPlayerContainer detection, ServerConnections auth resolution, and preserving JMP's native mpv player (#16); update direct media download URLs to use Jellyfin's native ?Apikey= parameter (#18, #10); plus clean disable recovery (#17), household profile security (#11, #8, #3), Tailscale LAN support (#12), cold-load speedup (#13), Visible Jellyfin Libraries nav fix (#14), and Seerr Tracker fix (#15).",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.4_10.9.0.zip",
+        "checksum": "bb6c9a1e853ed89ca60b88c7bef99376",
+        "timestamp": "2026-11-17T20:21:52Z"
+      },
+      {
         "version": "0.9.8.3",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.3 Release Candidate (Dev Test Channel): Clean disable/uninstall recovery with zero persistent disk branding/index.html writes and scoped body.bfx-active CSS (#17, #16); Jellyfin Media Player for Windows compatibility (#16); household-member scoping on Standard Jellyfin Login and active-profile admin enforcement across profile deletion/reordering/editing, backups, and device management (#11, #8, #3); Tailscale CGNAT (100.64.0.0/10) local-network recognition and Dashboard non-admin token protection (#12); 2-stage progressive Cinema Hub fallback, SWR caching, and non-blocking server popularity/showcase caches (#13); Visible Jellyfin Libraries navigation bar filtering & deduplication (#14); Seerr Tracker timeout & auth probe fixes (#15); and Jellyfin 12 download fix + direct Movie & Episode Download buttons (#10).",
         "targetAbi": "12.0.0.0",

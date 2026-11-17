@@ -113,7 +113,11 @@
         if (h.indexOf('#/video') === 0 || h.indexOf('#!/video') === 0) {
             return true;
         }
-        if (document.querySelector('#videoOsdPage:not(.hide), .videoPlayerContainer, video.htmlvideoplayer, .htmlvideoplayer')) {
+        if (document.querySelector('#videoOsdPage:not(.hide)')) {
+            return true;
+        }
+        var topPlayer = document.querySelector('.videoPlayerContainer.videoPlayerContainer-onTop:not(.hide):not(.backdropPlayerContainer)');
+        if (topPlayer && topPlayer.offsetWidth > 100 && topPlayer.offsetHeight > 100) {
             return true;
         }
         return false;

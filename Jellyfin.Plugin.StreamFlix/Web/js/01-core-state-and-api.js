@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.3)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.4)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.3';
+    var VERSION = '0.9.8.4';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -871,13 +871,10 @@
         return String(id || '').replace(/-/g, '').toLowerCase();
     }
 
-    function isNativeDesktopShellClient() {
+    function isJellyfinMediaPlayerApp() {
         try {
             var ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
             if (/JellyfinMediaPlayer|\bJMP\//i.test(ua)) {
-                return true;
-            }
-            if (window.location && /^(file|qrc):/i.test(window.location.protocol || '')) {
                 return true;
             }
             if (window.NativeShell && window.jmpInfo) {
@@ -887,8 +884,17 @@
         return false;
     }
 
+    function isBundledLocalProtocolOnly() {
+        try {
+            if (window.location && /^(file|qrc):/i.test(window.location.protocol || '')) {
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
     function isStreamFlixRuntimeEnabled() {
-        if (state.pluginDisabled || isNativeDesktopShellClient()) {
+        if (state.pluginDisabled || isBundledLocalProtocolOnly()) {
             return false;
         }
         if (state.config && state.config.enableStreamFlixUi === false) {
@@ -902,11 +908,18 @@
             if (window.ApiClient) {
                 return window.ApiClient;
             }
-            var cm = window.ConnectionManager || (window.Emby && window.Emby.ConnectionManager) || null;
-            if (cm && typeof cm.currentApiClient === 'function') {
-                var cur = cm.currentApiClient();
-                if (cur) {
-                    return cur;
+            var mgrs = [
+                window.ServerConnections,
+                window.ConnectionManager,
+                window.Emby && window.Emby.ConnectionManager
+            ];
+            for (var i = 0; i < mgrs.length; i++) {
+                var cm = mgrs[i];
+                if (cm && typeof cm.currentApiClient === 'function') {
+                    var cur = cm.currentApiClient();
+                    if (cur) {
+                        return cur;
+                    }
                 }
             }
         } catch (e) {}
