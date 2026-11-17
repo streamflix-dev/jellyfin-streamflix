@@ -1245,7 +1245,7 @@ img.is-broken { visibility: hidden; }
 .streamflix-grid > *,
 .streamflix-grid .streamflix-poster-card {
     flex: initial;
-    width: 100%;
+    width: 100% !important;
     min-width: 0;
     max-width: 100%;
 }

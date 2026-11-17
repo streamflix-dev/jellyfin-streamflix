@@ -91,8 +91,8 @@ public class StreamFlixStartupTask : IScheduledTask
     }
 
     /// <summary>
-    /// Creates a dedicated non-administrator Jellyfin Server User for a StreamFlix profile and immediately assigns a
-    /// cryptographically randomized 256-bit password so plugin-provisioned accounts are never left with a blank password.
+    /// Creates a dedicated non-administrator Jellyfin Server User for a StreamFlix profile, assigns a
+    /// cryptographically randomized 256-bit password, and initializes baseline playback permissions once.
     /// Pre-existing / user-created Jellyfin accounts are never touched by this method.
     /// </summary>
     public static async Task<JUser> CreatePluginManagedUserAsync(
@@ -102,7 +102,21 @@ public class StreamFlixStartupTask : IScheduledTask
     {
         var user = await userManager.CreateUserAsync(username).ConfigureAwait(false);
         await RandomizePluginUserPasswordAsync(userManager, user, logger).ConfigureAwait(false);
-        return userManager.GetUserById(user.Id) ?? user;
+        var reloaded = userManager.GetUserById(user.Id) ?? user;
+        var primaryAdmin = GetPrimaryAdminUserCompat(userManager);
+        if (InitializeNewPluginUserPermissions(reloaded, primaryAdmin))
+        {
+            try
+            {
+                await userManager.UpdateUserAsync(reloaded).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogDebug(ex, "StreamFlix: could not persist initial playback permissions for '{Username}'.", reloaded.Username);
+            }
+        }
+
+        return userManager.GetUserById(reloaded.Id) ?? reloaded;
     }
 
     /// <summary>
@@ -752,12 +766,13 @@ public class StreamFlixStartupTask : IScheduledTask
 
                         // Never silently fall back to the administrator account: a Kids/Guest profile whose user was
                         // deleted would otherwise inherit full admin rights with no parental controls.
-                        if (user == null && (allowCreateMissingUsers || config.AutoProvisionJellyfinUsers))
+                        if (user == null && allowCreateMissingUsers && config.AutoProvisionJellyfinUsers)
                         {
                             try
                             {
                                 user = await CreatePluginManagedUserAsync(userManager, GetAvailableUsername(userManager, desiredName), logger).ConfigureAwait(false);
                                 profile.IsPluginCreatedJellyfinUser = true;
+                                profile.PermissionsInitialized = true;
                                 logger?.LogInformation("StreamFlix: created Jellyfin Server User '{Username}' with randomized password for profile '{ProfileName}'.", user.Username, profile.Name);
                             }
                             catch (Exception ex)
@@ -796,8 +811,10 @@ public class StreamFlixStartupTask : IScheduledTask
                             }
                         }
                     }
-                    else
+                    else if (profile.IsPluginCreatedJellyfinUser)
                     {
+                        // Only manage permissions & parental ratings on dedicated plugin-created users,
+                        // never overwriting library/remote/download permissions on pre-existing Jellyfin accounts.
                         var desiredParentalAge = ParentalAgeFromMaturity(profile.MaturityRating, profile.IsKids);
                         if (TryGetMaxParentalAge(user) != desiredParentalAge)
                         {
@@ -807,7 +824,16 @@ public class StreamFlixStartupTask : IScheduledTask
                             }
                         }
 
-                        if (EnsureUserLibraryAccessAndPermissions(user, primaryAdmin, profile.AllowedLibraryIds))
+                        if (!profile.PermissionsInitialized)
+                        {
+                            if (InitializeNewPluginUserPermissions(user, primaryAdmin, profile.AllowedLibraryIds))
+                            {
+                                needsUpdate = true;
+                            }
+
+                            profile.PermissionsInitialized = true;
+                        }
+                        else if (JellyfinCompat.SyncUserLibraryRestriction(user, profile.AllowedLibraryIds))
                         {
                             needsUpdate = true;
                         }
@@ -838,7 +864,12 @@ public class StreamFlixStartupTask : IScheduledTask
         }
     }
 
-    public static bool EnsureUserLibraryAccessAndPermissions(
+    /// <summary>
+    /// Applies one-time baseline playback permissions to a newly created plugin-managed Jellyfin user.
+    /// Does NOT grant <c>EnableContentDownloading</c>, inherits <c>EnableRemoteAccess</c> from the primary admin
+    /// when available, and is never called on pre-existing (admin-managed) Jellyfin accounts.
+    /// </summary>
+    public static bool InitializeNewPluginUserPermissions(
         object targetUser,
         object? sourceAdminUser,
         IReadOnlyList<string>? allowedLibraryIds = null)
@@ -864,17 +895,21 @@ public class StreamFlixStartupTask : IScheduledTask
             var requiredPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "EnableAllDevices",
-                "EnableAllChannels",
                 "EnableMediaPlayback",
                 "EnableAudioPlaybackTranscoding",
                 "EnableVideoPlaybackTranscoding",
                 "EnablePlaybackRemuxing",
-                "EnableContentDownloading",
-                "EnableRemoteAccess",
             };
             if (!hasExplicitFolderRestriction)
             {
                 requiredPermissions.Add("EnableAllFolders");
+            }
+
+            var adminPermsProp = sourceAdminUser?.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            var allowRemote = sourceAdminUser == null || HasUserPermissionCompat(sourceAdminUser, adminPermsProp, "EnableRemoteAccess");
+            if (allowRemote)
+            {
+                requiredPermissions.Add("EnableRemoteAccess");
             }
 
             var foundPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

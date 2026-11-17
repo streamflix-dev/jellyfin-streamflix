@@ -31,6 +31,7 @@
         var community = item.CommunityRating ? Number(item.CommunityRating).toFixed(1) : '';
         var isFav = item.UserData && item.UserData.IsFavorite;
         var isPlayed = item.UserData && item.UserData.Played;
+        var canManageMedia = typeof canManageMediaItems === 'function' && canManageMediaItems();
         var hasResume = item.UserData && item.UserData.PlaybackPositionTicks && item.UserData.PlaybackPositionTicks > 0;
         var resumePct = hasResume && item.RunTimeTicks
             ? Math.min(100, Math.max(2, Math.round(item.UserData.PlaybackPositionTicks / item.RunTimeTicks * 100)))
@@ -99,7 +100,7 @@
                 : '')
             + '          <h2 class="streamflix-detail-title-text">' + escapeHtml(displayTitle) + '</h2>'
             + '        </div>'
-            + (episodeSubline ? '<div style="font-size:15px;font-weight:700;color:#e5e5e5;margin:0 0 14px 0;text-shadow:0 2px 10px rgba(0,0,0,0.9);">' + escapeHtml(episodeSubline) + '</div>' : '')
+            + (episodeSubline ? '<div id="streamflix-modal-episode-subline" style="font-size:15px;font-weight:700;color:#e5e5e5;margin:0 0 14px 0;text-shadow:0 2px 10px rgba(0,0,0,0.9);">' + escapeHtml(episodeSubline) + '</div>' : '')
             + (resumePct
                 ? '<div class="streamflix-detail-resume" id="streamflix-modal-resume-row"><div class="streamflix-hero-progress-bar"><span style="width:' + resumePct + '%;"></span></div>' + (resumeLeftText ? '<span>' + escapeHtml(resumeLeftText) + '</span>' : '') + '</div>'
                 : '')
@@ -112,6 +113,9 @@
             + '          <button type="button" class="streamflix-hero-icon-btn' + (isPlayed ? ' active' : '') + '" id="streamflix-modal-watched-btn" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>'
             + ((typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
                 ? '          <button type="button" class="streamflix-hero-icon-btn' + ((typeof watchPartyState !== 'undefined' && watchPartyState.activeGroup) ? ' active is-live' : '') + '" id="streamflix-modal-watchparty-btn" title="Watch Together" aria-label="Watch Together">' + icon('party') + '</button>'
+                : '')
+            + (canManageMedia
+                ? '          <button type="button" class="streamflix-hero-icon-btn" id="streamflix-modal-manage-btn" title="Manage media" aria-label="Manage media">' + icon('edit') + '</button>'
                 : '')
             + '        </div>'
             + '      </div>'
@@ -250,6 +254,107 @@
                         playableTarget: firstPlayableTarget || resolvedItem || item
                     });
                 }
+            });
+        }
+
+        var manageMediaBtn = qModal('#streamflix-modal-manage-btn');
+        if (manageMediaBtn) {
+            manageMediaBtn.addEventListener('click', function () {
+                openManageMediaMenu({
+                    item: resolvedItem || item,
+                    onItemEdited: function (updatedItem) {
+                        if (!updatedItem || !updatedItem.Id || modalClosed) {
+                            return;
+                        }
+                        var ownUserData = (resolvedItem && resolvedItem.UserData) || (item && item.UserData);
+                        if (ownUserData) {
+                            updatedItem.UserData = ownUserData;
+                        } else {
+                            delete updatedItem.UserData;
+                        }
+                        var editedId = normalizeGuid(updatedItem.Id);
+                        function mergeEditedMetadata(target) {
+                            if (!target || target === updatedItem || normalizeGuid(target.Id) !== editedId) {
+                                return;
+                            }
+                            Object.keys(updatedItem).forEach(function (key) {
+                                if (key !== 'UserData') {
+                                    target[key] = updatedItem[key];
+                                }
+                            });
+                        }
+                        mergeEditedMetadata(item);
+                        mergeEditedMetadata(resolvedItem);
+                        Object.keys(state.itemCache || {}).forEach(function (key) {
+                            mergeEditedMetadata(state.itemCache[key]);
+                        });
+                        var editedItemPools = [
+                            state.hubData && state.hubData.heroItems,
+                            state.hubData && state.hubData.resumeItems,
+                            state.hubData && state.hubData.nextUpItems,
+                            state.hubData && state.hubData.top10Items,
+                            state.hubData && state.hubData.favoriteItems,
+                            state.hubData && state.hubData.recentMovies,
+                            state.hubData && state.hubData.recentSeries,
+                            state.hubData && state.hubData.allMovies,
+                            state.hubData && state.hubData.allSeries,
+                            state.hubData && state.hubData.collectionsItems,
+                            state.searchResults,
+                            state.browseFilter && state.browseFilter.items
+                        ];
+                        editedItemPools.forEach(function (pool) {
+                            if (Array.isArray(pool)) {
+                                pool.forEach(mergeEditedMetadata);
+                            }
+                        });
+                        putCachedItem(updatedItem.Id, updatedItem);
+                        if (updatedItem.Type === 'Episode') {
+                            var sublineEl = qModal('#streamflix-modal-episode-subline');
+                            if (sublineEl) {
+                                sublineEl.textContent = 'Season ' + (updatedItem.ParentIndexNumber || 1)
+                                    + ' • Episode ' + (updatedItem.IndexNumber || 1) + ' — ' + (updatedItem.Name || '');
+                            }
+                        } else if (updatedItem.Name) {
+                            var titleTextEl = qModal('.streamflix-detail-title-text');
+                            if (titleTextEl) {
+                                titleTextEl.textContent = updatedItem.Name;
+                            }
+                        }
+                        var editedOverviewEl = qModal('#streamflix-modal-overview');
+                        if (editedOverviewEl) {
+                            editedOverviewEl.textContent = updatedItem.Overview || 'No description available.';
+                        }
+                        var editedTaglineEl = qModal('#streamflix-modal-tagline');
+                        if (editedTaglineEl) {
+                            var editedTagline = extractCleanTagline(updatedItem);
+                            editedTaglineEl.textContent = editedTagline;
+                            editedTaglineEl.style.display = editedTagline ? '' : 'none';
+                        }
+                        var editedMetaRow = qModal('#streamflix-modal-meta-row');
+                        if (editedMetaRow) {
+                            var updCommunity = updatedItem.CommunityRating ? Number(updatedItem.CommunityRating).toFixed(1) : '';
+                            var updYear = updatedItem.ProductionYear ? String(updatedItem.ProductionYear) : '';
+                            var updRating = updatedItem.OfficialRating ? String(updatedItem.OfficialRating) : '';
+                            var updRuntime = formatRuntimeTicks(updatedItem.RunTimeTicks);
+                            var updGenres = Array.isArray(updatedItem.Genres) ? updatedItem.Genres.slice(0, 4) : [];
+                            editedMetaRow.innerHTML = ''
+                                + (updCommunity ? '<span class="streamflix-hero-rating">' + icon('star') + escapeHtml(updCommunity) + '</span>' : '')
+                                + (updYear ? '<span>' + escapeHtml(updYear) + '</span>' : '')
+                                + (updRating ? '<span class="streamflix-maturity-pill">' + escapeHtml(updRating) + '</span>' : '')
+                                + (updRuntime ? '<span>' + escapeHtml(updRuntime.trim()) + '</span>' : '')
+                                + (updGenres.length
+                                    ? '<span class="streamflix-detail-genre-chips">' + updGenres.map(function (g) {
+                                        return '<button type="button" class="streamflix-genre-chip" data-filter-genre="' + escapeHtml(g) + '" title="Browse ' + escapeHtml(g) + '">' + escapeHtml(g) + '</button>';
+                                    }).join('') + '</span>'
+                                    : '');
+                            bindGenreChipsInModal();
+                        }
+                        renderEnrichedDetails(updatedItem);
+                    },
+                    onItemDeleted: function () {
+                        closeModal(false);
+                    }
+                });
             });
         }
 

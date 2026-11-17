@@ -22,7 +22,7 @@ namespace Jellyfin.Plugin.StreamFlix.Services;
 /// <summary>
 /// Full-compatibility server-side client for Seerr, Jellyseerr, and Overseerr (<c>/api/v1</c>).
 /// Handles IPv4-preferred socket transport, Docker localhost bridging, safe same-host POST/DELETE redirects,
-/// deleted-user-#1 X-Api-User recovery, Jellyfin per-profile user attribution with automatic admin fallback,
+/// deleted-user-#1 X-Api-User recovery, per-profile Seerr user attribution &amp; permission enforcement,
 /// Radarr/Sonarr un-defaulted &amp; 4K server auto-selection, and instant search/metadata caching.
 /// </summary>
 public static class StreamFlixSeerrService
@@ -156,7 +156,9 @@ public static class StreamFlixSeerrService
         int? DownloadProgress,
         List<int> Seasons,
         string CreatedAt,
-        string? JellyfinMediaId);
+        string? JellyfinMediaId,
+        int? RequestedByUserId = null,
+        bool CanCancel = true);
 
     public sealed record SeerrSubmitResult(
         bool Ok,
@@ -687,6 +689,9 @@ public static class StreamFlixSeerrService
     public static async Task<List<SeerrRequestEntry>> GetRecentRequestsAsync(
         PluginConfiguration config,
         bool isKidsProfile,
+        bool callerIsAdmin = true,
+        StreamFlixProfileConfig? callerProfile = null,
+        string? callerEmail = null,
         CancellationToken cancellationToken = default)
     {
         var entries = new List<SeerrRequestEntry>();
@@ -696,19 +701,44 @@ public static class StreamFlixSeerrService
         }
 
         var baseUrl = NormalizeBaseUrl(config.SeerrUrl);
-        var reqCacheKey = $"{baseUrl}|{(isKidsProfile ? "1" : "0")}";
+        var apiKey = config.SeerrApiKey.Trim();
+        await ValidateSafeSeerrBaseUrlAsync(baseUrl, cancellationToken).ConfigureAwait(false);
+        var authCtx = await ResolveApiAuthContextAsync(baseUrl, apiKey, cancellationToken).ConfigureAwait(false);
+
+        int? callerSeerrUserId = null;
+        if (!callerIsAdmin)
+        {
+            callerSeerrUserId = await ResolveMatchingSeerrUserIdAsync(
+                baseUrl,
+                apiKey,
+                authCtx?.ApiUserHeader,
+                authCtx?.AdminUserId,
+                callerProfile,
+                callerEmail,
+                callerIsAdmin: false,
+                cancellationToken).ConfigureAwait(false);
+            if (!callerSeerrUserId.HasValue)
+            {
+                return entries;
+            }
+        }
+
+        var scopeTag = callerIsAdmin
+            ? "admin"
+            : $"u:{callerSeerrUserId!.Value.ToString(CultureInfo.InvariantCulture)}";
+        var reqCacheKey = $"{baseUrl}|{(isKidsProfile ? "1" : "0")}|{scopeTag}";
         if (RecentRequestsCache.TryGetValue(reqCacheKey, out var cachedReqs) && cachedReqs.ExpiresAtUtc > DateTime.UtcNow)
         {
             return cachedReqs.Entries;
         }
 
-        var apiKey = config.SeerrApiKey.Trim();
-        await ValidateSafeSeerrBaseUrlAsync(baseUrl, cancellationToken).ConfigureAwait(false);
-        var authCtx = await ResolveApiAuthContextAsync(baseUrl, apiKey, cancellationToken).ConfigureAwait(false);
+        var listUrl = callerIsAdmin
+            ? $"{baseUrl}/api/v1/request?take=20&skip=0&sort=added"
+            : $"{baseUrl}/api/v1/request?take=20&skip=0&sort=added&requestedBy={callerSeerrUserId!.Value.ToString(CultureInfo.InvariantCulture)}";
 
         using var resp = await SendSeerrWithCircuitBreakerAsync(
             HttpMethod.Get,
-            $"{baseUrl}/api/v1/request?take=20&skip=0&sort=added",
+            listUrl,
             baseUrl,
             apiKey,
             authCtx?.ApiUserHeader,
@@ -736,7 +766,8 @@ public static class StreamFlixSeerrService
             int? DownloadProgress,
             string? JellyfinMediaId,
             List<int> Seasons,
-            string CreatedAt)>();
+            string CreatedAt,
+            int? RequestedByUserId)>();
 
         foreach (var el in results.EnumerateArray())
         {
@@ -744,6 +775,21 @@ public static class StreamFlixSeerrService
             var reqStatus = Math.Clamp(JsonInt(el, "status", 1), 1, 5);
             var createdAt = JsonStr(el, "createdAt");
             var is4kReq = JsonBool(el, "is4k");
+
+            int? reqById = null;
+            if (el.TryGetProperty("requestedBy", out var rbEl) && rbEl.ValueKind == JsonValueKind.Object)
+            {
+                var parsedRb = JsonInt(rbEl, "id", 0);
+                if (parsedRb > 0)
+                {
+                    reqById = parsedRb;
+                }
+            }
+
+            if (!callerIsAdmin && (!callerSeerrUserId.HasValue || reqById != callerSeerrUserId.Value))
+            {
+                continue;
+            }
 
             var mediaType = FirstNonEmpty(JsonStr(el, "type")).ToLowerInvariant();
             var tmdbId = 0;
@@ -800,7 +846,7 @@ public static class StreamFlixSeerrService
                 reqSeasons.Sort();
             }
 
-            parsedRows.Add((reqId, reqStatus, mediaType, tmdbId, mediaStatus, isDownloading, dlProgress, jfMediaId, reqSeasons, createdAt));
+            parsedRows.Add((reqId, reqStatus, mediaType, tmdbId, mediaStatus, isDownloading, dlProgress, jfMediaId, reqSeasons, createdAt, reqById));
             if (parsedRows.Count >= 18)
             {
                 break;
@@ -947,6 +993,9 @@ public static class StreamFlixSeerrService
                 statusLabel = "Approved · Queued";
             }
 
+            var canCancelRow = callerIsAdmin
+                || (row.RequestStatus == 1 && callerSeerrUserId.HasValue && row.RequestedByUserId == callerSeerrUserId.Value);
+
             entries.Add(new SeerrRequestEntry(
                 RequestId: row.RequestId,
                 TmdbId: row.TmdbId,
@@ -962,7 +1011,9 @@ public static class StreamFlixSeerrService
                 DownloadProgress: row.IsDownloading ? row.DownloadProgress : null,
                 Seasons: row.Seasons,
                 CreatedAt: row.CreatedAt,
-                JellyfinMediaId: row.JellyfinMediaId));
+                JellyfinMediaId: row.JellyfinMediaId,
+                RequestedByUserId: row.RequestedByUserId,
+                CanCancel: canCancelRow));
         }
 
         RecentRequestsCache[reqCacheKey] = new CachedRequestsResult(entries, DateTime.UtcNow.AddSeconds(6));
@@ -978,6 +1029,7 @@ public static class StreamFlixSeerrService
         int? requestedServerId,
         StreamFlixProfileConfig? callerProfile,
         string? callerEmail,
+        bool callerIsAdmin = false,
         CancellationToken cancellationToken = default)
     {
         if (tmdbId <= 0)
@@ -991,6 +1043,11 @@ public static class StreamFlixSeerrService
             throw new InvalidOperationException("Media type must be 'movie' or 'tv'.");
         }
 
+        if (!callerIsAdmin)
+        {
+            requestedServerId = null;
+        }
+
         var baseUrl = NormalizeBaseUrl(config.SeerrUrl);
         var apiKey = config.SeerrApiKey.Trim();
         await ValidateSafeSeerrBaseUrlAsync(baseUrl, cancellationToken).ConfigureAwait(false);
@@ -999,7 +1056,7 @@ public static class StreamFlixSeerrService
         // 1. Inspect available Radarr / Sonarr servers in Seerr so un-defaulted or 4K-only setups ALWAYS work!
         var servers = await GetServiceServersAsync(baseUrl, apiKey, authCtx?.ApiUserHeader, cleanType, cancellationToken).ConfigureAwait(false);
         SeerrServiceServer? chosenServer = null;
-        if (requestedServerId.HasValue && requestedServerId.Value >= 0)
+        if (callerIsAdmin && requestedServerId.HasValue && requestedServerId.Value >= 0)
         {
             chosenServer = servers.FirstOrDefault(s => s.Id == requestedServerId.Value);
         }
@@ -1031,19 +1088,29 @@ public static class StreamFlixSeerrService
             }
         }
 
-        // Only attach explicit serverId/profileId/rootFolder when caller explicitly picked a server OR when Seerr has NO default server marked for that tier!
+        // Only attach explicit serverId/profileId/rootFolder for administrators (or when Seerr has NO default server marked for an admin submission).
         var tierHasDefault = servers.Any(s => s.Is4k == effectiveIs4k && s.IsDefault);
-        var attachExplicitService = chosenServer != null && (requestedServerId.HasValue || !tierHasDefault);
+        var attachExplicitService = callerIsAdmin && chosenServer != null && (requestedServerId.HasValue || !tierHasDefault);
 
-        // 2. Optionally resolve the requesting household profile's imported Seerr User ID for attribution
+        // 2. Resolve the requesting household profile's imported Seerr User ID and enforce Seerr user permissions & quotas!
         int? targetSeerrUserId = await ResolveMatchingSeerrUserIdAsync(
             baseUrl,
             apiKey,
             authCtx?.ApiUserHeader,
+            authCtx?.AdminUserId,
             callerProfile,
             callerEmail,
+            callerIsAdmin,
             cancellationToken).ConfigureAwait(false);
-        if (targetSeerrUserId.HasValue && authCtx != null && targetSeerrUserId.Value == authCtx.AdminUserId)
+
+        if (!callerIsAdmin)
+        {
+            if (!targetSeerrUserId.HasValue || (authCtx != null && targetSeerrUserId.Value == authCtx.AdminUserId))
+            {
+                throw new UnauthorizedAccessException("Your Jellyfin account has not been imported into Seerr yet. Ask an administrator to import users in Seerr → Users.");
+            }
+        }
+        else if (targetSeerrUserId.HasValue && authCtx != null && targetSeerrUserId.Value == authCtx.AdminUserId)
         {
             targetSeerrUserId = null;
         }
@@ -1157,107 +1224,102 @@ public static class StreamFlixSeerrService
             return JsonSerializer.Serialize(dict);
         }
 
-        var payloadJson = BuildRequestBodyJson(targetSeerrUserId);
-        var resp = await SendSeerrWithCircuitBreakerAsync(
+        // Authenticate as the target Seerr user via X-Api-User for non-admin callers so Seerr enforces their REQUEST permission, quotas, and AUTO_APPROVE policy.
+        var submitApiUserHeader = !callerIsAdmin && targetSeerrUserId.HasValue
+            ? targetSeerrUserId.Value.ToString(CultureInfo.InvariantCulture)
+            : authCtx?.ApiUserHeader;
+        var payloadJson = BuildRequestBodyJson(callerIsAdmin ? targetSeerrUserId : null);
+
+        using var resp = await SendSeerrWithCircuitBreakerAsync(
             HttpMethod.Post,
             baseUrl + "/api/v1/request",
             baseUrl,
             apiKey,
-            authCtx?.ApiUserHeader,
+            submitApiUserHeader,
             payloadJson,
             cancellationToken).ConfigureAwait(false);
 
-        // If the attributed household Seerr user lacked REQUEST permission or hit quota (HTTP 403),
-        // retry immediately as the Admin API Key owner so requesting NEVER fails!
-        if ((int)resp.StatusCode == 403 && targetSeerrUserId.HasValue)
+        var respBody = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        SearchCache.Clear();
+        RecentRequestsCache.Clear();
+
+        if ((int)resp.StatusCode == 409)
         {
-            resp.Dispose();
-            payloadJson = BuildRequestBodyJson(null);
-            resp = await SendSeerrWithCircuitBreakerAsync(
-                HttpMethod.Post,
-                baseUrl + "/api/v1/request",
-                baseUrl,
-                apiKey,
-                authCtx?.ApiUserHeader,
-                payloadJson,
-                cancellationToken).ConfigureAwait(false);
+            return new SeerrSubmitResult(true, null, 2, "Requested", "This title has already been requested in Seerr.");
         }
 
-        using (resp)
+        if ((int)resp.StatusCode == 202)
         {
-            var respBody = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-            SearchCache.Clear();
-            RecentRequestsCache.Clear();
-
-            if ((int)resp.StatusCode == 409)
-            {
-                return new SeerrSubmitResult(true, null, 2, "Requested", "This title has already been requested in Seerr.");
-            }
-
-            if ((int)resp.StatusCode == 202)
-            {
-                var note = ExtractSeerrError(respBody) ?? "All available seasons are already requested or in your library.";
-                return new SeerrSubmitResult(true, null, 2, "Requested", note);
-            }
-
-            if (!resp.IsSuccessStatusCode)
-            {
-                var errMsg = ExtractSeerrError(respBody) ?? $"Seerr returned HTTP {(int)resp.StatusCode}.";
-                throw new InvalidOperationException(errMsg);
-            }
-
-            int? createdReqId = null;
-            var reqStatus = 2; // 1=PENDING, 2=APPROVED
-            var newMediaStatus = 2;
-            try
-            {
-                using var doc = JsonDocument.Parse(respBody);
-                var root = doc.RootElement;
-
-                // Guard against misconfigured reverse proxies that turned POST /api/v1/request into GET /api/v1/request
-                if (root.TryGetProperty("results", out _) && !root.TryGetProperty("id", out _))
-                {
-                    throw new InvalidOperationException("Seerr URL redirected POST to GET — update your Seerr URL in StreamFlix settings to the direct https:// or http://ip:port address.");
-                }
-
-                var parsedId = JsonInt(root, "id", 0);
-                if (parsedId > 0)
-                {
-                    createdReqId = parsedId;
-                }
-
-                reqStatus = JsonInt(root, "status", 2);
-                if (root.TryGetProperty("media", out var mediaEl) && mediaEl.ValueKind == JsonValueKind.Object)
-                {
-                    var rawMSt = effectiveIs4k
-                        ? JsonInt(mediaEl, "status4k", JsonInt(mediaEl, "status", 2))
-                        : JsonInt(mediaEl, "status", 2);
-                    newMediaStatus = Math.Clamp(NormalizeMediaStatus(rawMSt), 2, 5);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                throw;
-            }
-            catch
-            {
-            }
-
-            var statusLabel = reqStatus == 1
-                ? "Pending Approval"
-                : (newMediaStatus >= 3 ? "Processing" : "Requested");
-            var toastMsg = reqStatus == 1
-                ? "Request submitted (awaiting approval in Seerr)!"
-                : "Request approved & sent to Seerr!";
-
-            return new SeerrSubmitResult(true, createdReqId, newMediaStatus, statusLabel, toastMsg);
+            var note = ExtractSeerrError(respBody) ?? "All available seasons are already requested or in your library.";
+            return new SeerrSubmitResult(true, null, 2, "Requested", note);
         }
+
+        if ((int)resp.StatusCode is 401 or 403)
+        {
+            var permErr = ExtractSeerrError(respBody) ?? "You do not have permission or remaining quota in Seerr to submit this request.";
+            throw new UnauthorizedAccessException(permErr);
+        }
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var errMsg = ExtractSeerrError(respBody) ?? $"Seerr returned HTTP {(int)resp.StatusCode}.";
+            throw new InvalidOperationException(errMsg);
+        }
+
+        int? createdReqId = null;
+        var reqStatus = 2; // 1=PENDING, 2=APPROVED
+        var newMediaStatus = 2;
+        try
+        {
+            using var doc = JsonDocument.Parse(respBody);
+            var root = doc.RootElement;
+
+            // Guard against misconfigured reverse proxies that turned POST /api/v1/request into GET /api/v1/request
+            if (root.TryGetProperty("results", out _) && !root.TryGetProperty("id", out _))
+            {
+                throw new InvalidOperationException("Seerr URL redirected POST to GET — update your Seerr URL in StreamFlix settings to the direct https:// or http://ip:port address.");
+            }
+
+            var parsedId = JsonInt(root, "id", 0);
+            if (parsedId > 0)
+            {
+                createdReqId = parsedId;
+            }
+
+            reqStatus = JsonInt(root, "status", 2);
+            if (root.TryGetProperty("media", out var mediaEl) && mediaEl.ValueKind == JsonValueKind.Object)
+            {
+                var rawMSt = effectiveIs4k
+                    ? JsonInt(mediaEl, "status4k", JsonInt(mediaEl, "status", 2))
+                    : JsonInt(mediaEl, "status", 2);
+                newMediaStatus = Math.Clamp(NormalizeMediaStatus(rawMSt), 2, 5);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch
+        {
+        }
+
+        var statusLabel = reqStatus == 1
+            ? "Pending Approval"
+            : (newMediaStatus >= 3 ? "Processing" : "Requested");
+        var toastMsg = reqStatus == 1
+            ? "Request submitted (awaiting approval in Seerr)!"
+            : "Request approved & sent to Seerr!";
+
+        return new SeerrSubmitResult(true, createdReqId, newMediaStatus, statusLabel, toastMsg);
     }
 
     public static async Task<(bool Ok, string Message)> CancelRequestAsync(
         PluginConfiguration config,
         int requestId,
+        bool callerIsAdmin = true,
+        StreamFlixProfileConfig? callerProfile = null,
+        string? callerEmail = null,
         CancellationToken cancellationToken = default)
     {
         if (requestId <= 0)
@@ -1270,12 +1332,70 @@ public static class StreamFlixSeerrService
         await ValidateSafeSeerrBaseUrlAsync(baseUrl, cancellationToken).ConfigureAwait(false);
         var authCtx = await ResolveApiAuthContextAsync(baseUrl, apiKey, cancellationToken).ConfigureAwait(false);
 
+        var deleteApiUserHeader = authCtx?.ApiUserHeader;
+        if (!callerIsAdmin)
+        {
+            var callerSeerrUserId = await ResolveMatchingSeerrUserIdAsync(
+                baseUrl,
+                apiKey,
+                authCtx?.ApiUserHeader,
+                authCtx?.AdminUserId,
+                callerProfile,
+                callerEmail,
+                callerIsAdmin: false,
+                cancellationToken).ConfigureAwait(false);
+            if (!callerSeerrUserId.HasValue)
+            {
+                throw new UnauthorizedAccessException("You can only cancel media requests submitted by your own account.");
+            }
+
+            using (var inspectResp = await SendSeerrWithCircuitBreakerAsync(
+                HttpMethod.Get,
+                $"{baseUrl}/api/v1/request/{requestId.ToString(CultureInfo.InvariantCulture)}",
+                baseUrl,
+                apiKey,
+                authCtx?.ApiUserHeader,
+                null,
+                cancellationToken).ConfigureAwait(false))
+            {
+                if ((int)inspectResp.StatusCode == 404)
+                {
+                    return (true, "Request was already removed.");
+                }
+
+                if (!inspectResp.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException($"Could not inspect request in Seerr (HTTP {(int)inspectResp.StatusCode}).");
+                }
+
+                var inspectRaw = await inspectResp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                using var inspectDoc = JsonDocument.Parse(inspectRaw);
+                var inspectRoot = inspectDoc.RootElement;
+                var reqStatus = JsonInt(inspectRoot, "status", 0);
+                var reqById = inspectRoot.TryGetProperty("requestedBy", out var rbEl) && rbEl.ValueKind == JsonValueKind.Object
+                    ? JsonInt(rbEl, "id", 0)
+                    : 0;
+
+                if (reqById <= 0 || reqById != callerSeerrUserId.Value)
+                {
+                    throw new UnauthorizedAccessException("You can only cancel media requests that you submitted.");
+                }
+
+                if (reqStatus != 1)
+                {
+                    throw new UnauthorizedAccessException("Only pending requests can be canceled by non-administrators.");
+                }
+            }
+
+            deleteApiUserHeader = callerSeerrUserId.Value.ToString(CultureInfo.InvariantCulture);
+        }
+
         using var resp = await SendSeerrWithCircuitBreakerAsync(
             HttpMethod.Delete,
             $"{baseUrl}/api/v1/request/{requestId.ToString(CultureInfo.InvariantCulture)}",
             baseUrl,
             apiKey,
-            authCtx?.ApiUserHeader,
+            deleteApiUserHeader,
             null,
             cancellationToken).ConfigureAwait(false);
 
@@ -1285,6 +1405,12 @@ public static class StreamFlixSeerrService
         if ((int)resp.StatusCode == 404)
         {
             return (true, "Request was already removed.");
+        }
+
+        if ((int)resp.StatusCode is 401 or 403)
+        {
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new UnauthorizedAccessException(ExtractSeerrError(body) ?? "You do not have permission to cancel this request.");
         }
 
         if (!resp.IsSuccessStatusCode)
@@ -1449,8 +1575,10 @@ public static class StreamFlixSeerrService
         string baseUrl,
         string apiKey,
         string? apiUserHeader,
+        int? adminUserId,
         StreamFlixProfileConfig? profile,
         string? callerEmail,
+        bool callerIsAdmin,
         CancellationToken cancellationToken)
     {
         if (profile == null && string.IsNullOrWhiteSpace(callerEmail))
@@ -1464,33 +1592,56 @@ public static class StreamFlixSeerrService
             return null;
         }
 
+        bool IsEligibleUser(SeerrUserSummary u)
+        {
+            if (callerIsAdmin)
+            {
+                return true;
+            }
+
+            // Seerr Permission.ADMIN == 2; non-admin Jellyfin callers may never map onto a Seerr administrator account.
+            if ((u.Permissions & 2) != 0)
+            {
+                return false;
+            }
+
+            if (adminUserId.HasValue && u.Id == adminUserId.Value)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         var jfNorm = NormalizeHexGuid(profile?.JellyfinUserId);
         if (!string.IsNullOrEmpty(jfNorm))
         {
             var byJf = users.FirstOrDefault(u => string.Equals(u.JellyfinUserIdNorm, jfNorm, StringComparison.OrdinalIgnoreCase));
             if (byJf != null)
             {
-                return byJf.Id;
+                return IsEligibleUser(byJf) ? byJf.Id : null;
             }
         }
 
-        var email = FirstNonEmpty(callerEmail, profile?.GoogleAccountEmail).ToLowerInvariant();
-        if (!string.IsNullOrEmpty(email))
+        if (!string.IsNullOrEmpty(jfNorm) && !string.IsNullOrWhiteSpace(profile?.JellyfinUsername))
         {
-            var byEmail = users.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+            var verifiedJfUsername = profile!.JellyfinUsername.Trim();
+            var byVerifiedUsername = users.FirstOrDefault(u =>
+                string.IsNullOrEmpty(u.JellyfinUserIdNorm)
+                && string.Equals(u.Username, verifiedJfUsername, StringComparison.OrdinalIgnoreCase));
+            if (byVerifiedUsername != null)
+            {
+                return IsEligibleUser(byVerifiedUsername) ? byVerifiedUsername.Id : null;
+            }
+        }
+
+        var verifiedEmail = (callerEmail ?? string.Empty).Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(verifiedEmail))
+        {
+            var byEmail = users.FirstOrDefault(u => string.Equals(u.Email, verifiedEmail, StringComparison.OrdinalIgnoreCase));
             if (byEmail != null)
             {
-                return byEmail.Id;
-            }
-        }
-
-        var uname = FirstNonEmpty(profile?.JellyfinUsername, profile?.Name);
-        if (!string.IsNullOrEmpty(uname))
-        {
-            var byName = users.FirstOrDefault(u => string.Equals(u.Username, uname, StringComparison.OrdinalIgnoreCase));
-            if (byName != null)
-            {
-                return byName.Id;
+                return IsEligibleUser(byEmail) ? byEmail.Id : null;
             }
         }
 

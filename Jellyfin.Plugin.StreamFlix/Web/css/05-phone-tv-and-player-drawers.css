@@ -148,8 +148,8 @@
         scroll-snap-align: start;
     }
     .streamflix-grid {
-        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-        gap: 16px 10px;
+        grid-template-columns: repeat(auto-fill, minmax(clamp(104px, 28vw, 132px), 1fr)) !important;
+        gap: 16px 10px !important;
     }
     .streamflix-grid .streamflix-poster-card {
         flex: initial !important;

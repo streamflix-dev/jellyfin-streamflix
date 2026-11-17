@@ -265,6 +265,8 @@ public class SaveAdminConfigRequest
 
     public bool EnableGuestPasses { get; set; } = true;
 
+    public List<string>? GuestPassManagerProfileIds { get; set; }
+
     public bool EnableWatchTogether { get; set; } = true;
 
     public bool EnableSeerr { get; set; }
@@ -335,6 +337,8 @@ public class ImportConfigBackupRequest
     public List<string>? ApprovedOidcUsers { get; set; }
 
     public bool? EnableGuestPasses { get; set; }
+
+    public List<string>? GuestPassManagerProfileIds { get; set; }
 
     public bool? EnableWatchTogether { get; set; }
 

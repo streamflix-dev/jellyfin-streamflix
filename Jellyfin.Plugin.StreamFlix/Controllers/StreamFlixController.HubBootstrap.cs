@@ -33,14 +33,34 @@ public partial class StreamFlixController
             return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
         }
 
-        var isGuest = IsGuestSession(caller);
-        var effectiveProfileId = isGuest ? caller.Session?.LockedProfileId : profileId;
-        var profile = FindProfile(config, effectiveProfileId);
-        if (profile == null)
+        StreamFlixProfileConfig? profile = null;
+        if (IsGuestSession(caller))
+        {
+            profile = FindProfile(config, caller.Session?.LockedProfileId);
+        }
+        else if (IsEffectiveActiveAdmin(caller))
+        {
+            profile = FindProfile(config, profileId);
+            if (profile == null)
+            {
+                var adminUid = caller.JellyfinUser.Id.ToString("N");
+                profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                    .FirstOrDefault(p => string.Equals(p.JellyfinUserId, adminUid, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        else
         {
             var callerUid = caller.JellyfinUser.Id.ToString("N");
-            profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
-                .FirstOrDefault(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase));
+            var requested = FindProfile(config, profileId);
+            if (requested != null && string.Equals(requested.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
+            {
+                profile = requested;
+            }
+            else
+            {
+                profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                    .FirstOrDefault(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         var scores = GetPopularScoresCached(_libraryManager, _userManager, _userDataManager);
@@ -124,6 +144,7 @@ public partial class StreamFlixController
             oidcRequireAllowlist = config.OidcRequireAllowlist,
             approvedOidcUsers = (config.ApprovedOidcUsers ?? new List<string>()).ToList(),
             enableGuestPasses = config.EnableGuestPasses,
+            guestPassManagerProfileIds = (config.GuestPassManagerProfileIds ?? new List<string>()).ToList(),
             enableWatchTogether = config.EnableWatchTogether,
             enableSeerr = config.EnableSeerr,
             seerrUrl = config.SeerrUrl ?? string.Empty,
@@ -391,6 +412,7 @@ public partial class StreamFlixController
                         JellyfinUserId = prevProf?.JellyfinUserId,
                         JellyfinUsername = !string.IsNullOrWhiteSpace(src.JellyfinUsername) ? src.JellyfinUsername.Trim() : prevProf?.JellyfinUsername,
                         IsPluginCreatedJellyfinUser = prevProf?.IsPluginCreatedJellyfinUser ?? false,
+                        PermissionsInitialized = prevProf?.PermissionsInitialized ?? false,
                     });
                 }
 
@@ -399,6 +421,20 @@ public partial class StreamFlixController
                     config.Profiles = nextProfiles;
                     importedProfilesCount = nextProfiles.Count;
                 }
+            }
+
+            if (request.GuestPassManagerProfileIds != null)
+            {
+                var eligibleIds = new HashSet<string>(
+                    (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                        .Where(p => !p.IsKids && !IsProfileLinkedToAdmin(p) && !string.IsNullOrWhiteSpace(p.Id))
+                        .Select(p => p.Id),
+                    StringComparer.OrdinalIgnoreCase);
+                config.GuestPassManagerProfileIds = request.GuestPassManagerProfileIds
+                    .Select(id => (id ?? string.Empty).Trim())
+                    .Where(id => !string.IsNullOrEmpty(id) && eligibleIds.Contains(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             }
 
             Plugin.Instance?.SaveConfiguration();

@@ -77,6 +77,12 @@ public class StreamFlixProfileConfig
     /// (rather than created manually by the server owner in Jellyfin Dashboard -> Users).
     /// </summary>
     public bool IsPluginCreatedJellyfinUser { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether initial playback permissions have already been applied to a plugin-created Jellyfin user,
+    /// ensuring subsequent permission adjustments made by an administrator in Jellyfin Dashboard are preserved.
+    /// </summary>
+    public bool PermissionsInitialized { get; set; }
 }
 
 /// <summary>
@@ -155,6 +161,7 @@ public class PluginConfiguration : BasePluginConfiguration
         OidcRequireAllowlist = false;
         ApprovedOidcUsers = new List<string>();
         EnableGuestPasses = true;
+        GuestPassManagerProfileIds = new List<string>();
         EnableWatchTogether = true;
         GuestPasses = new List<StreamFlixGuestPass>();
         EnableSeerr = false;
@@ -334,6 +341,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether Temporary Guest Passes (creation, invite links, QR codes, and guest sessions) are enabled.
     /// </summary>
     public bool EnableGuestPasses { get; set; }
+
+    /// <summary>
+    /// Gets or sets non-administrator adult profile IDs allowed to create, view, share, and revoke Guest Passes.
+    /// Empty by default (only Administrator profiles can manage Guest Passes).
+    /// </summary>
+    public List<string> GuestPassManagerProfileIds { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether StreamFlix Watch Together (SyncPlay rooms) is enabled for non-Kids profiles.

@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.1)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.2)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.1';
+    var VERSION = '0.9.8.2';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -478,6 +478,7 @@
             if (!img.complete) {
                 continue;
             }
+            var imgMode = img.getAttribute('data-bfx-img');
             if (img.naturalWidth > 0) {
                 if (isManagedFadeImg(img)) {
                     img.classList.add('is-loaded');
@@ -486,6 +487,8 @@
                 var logoKind = img.getAttribute('data-bfx-logo-fallback');
                 if (logoKind) {
                     applyLogoImgFallback(img, logoKind);
+                } else if (imgMode === 'pv') {
+                    applyFadeImgError(img, 'hide');
                 } else if (isManagedFadeImg(img)) {
                     applyFadeImgError(img, img.getAttribute('data-bfx-err') || 'broken');
                 }
@@ -514,7 +517,10 @@
                 applyLogoImgFallback(t, logoKind);
                 return;
             }
-            if (isManagedFadeImg(t)) {
+            var imgMode = t.getAttribute('data-bfx-img');
+            if (imgMode === 'pv') {
+                applyFadeImgError(t, 'hide');
+            } else if (isManagedFadeImg(t)) {
                 applyFadeImgError(t, t.getAttribute('data-bfx-err') || 'broken');
             }
         }, true);

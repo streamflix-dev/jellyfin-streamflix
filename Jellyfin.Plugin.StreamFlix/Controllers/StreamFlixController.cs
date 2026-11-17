@@ -139,7 +139,11 @@ public partial class StreamFlixController : ControllerBase
         Plugin.Instance?.EnsureInjectedThrottled();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+        if (HasHouseholdAccess(config, caller))
+        {
+            await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+        }
+
         return Ok(BuildPublicState(config, caller));
     }
 
@@ -325,6 +329,20 @@ public partial class StreamFlixController : ControllerBase
 
             var wasGuestPassesEnabled = config.EnableGuestPasses;
             config.EnableGuestPasses = request.EnableGuestPasses;
+            if (request.GuestPassManagerProfileIds != null)
+            {
+                var eligibleIds = new HashSet<string>(
+                    (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                        .Where(p => !p.IsKids && !IsProfileLinkedToAdmin(p) && !string.IsNullOrWhiteSpace(p.Id))
+                        .Select(p => p.Id.Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+                config.GuestPassManagerProfileIds = request.GuestPassManagerProfileIds
+                    .Where(id => !string.IsNullOrWhiteSpace(id) && eligibleIds.Contains(id.Trim()))
+                    .Select(id => id.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
             config.EnableWatchTogether = request.EnableWatchTogether;
 
             Plugin.Instance?.SaveConfiguration();
@@ -417,10 +435,19 @@ public partial class StreamFlixController : ControllerBase
 
     private static bool HasHouseholdAccess(PluginConfiguration config, CallerContext caller)
     {
+        if (caller.IsAdmin)
+        {
+            return true;
+        }
+
+        if (IsGateUnconfigured(config))
+        {
+            return false;
+        }
+
         return (config.BypassLoginGateOnLan && caller.IsLocalLan)
             || caller.Session != null
-            || caller.IsAdmin
-            || (caller.IsJellyfinAuthenticated && (!config.RequireGoogleAuth || config.AllowStandardJellyfinLogin || IsGateUnconfigured(config)));
+            || (config.AllowStandardJellyfinLogin && caller.IsJellyfinAuthenticated && caller.JellyfinUser != null);
     }
 
     private ObjectResult GoogleRequired(PluginConfiguration? config = null)
@@ -651,6 +678,7 @@ public partial class StreamFlixController : ControllerBase
             hasAccess,
             isAdmin = caller.IsAdmin,
             enableGuestPasses = config.EnableGuestPasses,
+            guestPassManagerProfileIds = hasAccess && caller.IsAdmin ? (config.GuestPassManagerProfileIds ?? new List<string>()).ToList() : new List<string>(),
             enableWatchTogether = config.EnableWatchTogether,
             hasAnyAdultPin = hasAccess && !isGuestPass && (config.Profiles ?? new List<StreamFlixProfileConfig>()).Any(p => !p.IsKids && !string.IsNullOrWhiteSpace(p.PinCode)),
             isGuestPass,
@@ -735,6 +763,7 @@ public partial class StreamFlixController : ControllerBase
             oidcRequireAllowlist = config.OidcRequireAllowlist,
             approvedOidcUsers = (config.ApprovedOidcUsers ?? new List<string>()).ToList(),
             enableGuestPasses = config.EnableGuestPasses,
+            guestPassManagerProfileIds = (config.GuestPassManagerProfileIds ?? new List<string>()).ToList(),
             enableWatchTogether = config.EnableWatchTogether,
             enableSeerr = config.EnableSeerr,
             seerrUrl = config.SeerrUrl ?? string.Empty,

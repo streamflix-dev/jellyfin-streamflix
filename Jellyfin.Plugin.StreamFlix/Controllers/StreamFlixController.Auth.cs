@@ -370,7 +370,7 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!HasHouseholdAccess(config, caller) || IsGuestSession(caller))
+        if (!HasHouseholdAccess(config, caller) || !caller.IsAdmin || IsGuestSession(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Sign in as a Jellyfin Administrator first." });
         }
@@ -380,51 +380,16 @@ public partial class StreamFlixController
         var ownerProfile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
             .FirstOrDefault(p => StreamFlixStartupTask.IsOwnerProfile(p) || IsProfileLinkedToAdmin(p));
 
-        if (!caller.IsAdmin)
+        JUser? adminUser = caller.JellyfinUser;
+        if (adminUser == null
+            || StreamFlixStartupTask.IsUserDisabledCompat(adminUser)
+            || !StreamFlixStartupTask.IsUserAdminCompat(adminUser))
         {
-            if (ownerProfile == null)
-            {
-                return StatusCode(403, new { code = "admin_required", message = "Administrator privileges are required to open Plugin Settings." });
-            }
-
-            var lockRes = CheckGoogleLock(config, ownerProfile, caller);
-            if (lockRes != null)
-            {
-                return lockRes;
-            }
-
-            var pinRes = CheckPin(ownerProfile, request?.Pin ?? string.Empty);
-            if (pinRes != null)
-            {
-                return pinRes;
-            }
+            adminUser = caller.Session != null && Guid.TryParse(caller.Session.JellyfinUserId, out var sessUid)
+                ? _userManager.GetUserById(sessUid)
+                : null;
         }
 
-        JUser? adminUser = null;
-        if (caller.Session != null && Guid.TryParse(caller.Session.JellyfinUserId, out var sessUid))
-        {
-            var candidate = _userManager.GetUserById(sessUid);
-            if (candidate != null && !StreamFlixStartupTask.IsUserDisabledCompat(candidate) && StreamFlixStartupTask.IsUserAdminCompat(candidate))
-            {
-                adminUser = candidate;
-            }
-        }
-
-        if (adminUser == null && caller.JellyfinUser != null && !StreamFlixStartupTask.IsUserDisabledCompat(caller.JellyfinUser) && StreamFlixStartupTask.IsUserAdminCompat(caller.JellyfinUser))
-        {
-            adminUser = caller.JellyfinUser;
-        }
-
-        if (adminUser == null && ownerProfile != null && Guid.TryParse(ownerProfile.JellyfinUserId, out var ownUid))
-        {
-            var ownCandidate = _userManager.GetUserById(ownUid);
-            if (ownCandidate != null && !StreamFlixStartupTask.IsUserDisabledCompat(ownCandidate) && StreamFlixStartupTask.IsUserAdminCompat(ownCandidate))
-            {
-                adminUser = ownCandidate;
-            }
-        }
-
-        adminUser ??= StreamFlixStartupTask.GetPrimaryAdminUserCompat(_userManager);
         if (adminUser == null || StreamFlixStartupTask.IsUserDisabledCompat(adminUser) || !StreamFlixStartupTask.IsUserAdminCompat(adminUser))
         {
             return StatusCode(403, new { code = "admin_not_found", message = "No active Jellyfin Administrator account was found." });

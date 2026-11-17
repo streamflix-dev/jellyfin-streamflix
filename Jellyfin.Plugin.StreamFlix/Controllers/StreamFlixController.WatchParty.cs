@@ -153,7 +153,7 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!HasHouseholdAccess(config, caller) && !caller.IsJellyfinAuthenticated)
+        if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
         }
@@ -169,7 +169,7 @@ public partial class StreamFlixController
             positionSeconds: null,
             isBuffering: null);
 
-        var isLeaveAdmin = caller.IsAdmin || (!IsGuestSession(caller) && resolvedProfile != null && StreamFlixStartupTask.IsOwnerProfile(resolvedProfile));
+        var isLeaveAdmin = IsEffectiveActiveAdmin(caller);
         StreamFlixWatchPartyService.LeaveRoom(
             request?.RoomId,
             participant.ParticipantId,
@@ -196,7 +196,7 @@ public partial class StreamFlixController
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!HasHouseholdAccess(config, caller) && !caller.IsJellyfinAuthenticated)
+        if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
         }
@@ -213,7 +213,7 @@ public partial class StreamFlixController
             isBuffering: null);
 
         var isGuest = IsGuestSession(caller);
-        var isAdmin = caller.IsAdmin || (!isGuest && resolvedProfile != null && StreamFlixStartupTask.IsOwnerProfile(resolvedProfile));
+        var isAdmin = !isGuest && IsEffectiveActiveAdmin(caller);
         var (deleted, statusCode, errorMessage) = StreamFlixWatchPartyService.DeleteRoom(
             request.RoomId,
             participant,
@@ -297,7 +297,7 @@ public partial class StreamFlixController
                 RunTimeTicks = runTimeTicks,
                 IsBuffering = request.IsBuffering,
             },
-            caller.IsAdmin);
+            IsEffectiveActiveAdmin(caller));
 
         if (statusCode != 200 || room == null)
         {
@@ -387,7 +387,7 @@ public partial class StreamFlixController
         out StreamFlixProfileConfig? resolvedProfile)
     {
         resolvedProfile = null;
-        if (!HasHouseholdAccess(config, caller) && !caller.IsJellyfinAuthenticated)
+        if (!HasHouseholdAccess(config, caller))
         {
             return GoogleRequired(config);
         }
@@ -411,9 +411,32 @@ public partial class StreamFlixController
         CallerContext caller,
         string? requestedProfileId)
     {
-        var isGuest = IsGuestSession(caller);
-        var effectiveId = isGuest ? caller.Session?.LockedProfileId : requestedProfileId;
-        var profile = FindProfile(config, effectiveId);
+        if (IsGuestSession(caller))
+        {
+            return FindProfile(config, caller.Session?.LockedProfileId);
+        }
+
+        if (!IsEffectiveActiveAdmin(caller) && caller.JellyfinUser != null)
+        {
+            var callerUid = caller.JellyfinUser.Id.ToString("N");
+            var candidates = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                .Where(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(requestedProfileId))
+            {
+                var matchedRequested = candidates.FirstOrDefault(p =>
+                    string.Equals(p.Id, requestedProfileId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, requestedProfileId, StringComparison.OrdinalIgnoreCase));
+                if (matchedRequested != null)
+                {
+                    return matchedRequested;
+                }
+            }
+
+            return candidates.FirstOrDefault();
+        }
+
+        var profile = FindProfile(config, requestedProfileId);
         if (profile == null && caller.JellyfinUser != null)
         {
             var callerUid = caller.JellyfinUser.Id.ToString("N");

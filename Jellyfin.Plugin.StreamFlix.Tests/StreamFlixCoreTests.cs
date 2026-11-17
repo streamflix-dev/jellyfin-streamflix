@@ -13,6 +13,11 @@ public class StreamFlixCoreTests
     [InlineData("google_required", 401, "/StreamFlix/PublicConfig", StreamFlixErrorCodes.HouseholdSignInRequired)]
     [InlineData("profile_unlinked", 409, "/StreamFlix/Profiles/Activate", StreamFlixErrorCodes.ProfileUnlinked)]
     [InlineData("pin_invalid", 403, "/StreamFlix/Profiles/VerifyPin", StreamFlixErrorCodes.PinInvalid)]
+    [InlineData("admin_profile_required", 403, "/StreamFlix/Profiles/Activate", StreamFlixErrorCodes.ProfileActivationForbidden)]
+    [InlineData("profile_account_mismatch", 403, "/StreamFlix/Profiles/Activate", StreamFlixErrorCodes.ProfileActivationForbidden)]
+    [InlineData("profile_protection_required", 403, "/StreamFlix/Profiles/Activate", StreamFlixErrorCodes.ProfileActivationForbidden)]
+    [InlineData("guest_pass_permission_required", 403, "/StreamFlix/GuestPasses", StreamFlixErrorCodes.GuestPassRestricted)]
+    [InlineData("seerr_permission_denied", 403, "/StreamFlix/Seerr/Request", StreamFlixErrorCodes.SeerrForbidden)]
     [InlineData("pin_locked", 429, "/StreamFlix/Profiles/Activate", StreamFlixErrorCodes.PinLockedOut)]
     [InlineData("seerr_timeout", 504, "/StreamFlix/Seerr/Search", StreamFlixErrorCodes.SeerrTimeout)]
     [InlineData("seerr_quota_exceeded", 429, "/StreamFlix/Seerr/Request", StreamFlixErrorCodes.SeerrQuotaExceeded)]
@@ -94,5 +99,38 @@ public class StreamFlixCoreTests
         Assert.Equal(
             "https://sso.example.com/.well-known/openid-configuration",
             StreamFlixOidcService.BuildDiscoveryUrl("https://sso.example.com/.well-known/openid-configuration"));
+    }
+
+    private sealed class FakePerm
+    {
+        public string Kind { get; set; } = string.Empty;
+
+        public bool Value { get; set; }
+    }
+
+    private sealed class FakeUserEntity
+    {
+        public bool EnableAllFolders { get; set; }
+
+        public List<FakePerm> Permissions { get; } = new();
+    }
+
+    [Fact]
+    public void InitializeNewPluginUserPermissions_NeverGrantsContentDownloadingAndInheritsAdminRemoteAccess()
+    {
+        var restrictedAdmin = new FakeUserEntity();
+        restrictedAdmin.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = false });
+
+        var newUser = new FakeUserEntity();
+        newUser.Permissions.Add(new FakePerm { Kind = "EnableMediaPlayback", Value = false });
+        newUser.Permissions.Add(new FakePerm { Kind = "EnableContentDownloading", Value = false });
+        newUser.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = false });
+
+        var changed = StreamFlixStartupTask.InitializeNewPluginUserPermissions(newUser, restrictedAdmin);
+        Assert.True(changed);
+        Assert.True(newUser.EnableAllFolders);
+        Assert.True(newUser.Permissions.Find(p => p.Kind == "EnableMediaPlayback")!.Value);
+        Assert.False(newUser.Permissions.Find(p => p.Kind == "EnableContentDownloading")!.Value);
+        Assert.False(newUser.Permissions.Find(p => p.Kind == "EnableRemoteAccess")!.Value);
     }
 }

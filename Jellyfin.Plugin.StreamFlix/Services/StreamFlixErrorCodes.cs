@@ -41,6 +41,7 @@ public static class StreamFlixErrorCodes
     public const string ProfileAccountLocked = "SF-PROF-304";
     public const string ProfileAdminLinkForbidden = "SF-PROF-305";
     public const string ProfileValidationFailed = "SF-PROF-306";
+    public const string ProfileActivationForbidden = "SF-PROF-307";
     public const string PinRequired = "SF-PIN-310";
     public const string AdultPinRequired = "SF-PIN-311";
     public const string PinInvalid = "SF-PIN-312";
@@ -102,10 +103,14 @@ public static class StreamFlixErrorCodes
         ["profile_unlinked"] = ProfileUnlinked,
         ["auth_failed"] = ProfileJellyfinAuthFailed,
         ["user_disabled"] = ProfileJellyfinUserDisabled,
+        ["google_lock"] = ProfileAccountLocked,
         ["google_locked"] = ProfileAccountLocked,
         ["google_lock_forbidden"] = ProfileAccountLocked,
         ["admin_link_forbidden"] = ProfileAdminLinkForbidden,
         ["link_change_forbidden"] = ProfileAdminLinkForbidden,
+        ["admin_profile_required"] = ProfileActivationForbidden,
+        ["profile_account_mismatch"] = ProfileActivationForbidden,
+        ["profile_protection_required"] = ProfileActivationForbidden,
         ["invalid_link"] = ProfileValidationFailed,
 
         ["pin_required"] = PinRequired,
@@ -114,6 +119,8 @@ public static class StreamFlixErrorCodes
         ["pin_locked"] = PinLockedOut,
 
         ["seerr_forbidden"] = SeerrForbidden,
+        ["seerr_permission_denied"] = SeerrForbidden,
+        ["seerr_cancel_forbidden"] = SeerrForbidden,
         ["seerr_unreachable"] = SeerrUnreachable,
         ["seerr_timeout"] = SeerrTimeout,
         ["seerr_request_failed"] = SeerrRequestFailed,
@@ -127,6 +134,7 @@ public static class StreamFlixErrorCodes
         ["guest_handoff_missing"] = GuestPassInvalidOrExpired,
         ["guest_locked"] = GuestPassRateLimited,
         ["guest_pass_restricted"] = GuestPassRestricted,
+        ["guest_pass_permission_required"] = GuestPassRestricted,
         ["guest_profile_locked"] = GuestPassRestricted,
         ["guest_admin_forbidden"] = GuestPassAdminForbidden,
 

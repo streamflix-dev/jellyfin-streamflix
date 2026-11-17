@@ -3,9 +3,13 @@
        5. Merged Top-Right Profile & Account Dropdown Menu + STREAMFLIX Brand
        ---------------------------------------------------------------------- */
     function isAdminConfigRoute() {
+        // Keep in sync with isAdminRouteHash() so native admin pages
+        // (Dashboard, plugin config, Metadata Manager) render without StreamFlix chrome.
         var h = (window.location.hash || '').toLowerCase();
         return h.indexOf('configurationpage') !== -1
-            || h.indexOf('dashboard') !== -1;
+            || h.indexOf('dashboard') !== -1
+            || h.indexOf('#/metadata') === 0
+            || h.indexOf('#!/metadata') === 0;
     }
 
     function setCinemaHubEnabled(nextEnabled, silent) {
@@ -883,7 +887,8 @@
         var profiles = getProfiles();
         var isGuest = isGuestPassSession();
         var isKidsActive = Boolean(active.isKids);
-        var isAdmin = !isGuest && !isKidsActive && (isHouseholdAdmin() || Boolean(active.isAdmin));
+        var isAdmin = !isGuest && !isKidsActive && isActiveProfileAdmin();
+        var canManageGuests = !isGuest && !isKidsActive && canActiveProfileManageGuestPasses();
         var googleEmail = state.googleUser && state.googleUser.email;
         var sessionUsername = state.googleUser && state.googleUser.username;
         var isOidcSession = Boolean(state.googleUser && state.googleUser.authKind === 'oidc');
@@ -903,15 +908,18 @@
 
         var otherProfiles = isGuest ? [] : profiles.filter(function (p) { return p.id !== active.id; });
         var quickProfilesHtml = otherProfiles.map(function (p) {
-            var lockedOut = p.googleLocked && !p.googleLockSatisfied;
+            var accountBlocked = p.canActivate === false;
+            var lockedOut = (p.googleLocked && !p.googleLockSatisfied) || accountBlocked;
             var lockMeta = p.googleLocked ? getProfileLockMeta(p) : null;
             var lockHint = p.googleAccountEmail || p.googleAccountHint || '';
             var rowTitle = lockedOut
-                ? ('Locked to ' + (lockMeta ? lockMeta.providerLabel : 'another') + (lockHint ? ' (' + lockHint + ')' : ' account'))
+                ? (accountBlocked && !(p.googleLocked && !p.googleLockSatisfied)
+                    ? (p.isAdmin ? 'Sign in as Administrator to switch' : 'Sign in with linked account to switch')
+                    : ('Locked to ' + (lockMeta ? lockMeta.providerLabel : 'another') + (lockHint ? ' (' + lockHint + ')' : ' account')))
                 : ('Switch to ' + p.name);
             var lockBadgeHtml = lockMeta
                 ? '<span class="bfx-dd-prof-lock is-acct ' + lockMeta.badgeClass + '">' + lockMeta.badgeSvg + '</span>'
-                : (p.hasPin ? '<span class="bfx-dd-prof-lock">•••</span>' : '');
+                : ((p.hasPin || accountBlocked) ? '<span class="bfx-dd-prof-lock">•••</span>' : '');
             return ''
                 + '<button type="button" class="bfx-dd-prof' + (lockedOut ? ' is-locked' : '') + '" data-quick-switch-id="' + escapeHtml(p.id) + '" title="' + escapeHtml(rowTitle) + '">'
                 + '  <span class="bfx-dd-prof-av" style="background:' + escapeHtml(p.color || '#E50914') + ';">' + escapeHtml(p.icon || '🎬')
@@ -1010,7 +1018,7 @@
                     + (!isGuest ? ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', 'Subtitles, playback & ' + getBrandName() + ' Home', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (showClientSettingsRow ? ddItem('streamflix-dd-client-settings', 'smartphone', 'Client Settings', clientSettingsSubLabel, 'is-client-settings', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (isCurrentProfileSeerrAllowed() ? ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', 'Track requested movies & shows', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (isAdmin && areGuestPassesEnabled() ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', 'Temporary invite links & QR', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
+                    + (canManageGuests ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', 'Temporary invite links & QR', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (isAdmin ? ddItem('streamflix-dd-plugin-settings', 'sliders', getBrandName() + ' Settings', 'Auth, profiles, navigation & hero', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (isAdmin ? ddItem('streamflix-dd-dashboard', 'gear', 'Dashboard', 'Jellyfin server administration', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + '<div class="streamflix-dd-divider"></div>'

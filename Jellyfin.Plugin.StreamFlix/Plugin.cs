@@ -176,6 +176,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         incoming.GuestPasses = existing.GuestPasses;
                     }
 
+                    if ((incoming.GuestPassManagerProfileIds == null || incoming.GuestPassManagerProfileIds.Count == 0)
+                        && existing.GuestPassManagerProfileIds != null
+                        && existing.GuestPassManagerProfileIds.Count > 0)
+                    {
+                        incoming.GuestPassManagerProfileIds = existing.GuestPassManagerProfileIds;
+                    }
+
                     if (string.IsNullOrWhiteSpace(incoming.SessionSigningKey) && !string.IsNullOrWhiteSpace(existing.SessionSigningKey))
                     {
                         incoming.SessionSigningKey = existing.SessionSigningKey;
@@ -514,6 +521,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     .ToList();
             }
 
+            var gpMgrEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.GuestPassManagerProfileIds), StringComparison.OrdinalIgnoreCase));
+            if (gpMgrEl != null)
+            {
+                cfg.GuestPassManagerProfileIds = gpMgrEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
             var deletedEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.DeletedProfileIds), StringComparison.OrdinalIgnoreCase));
             if (deletedEl != null)
             {
@@ -562,6 +578,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         JellyfinUserId = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUserId)),
                         JellyfinUsername = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUsername)),
                         IsPluginCreatedJellyfinUser = BoolVal(pEl, nameof(StreamFlixProfileConfig.IsPluginCreatedJellyfinUser), false),
+                        PermissionsInitialized = BoolVal(pEl, nameof(StreamFlixProfileConfig.PermissionsInitialized), false),
                     });
                 }
             }

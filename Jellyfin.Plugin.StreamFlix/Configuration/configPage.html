@@ -542,6 +542,14 @@
                         </div>
 
                         <div class="bfx-collapse-body hide" id="GuestPassesConfigBody">
+                            <div class="bfx-subbox" style="margin:0 0 14px;">
+                                <div class="bfx-subbox-title">Guest Pass Managers</div>
+                                <div class="fieldDescription" style="margin-bottom:8px;">Administrator profiles can always create, view, and revoke Guest Passes. Select any adult household profiles below that should also be allowed to manage Guest Passes (Kids profiles are never eligible).</div>
+                                <div class="bfx-libs-grid" id="GuestPassManagerProfiles">
+                                    <div class="bfx-empty">Loading profiles…</div>
+                                </div>
+                            </div>
+
                             <div class="bfx-subbox" style="margin-top:0;">
                                 <div class="bfx-subbox-title">Create New Guest Pass</div>
                                 <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
@@ -829,6 +837,8 @@
                 var selectedHeroLibIds = [];
                 var selectedNavHiddenBuiltIns = [];
                 var selectedNavLibIds = [];
+                var selectedGuestPassManagerIds = [];
+                var guestPassManagersLoaded = false;
                 var navLibsTouched = false;
                 var heroLibrariesLoaded = false;
                 var reorderBusy = false;
@@ -1757,9 +1767,69 @@
                     return '<span class="bfx-badge blue" title="Locked to a Google account">G ' + esc(hint) + '</span>';
                 }
 
+                function renderGuestPassManagers() {
+                    var host = $('#GuestPassManagerProfiles');
+                    if (!host) {
+                        return;
+                    }
+                    if (!profiles.length) {
+                        host.innerHTML = '<div class="bfx-empty">No profiles available yet.</div>';
+                        return;
+                    }
+                    var selectedMap = {};
+                    selectedGuestPassManagerIds.forEach(function (id) {
+                        selectedMap[String(id || '').trim().toLowerCase()] = true;
+                    });
+                    var adminProfiles = profiles.filter(function (p) { return Boolean(p.isAdmin); });
+                    var adultProfiles = profiles.filter(function (p) { return !p.isAdmin && !p.isKids; });
+                    var chips = [];
+                    adminProfiles.forEach(function (p) {
+                        chips.push(''
+                            + '<label class="bfx-lib-chip" style="opacity:.78;cursor:default;">'
+                            + '  <input type="checkbox" checked disabled />'
+                            + '  <span>' + esc((p.avatarEmoji ? p.avatarEmoji + ' ' : '') + p.name) + '</span>'
+                            + '  <span class="bfx-lib-type">ADMIN</span>'
+                            + '</label>');
+                    });
+                    adultProfiles.forEach(function (p) {
+                        var isChecked = Boolean(selectedMap[String(p.id || '').trim().toLowerCase()]);
+                        chips.push(''
+                            + '<label class="bfx-lib-chip">'
+                            + '  <input type="checkbox" data-gp-manager-id="' + esc(p.id) + '"' + (isChecked ? ' checked' : '') + ' />'
+                            + '  <span>' + esc((p.avatarEmoji ? p.avatarEmoji + ' ' : '') + p.name) + '</span>'
+                            + '</label>');
+                    });
+                    if (!chips.length) {
+                        host.innerHTML = '<div class="bfx-empty">No adult profiles found.</div>';
+                        return;
+                    }
+                    host.innerHTML = chips.join('');
+                    Array.prototype.forEach.call(host.querySelectorAll('input[data-gp-manager-id]'), function (cb) {
+                        cb.addEventListener('change', function () {
+                            selectedGuestPassManagerIds = getCheckedGuestPassManagerIds();
+                        });
+                    });
+                }
+
+                function getCheckedGuestPassManagerIds() {
+                    var host = $('#GuestPassManagerProfiles');
+                    if (!host || !profiles.length) {
+                        return selectedGuestPassManagerIds.slice();
+                    }
+                    var out = [];
+                    Array.prototype.forEach.call(host.querySelectorAll('input[data-gp-manager-id]:checked'), function (cb) {
+                        var id = cb.getAttribute('data-gp-manager-id');
+                        if (id) {
+                            out.push(id);
+                        }
+                    });
+                    return out;
+                }
+
                 function renderProfiles() {
                     if (!profiles.length) {
                         grid.innerHTML = '<div class="bfx-empty">No profiles yet. Open <strong>Manage profiles</strong> to create one.</div>';
+                        renderGuestPassManagers();
                         renderStatus();
                         return;
                     }
@@ -1788,6 +1858,7 @@
                             + '  </div>'
                             + '</div>';
                     }).join('');
+                    renderGuestPassManagers();
                     renderStatus();
                 }
 
@@ -1855,6 +1926,7 @@
                             + '  </div>'
                             + '</div>';
                     }).join('');
+                    renderGuestPassManagers();
                     renderStatus();
                 }
 
@@ -1955,6 +2027,9 @@
                     lastPublic = pub || null;
                     if (pub && Array.isArray(pub.profiles)) {
                         profiles = pub.profiles;
+                    }
+                    if (!guestPassManagersLoaded && pub && Array.isArray(pub.guestPassManagerProfileIds)) {
+                        selectedGuestPassManagerIds = pub.guestPassManagerProfileIds.slice();
                     }
                     if (pub && pub.version) {
                         $('#StreamFlixVersionLabel').textContent = '· v' + String(pub.version).replace(/\.0$/, '');
@@ -2603,6 +2678,9 @@
                     $('#BypassLoginGateOnLan').checked = Boolean(cfg.bypassLoginGateOnLan);
                     $('#AutoProvisionJellyfinUsers').checked = cfg.autoProvisionJellyfinUsers !== false;
                     $('#EnableGuestPasses').checked = cfg.enableGuestPasses !== false;
+                    selectedGuestPassManagerIds = Array.isArray(cfg.guestPassManagerProfileIds) ? cfg.guestPassManagerProfileIds.slice() : [];
+                    guestPassManagersLoaded = true;
+                    renderGuestPassManagers();
                     $('#EnableWatchTogether').checked = cfg.enableWatchTogether !== false;
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
                     $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
@@ -2724,6 +2802,7 @@
                         bypassLoginGateOnLan: $('#BypassLoginGateOnLan').checked,
                         autoProvisionJellyfinUsers: $('#AutoProvisionJellyfinUsers').checked,
                         enableGuestPasses: $('#EnableGuestPasses').checked,
+                        guestPassManagerProfileIds: getCheckedGuestPassManagerIds(),
                         enableWatchTogether: $('#EnableWatchTogether').checked,
                         googleClientId: $('#GoogleClientId').value.trim(),
                         googleClientSecret: googleSecretTyped || '__KEEP__',

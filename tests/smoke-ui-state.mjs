@@ -295,4 +295,11 @@ assert.match(css05, /\.streamflix-carousel-track\s*>\s*\.streamflix-poster-card/
 assert.match(combinedJs, /img\[data-bfx-img="pv"\]/, 'Hover preview images (data-bfx-img="pv") must be hydrated by Strict-CSP image loader');
 console.log('[PASS] Uniform poster grid height & hover preview artwork invariants verified');
 
-console.log('ALL STREAMFLIX v0.9.8.1 SMOKE CHECKS PASSED!');
+// Verify per-profile Guest Pass permission helper & admin Manage Media detail modal hooks
+assert.match(combinedJs, /function\s+canActiveProfileManageGuestPasses\s*\(/, 'Per-profile Guest Pass permission helper must be present');
+assert.match(combinedJs, /function\s+isActiveProfileAdmin\s*\(/, 'Active profile admin check must be present');
+assert.match(combinedJs, /function\s+canManageMediaItems\s*\(/, 'Admin Manage Media permission check must be present');
+assert.match(combinedJs, /streamflix-modal-manage-btn/, 'Admin Manage Media modal entry point must be wired');
+console.log('[PASS] Per-profile Guest Pass permissions & Manage Media tools invariants verified');
+
+console.log('ALL STREAMFLIX v0.9.8.2 SMOKE CHECKS PASSED!');

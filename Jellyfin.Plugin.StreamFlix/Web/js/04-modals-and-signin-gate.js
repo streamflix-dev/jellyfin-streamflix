@@ -396,7 +396,10 @@
             + '<div class="streamflix-pin-msg" aria-live="assertive">' + escapeHtml(opts.initialError || '') + '</div>'
             + '<div class="streamflix-modal-actions streamflix-modal-actions-center">'
             + '  <button type="button" class="streamflix-ghost-btn" data-act="cancel">Cancel</button>'
-            + '</div>', { className: 'streamflix-modal-pin' });
+            + '</div>', {
+                className: 'streamflix-modal-pin',
+                onClose: opts.onClose
+            });
 
         var input = m.modal.querySelector('.streamflix-pin-input');
         var boxEls = m.modal.querySelectorAll('.streamflix-pin-box');

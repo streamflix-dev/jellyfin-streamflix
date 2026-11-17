@@ -46,9 +46,9 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!CanCallerManageGuestPasses(config, caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can manage Guest Passes." });
+            return StatusCode(403, new { code = "guest_pass_permission_required", message = "This profile does not have permission to manage Guest Passes." });
         }
 
         List<string> prunedIds;
@@ -107,9 +107,9 @@ public partial class StreamFlixController
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!CanCallerManageGuestPasses(config, caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can create Guest Passes." });
+            return StatusCode(403, new { code = "guest_pass_permission_required", message = "This profile does not have permission to create Guest Passes." });
         }
 
         if (!config.EnableGuestPasses)
@@ -222,9 +222,9 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!CanCallerManageGuestPasses(config, caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can view Guest Pass QR codes." });
+            return StatusCode(403, new { code = "guest_pass_permission_required", message = "This profile does not have permission to view Guest Pass QR codes." });
         }
 
         var pass = (config.GuestPasses ?? new List<StreamFlixGuestPass>())
@@ -261,9 +261,9 @@ public partial class StreamFlixController
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!CanCallerManageGuestPasses(config, caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can revoke Guest Passes." });
+            return StatusCode(403, new { code = "guest_pass_permission_required", message = "This profile does not have permission to revoke Guest Passes." });
         }
 
         StreamFlixGuestPass? targetPass = null;
@@ -466,6 +466,50 @@ public partial class StreamFlixController
         return !caller.IsAdmin
             && caller.Session != null
             && string.Equals(caller.Session.AuthKind, StreamFlixSessionService.AuthKindGuestPass, StringComparison.Ordinal);
+    }
+
+    private static bool IsEffectiveActiveAdmin(CallerContext caller)
+    {
+        if (caller.IsJellyfinAuthenticated && caller.JellyfinUser != null)
+        {
+            return StreamFlixStartupTask.IsUserAdminCompat(caller.JellyfinUser);
+        }
+
+        return caller.IsAdmin;
+    }
+
+    private bool IsProfileAllowedGuestPassManager(PluginConfiguration config, StreamFlixProfileConfig? profile)
+    {
+        if (profile == null || profile.IsKids || string.IsNullOrWhiteSpace(profile.Id) || IsProfileLinkedToAdmin(profile))
+        {
+            return false;
+        }
+
+        return (config.GuestPassManagerProfileIds ?? new List<string>())
+            .Any(id => string.Equals(id?.Trim(), profile.Id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool CanCallerManageGuestPasses(PluginConfiguration config, CallerContext caller)
+    {
+        if (!HasHouseholdAccess(config, caller) || IsGuestSession(caller))
+        {
+            return false;
+        }
+
+        if (caller.IsJellyfinAuthenticated && caller.JellyfinUser != null)
+        {
+            if (StreamFlixStartupTask.IsUserAdminCompat(caller.JellyfinUser))
+            {
+                return true;
+            }
+
+            var activeUid = caller.JellyfinUser.Id.ToString("N");
+            return (config.Profiles ?? new List<StreamFlixProfileConfig>())
+                .Any(p => string.Equals(p.JellyfinUserId, activeUid, StringComparison.OrdinalIgnoreCase)
+                    && IsProfileAllowedGuestPassManager(config, p));
+        }
+
+        return caller.IsAdmin;
     }
 
     private static string GetGuestPassStatus(StreamFlixGuestPass pass)
@@ -755,7 +799,7 @@ public partial class StreamFlixController
 
         StreamFlixSessionService.ResetGuestFailures(lockKey);
 
-        // Resolve or auto-provision the assigned non-administrator Jellyfin user and sign the guest directly into it
+        // Resolve the assigned non-administrator Jellyfin user and sign the guest directly into it (never create users during guest redemption)
         var primaryAdmin = StreamFlixStartupTask.GetPrimaryAdminUserCompat(_userManager);
         var user = (!string.IsNullOrWhiteSpace(profile.JellyfinUserId) && Guid.TryParse(profile.JellyfinUserId, out var parsedUid))
             ? _userManager.GetUserById(parsedUid)
@@ -767,22 +811,6 @@ public partial class StreamFlixController
             if (user != null)
             {
                 profile.IsPluginCreatedJellyfinUser = false;
-            }
-
-            if (user == null && config.AutoProvisionJellyfinUsers)
-            {
-                try
-                {
-                    user = await StreamFlixStartupTask.CreatePluginManagedUserAsync(_userManager, StreamFlixStartupTask.GetAvailableUsername(_userManager, targetName), _logger).ConfigureAwait(false);
-                    profile.IsPluginCreatedJellyfinUser = true;
-                    profile.JellyfinUserId = user.Id.ToString("N");
-                    profile.JellyfinUsername = user.Username;
-                    Plugin.Instance?.SaveConfiguration();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "StreamFlix: could not auto-provision Jellyfin user '{TargetName}' for Guest Pass.", targetName);
-                }
             }
         }
 
@@ -797,20 +825,33 @@ public partial class StreamFlixController
         }
 
         var needsUpdate = false;
-        var desiredAge = StreamFlixStartupTask.ParentalAgeFromMaturity(profile.MaturityRating, profile.IsKids);
-        if (StreamFlixStartupTask.TryGetMaxParentalAge(user) != desiredAge && StreamFlixStartupTask.TrySetMaxParentalAge(user, desiredAge))
+        if (profile.IsPluginCreatedJellyfinUser)
         {
-            needsUpdate = true;
-        }
+            var desiredAge = StreamFlixStartupTask.ParentalAgeFromMaturity(profile.MaturityRating, profile.IsKids);
+            if (StreamFlixStartupTask.TryGetMaxParentalAge(user) != desiredAge && StreamFlixStartupTask.TrySetMaxParentalAge(user, desiredAge))
+            {
+                needsUpdate = true;
+            }
 
-        if (StreamFlixStartupTask.EnsureUserLibraryAccessAndPermissions(user, primaryAdmin))
-        {
-            needsUpdate = true;
-        }
+            if (!profile.PermissionsInitialized)
+            {
+                if (StreamFlixStartupTask.InitializeNewPluginUserPermissions(user, primaryAdmin, profile.AllowedLibraryIds))
+                {
+                    needsUpdate = true;
+                }
 
-        if (StreamFlixStartupTask.EnsureUserSyncPlayAccess(user, allowCreateAndJoin: !profile.IsKids))
-        {
-            needsUpdate = true;
+                profile.PermissionsInitialized = true;
+                Plugin.Instance?.SaveConfiguration();
+            }
+            else if (JellyfinCompat.SyncUserLibraryRestriction(user, profile.AllowedLibraryIds))
+            {
+                needsUpdate = true;
+            }
+
+            if (StreamFlixStartupTask.EnsureUserSyncPlayAccess(user, allowCreateAndJoin: !profile.IsKids))
+            {
+                needsUpdate = true;
+            }
         }
 
         if (needsUpdate)

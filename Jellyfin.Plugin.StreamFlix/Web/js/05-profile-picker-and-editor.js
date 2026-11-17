@@ -26,6 +26,39 @@
         );
     }
 
+    function isActiveProfileAdmin() {
+        if (isGuestPassSession()) {
+            return false;
+        }
+        var active = state.activeProfile;
+        if (!active || active.isKids) {
+            return false;
+        }
+        var serverProf = active.id ? findProfileById(active.id) : null;
+        if (serverProf) {
+            return Boolean(serverProf.isAdmin);
+        }
+        return Boolean(active.isAdmin);
+    }
+
+    function canActiveProfileManageGuestPasses() {
+        if (isGuestPassSession() || !areGuestPassesEnabled()) {
+            return false;
+        }
+        var active = state.activeProfile;
+        if (!active || active.isKids) {
+            return false;
+        }
+        if (isActiveProfileAdmin()) {
+            return true;
+        }
+        var serverProf = active.id ? findProfileById(active.id) : null;
+        if (serverProf) {
+            return Boolean(serverProf.canManageGuestPasses);
+        }
+        return Boolean(active.canManageGuestPasses);
+    }
+
     function isGateOpen() {
         return Boolean(document.getElementById('streamflix-overlay-root'));
     }
@@ -154,23 +187,26 @@
         var manage = Boolean(state.manageMode) && !isGuest;
 
         var cardsHtml = profiles.map(function (p, idx) {
-            var lockedOut = p.googleLocked && !p.googleLockSatisfied;
+            var accountBlocked = p.canActivate === false;
+            var lockedOut = (p.googleLocked && !p.googleLockSatisfied) || accountBlocked;
             var lockLabel = p.googleAccountEmail || p.googleAccountHint || '';
             var lockMeta = p.googleLocked ? getProfileLockMeta(p) : null;
             var lockBadgeTitle = lockMeta
                 ? ('Locked to ' + lockMeta.providerLabel + (lockLabel ? ': ' + lockLabel : ' account'))
-                : '';
+                : (accountBlocked
+                    ? (p.isAdmin ? 'Sign in with an administrator account to open' : 'Sign in with this profile\'s Jellyfin account to open')
+                    : '');
             var badges = ''
-                + (p.hasPin ? '<span class="streamflix-tile-badge" title="PIN protected">' + icon('lock') + '</span>' : '')
+                + ((p.hasPin || (accountBlocked && !lockMeta)) ? '<span class="streamflix-tile-badge" title="' + escapeHtml(accountBlocked && !p.hasPin ? lockBadgeTitle : 'PIN protected') + '">' + icon('lock') + '</span>' : '')
                 + (lockMeta ? '<span class="streamflix-tile-badge streamflix-tile-badge-lock ' + lockMeta.badgeClass + '" title="' + escapeHtml(lockBadgeTitle) + '">' + lockMeta.badgeSvg + '</span>' : '');
             var roleBadge = p.isAdmin ? 'Admin' : (p.isKids ? 'Kids' : 'Profile');
             var linkedUserLabel = p.jellyfinUsername || p.name;
-            var canDelete = profiles.length > 1 && (!(p.isOwner || p.isAdmin) || isAdmin);
+            var canDelete = isAdmin && profiles.length > 1;
             var title = lockedOut ? (lockBadgeTitle || ('Locked to ' + lockLabel)) : (manage ? 'Edit ' + p.name : 'Open ' + p.name);
 
             return ''
                 + '<div class="streamflix-profile-tile' + (lockedOut ? ' streamflix-tile-locked' : '') + '" tabindex="0" role="button" style="--i:' + idx + ';--pc:' + escapeHtml(p.color || '#E50914') + ';"'
-                + (manage ? ' draggable="true"' : '')
+                + (manage && isAdmin ? ' draggable="true"' : '')
                 + ' data-profile-id="' + escapeHtml(p.id) + '" data-profile-idx="' + idx + '" title="' + escapeHtml(title) + '">'
                 + '  <div class="streamflix-profile-avatar" style="background:' + escapeHtml(p.color || '#E50914') + ';">'
                 + (manage ? '<span class="streamflix-profile-order-badge">#' + (idx + 1) + '</span>' : '')
@@ -186,22 +222,22 @@
                       + '<span class="streamflix-profile-role">' + escapeHtml(roleBadge) + '</span><span class="streamflix-profile-linked">' + icon('link') + escapeHtml(linkedUserLabel) + '</span>'
                       + '</div>'
                       + '<div class="streamflix-profile-reorder-bar">'
-                      + '  <button type="button" class="streamflix-reorder-btn" data-move-left="' + escapeHtml(p.id) + '" title="Move left" aria-label="Move left"' + (idx === 0 ? ' disabled' : '') + '>' + icon('chevronLeft') + '</button>'
+                      + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-left="' + escapeHtml(p.id) + '" title="Move left" aria-label="Move left"' + (idx === 0 ? ' disabled' : '') + '>' + icon('chevronLeft') + '</button>' : '')
                       + '  <button type="button" class="streamflix-reorder-btn" data-edit-profile-id="' + escapeHtml(p.id) + '" title="Edit profile" aria-label="Edit profile">' + icon('edit') + '</button>'
                       + (canDelete
                           ? '<button type="button" class="streamflix-reorder-btn streamflix-reorder-btn-danger" data-delete-profile-id="' + escapeHtml(p.id) + '" title="Delete profile" aria-label="Delete profile">' + icon('trash') + '</button>'
                           : '')
-                      + '  <button type="button" class="streamflix-reorder-btn" data-move-right="' + escapeHtml(p.id) + '" title="Move right" aria-label="Move right"' + (idx === profiles.length - 1 ? ' disabled' : '') + '>' + icon('chevronRight') + '</button>'
+                      + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-right="' + escapeHtml(p.id) + '" title="Move right" aria-label="Move right"' + (idx === profiles.length - 1 ? ' disabled' : '') + '>' + icon('chevronRight') + '</button>' : '')
                       + '</div>'
                     : '')
                 + '</div>';
         }).join('');
 
-        var addTileHtml = isGuest ? '' : (''
+        var addTileHtml = (!isGuest && isAdmin) ? (''
             + '<div class="streamflix-profile-tile streamflix-add-tile" id="streamflix-add-profile-tile" tabindex="0" role="button" style="--i:' + profiles.length + ';">'
             + '  <div class="streamflix-profile-avatar streamflix-add-avatar">' + icon('plus') + '</div>'
             + '  <div class="streamflix-profile-name">Add Profile</div>'
-            + '</div>');
+            + '</div>') : '';
 
         var hasSessionToken = Boolean(state.googleUser && state.googleUser.token);
         var onAdminPage = typeof isAdminConfigRoute === 'function' && isAdminConfigRoute();
@@ -610,6 +646,28 @@
             openGoogleLockPrompt(profile);
             return;
         }
+        if (profile.canActivate === false) {
+            confirmDialog({
+                title: profile.isAdmin ? 'Administrator Sign-In Required' : 'Account Sign-In Required',
+                message: profile.isAdmin
+                    ? ('Sign in with an administrator account to open "' + profile.name + '".')
+                    : ('Sign in with "' + (profile.jellyfinUsername || profile.name) + '" (or an administrator account) to open this profile.'),
+                confirmText: 'Go to Sign In',
+                cancelText: 'Cancel'
+            }).then(function (ok) {
+                if (ok) {
+                    try {
+                        sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
+                    } catch (ePend) {}
+                    clearHouseholdSession();
+                    if (state.config) {
+                        state.config.hasAccess = false;
+                    }
+                    renderGoogleAuthGate();
+                }
+            });
+            return;
+        }
         var leavingKids = typeof isKidsProfileActive === 'function' && isKidsProfileActive() && !profile.isKids;
         if (profile.hasPin) {
             openPinUnlockModal(profile, '', leavingKids ? {
@@ -808,6 +866,11 @@
         var isNew = !existingProfile;
         var isAdmin = isHouseholdAdmin();
 
+        if (isNew && !isAdmin) {
+            showToast('Only an administrator can create new household profiles.', 'error');
+            return;
+        }
+
         // Administrator/owner profiles can only be edited while signed in to an administrator profile.
         if (!isNew && !isAdmin && (existingProfile.isAdmin || existingProfile.isOwner)) {
             confirmDialog({
@@ -821,6 +884,16 @@
                     handleSelectProfile(existingProfile);
                 }
             });
+            return;
+        }
+
+        if (!isNew && !isAdmin && existingProfile.isKids) {
+            showToast('Only an administrator can edit a Kids profile.', 'error');
+            return;
+        }
+
+        if (!isNew && !isAdmin && existingProfile.canActivate === false) {
+            showToast('Sign in with that account or an administrator account to edit this profile.', 'error');
             return;
         }
 
@@ -1049,7 +1122,7 @@
             return '<option value="' + escapeHtml(m.value) + '"' + sel + '>' + escapeHtml(m.label) + '</option>';
         }).join('');
 
-        var canDelete = !isNew && profileCount > 1 && (!(draft.isOwner || draft.isAdmin) || isAdmin);
+        var canDelete = isAdmin && !isNew && profileCount > 1;
         var serverLibraries = (state.config && Array.isArray(state.config.serverLibraries)) ? state.config.serverLibraries : [];
         var draftAllowedLibMap = {};
         (Array.isArray(draft.allowedLibraryIds) ? draft.allowedLibraryIds : []).forEach(function (lid) {
@@ -1126,10 +1199,10 @@
             + '<div class="streamflix-field-row">'
             + '  <div class="streamflix-field">'
             + '    <label for="streamflix-prof-maturity">Maturity Rating</label>'
-            + '    <select id="streamflix-prof-maturity" class="streamflix-select">' + maturityOptionsHtml + '</select>'
+            + '    <select id="streamflix-prof-maturity" class="streamflix-select"' + (isAdmin ? '' : ' disabled title="Only an administrator can change maturity limits"') + '>' + maturityOptionsHtml + '</select>'
             + '  </div>'
             + '  <label class="streamflix-check">'
-            + '    <input type="checkbox" id="streamflix-prof-kids" ' + (draft.isKids ? 'checked' : '') + ' />'
+            + '    <input type="checkbox" id="streamflix-prof-kids" ' + (draft.isKids ? 'checked' : '') + (isAdmin ? '' : ' disabled') + ' />'
             + '    <span>Kids profile</span>'
             + '  </label>'
             + '</div>'
