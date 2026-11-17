@@ -44,6 +44,7 @@
         right: 10px !important;
         width: auto !important;
         max-width: none !important;
+        max-height: calc(100vh - 20px) !important;
         max-height: calc(100dvh - 20px) !important;
     }
 
@@ -83,7 +84,9 @@
     .streamflix-subnav:not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) .streamflix-search-icon {
         margin: 0 !important;
     }
-    .streamflix-subnav.is-search-open,
+    .streamflix-subnav.is-search-open {
+        flex-wrap: wrap !important;
+    }
     .streamflix-subnav:has(.streamflix-search-box:focus-within),
     .streamflix-subnav:has(.streamflix-search-box.has-value) {
         flex-wrap: wrap !important;
@@ -98,6 +101,7 @@
 
     /* Hero Billboard: balanced mobile height so Continue Watching & Top Picks sit above the fold */
     #streamflix-hero-billboard {
+        min-height: clamp(370px, 56vh, 480px) !important;
         min-height: clamp(370px, 56svh, 480px) !important;
         margin-bottom: -20px !important;
         padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 64px) !important;
@@ -200,6 +204,7 @@
     .streamflix-modal-backdrop > .streamflix-detail-modal {
         width: 100% !important;
         max-width: 100% !important;
+        max-height: calc(100vh - 16px) !important;
         max-height: min(92dvh, calc(100vh - 16px)) !important;
         margin: 0 !important;
         border-radius: 20px 20px 0 0 !important;
@@ -728,7 +733,13 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
 }
 #streamflix-osd-episodes {
     position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
+    width: 100%;
+    height: 100%;
     z-index: 10020;
     display: flex;
     justify-content: flex-end;
@@ -736,6 +747,10 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
 }
 .bfx-osd-drawer-scrim {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     background: rgba(0, 0, 0, 0.48);
     animation: streamflixFadeIn 0.2s ease both;
@@ -1003,12 +1018,22 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
 /* ---------- Netflix-Style Two-Column Audio & Subtitles Popover ---------- */
 #streamflix-osd-tracks {
     position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
+    width: 100%;
+    height: 100%;
     z-index: 10020;
     font-family: "Netflix Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 .bfx-tracks-scrim {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     background: transparent;
 }
@@ -1235,6 +1260,10 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
 }
 .bfx-upnext-fill {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     background: #ffffff;
     transform-origin: left center;

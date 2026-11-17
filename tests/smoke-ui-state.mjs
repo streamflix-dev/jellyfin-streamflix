@@ -315,4 +315,13 @@ assert.match(combinedJs, /streamflix-modal-download-btn/, 'Detail modal Download
 assert.match(combinedJs, /data-ep-download-id/, 'Per-episode Download button must be wired');
 console.log('[PASS] Clean UI teardown, JMP mpv support, active-admin scoping & native ?Apikey= downloads verified');
 
-console.log('ALL STREAMFLIX v0.9.8.4 SMOKE CHECKS PASSED!');
+// Verify v0.9.8.5 QtWebEngine / Chromium 83+ CSS fallbacks & JMP system-browser SSO relay
+const css02 = fs.readFileSync(path.join(cssDir, '02-modals-gate-and-profiles.css'), 'utf8');
+assert.match(css02, /#streamflix-overlay-root\s*\{[\s\S]*?top:\s*0;[\s\S]*?left:\s*0;/, '#streamflix-overlay-root must include explicit top/right/bottom/left fallbacks for QtWebEngine');
+assert.match(css02, /@supports\s+not\s*\(aspect-ratio:\s*1\s*\/\s*1\)/, 'Card aspect-ratio fallback block must be present for Chromium < 88 / QtWebEngine');
+assert.match(combinedJs, /function\s+canOpenExternalSystemBrowser\s*\(/, 'JMP external system-browser SSO detection helper must be present');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopBegin/, 'Desktop Google OAuth relay begin endpoint must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopPoll/, 'Desktop Google OAuth relay poll endpoint must be wired');
+console.log('[PASS] QtWebEngine CSS fallbacks & JMP external system-browser SSO relay verified');
+
+console.log('ALL STREAMFLIX v0.9.8.5 SMOKE CHECKS PASSED!');

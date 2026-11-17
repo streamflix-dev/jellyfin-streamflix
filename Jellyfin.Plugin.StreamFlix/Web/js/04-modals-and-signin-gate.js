@@ -885,7 +885,10 @@
 
     function renderGoogleAuthGate(statusText, errorText) {
         var cfg = state.config || DEFAULT_CONFIG;
-        var busy = Boolean(state.verifyingGoogle || state.startingOidcRedirect);
+        var busy = Boolean(state.verifyingGoogle || state.startingOidcRedirect || state.startingGoogleDesktopRelay);
+        var waitingExternalBrowser = Boolean((state.startingOidcRedirect || state.startingGoogleDesktopRelay)
+            && typeof canOpenExternalSystemBrowser === 'function'
+            && canOpenExternalSystemBrowser());
         var stageHtml;
         var viewKey = 'auth';
 
@@ -919,9 +922,12 @@
                 + '</button>')
             : '';
 
+        var effectiveStatus = statusText || (waitingExternalBrowser ? 'Complete sign-in in your browser — this app will unlock automatically…' : '');
         var alertsHtml = ''
-            + (statusText
-                ? '<div class="streamflix-auth-alert"><span class="streamflix-inline-spinner"></span>' + escapeHtml(statusText) + '</div>'
+            + (effectiveStatus
+                ? '<div class="streamflix-auth-alert"><span class="streamflix-inline-spinner"></span><span>' + escapeHtml(effectiveStatus) + '</span>'
+                    + (waitingExternalBrowser ? ' <button type="button" class="streamflix-link-btn" id="streamflix-cancel-desktop-sso" style="margin-left:auto;">Cancel</button>' : '')
+                    + '</div>'
                 : '')
             + (errorText
                 ? '<div class="streamflix-auth-alert streamflix-auth-alert-error">' + escapeHtml(errorText) + '</div>'
@@ -931,13 +937,13 @@
             + (googleEnabled
                 ? '<button type="button" class="streamflix-google-btn" id="streamflix-google-login-btn"' + (busy ? ' disabled' : '') + '>'
                   + GOOGLE_G_SVG
-                  + '<span>' + (busy ? 'Verifying…' : 'Continue with Google') + '</span>'
+                  + '<span>' + (state.startingGoogleDesktopRelay ? 'Waiting for browser…' : (busy ? 'Verifying…' : 'Continue with Google')) + '</span>'
                   + '</button>'
                 : '')
             + (oidcEnabled
                 ? '<button type="button" class="streamflix-oidc-btn' + (!googleEnabled ? ' streamflix-oidc-btn-primary' : '') + '" id="streamflix-oidc-login-btn"' + (busy ? ' disabled' : '') + '>'
                   + OIDC_SSO_SVG
-                  + '<span>' + (state.startingOidcRedirect ? 'Redirecting…' : (busy ? 'Verifying…' : ('Continue with ' + escapeHtml(oidcLabel)))) + '</span>'
+                  + '<span>' + (state.startingOidcRedirect ? (waitingExternalBrowser ? 'Waiting for browser…' : 'Redirecting…') : (busy ? 'Verifying…' : ('Continue with ' + escapeHtml(oidcLabel)))) + '</span>'
                   + '</button>'
                 : '')
             + '</div>';
@@ -1097,6 +1103,15 @@
         if (oidcBtn) {
             oidcBtn.addEventListener('click', function () {
                 startOidcRedirect('', '');
+            });
+        }
+
+        var cancelDesktopSsoBtn = root.querySelector('#streamflix-cancel-desktop-sso');
+        if (cancelDesktopSsoBtn) {
+            cancelDesktopSsoBtn.addEventListener('click', function () {
+                if (typeof cancelPendingDesktopAuthFlows === 'function') {
+                    cancelPendingDesktopAuthFlows();
+                }
             });
         }
 

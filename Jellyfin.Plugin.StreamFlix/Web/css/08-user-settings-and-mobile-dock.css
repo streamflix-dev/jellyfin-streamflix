@@ -1133,6 +1133,9 @@ body.bfx-settings-route button:focus-visible {
         transition: opacity 0.2s ease;
     }
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-search-focused::after,
+    html:not(.layout-tv) body.bfx-phone-mode.streamflix-modal-open::after {
+        opacity: 0 !important;
+    }
     html:not(.layout-tv) body.bfx-phone-mode:has(.streamflix-modal-backdrop:not(.streamflix-modal-leave))::after {
         opacity: 0 !important;
     }
@@ -1163,6 +1166,11 @@ body.bfx-settings-route button:focus-visible {
 
     /* Smoothly tuck dock away while soft keyboard is active in search or a modal sheet is open */
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-search-focused #streamflix-mobile-dock,
+    html:not(.layout-tv) body.bfx-phone-mode.streamflix-modal-open #streamflix-mobile-dock {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translate(-50%, 22px) !important;
+    }
     html:not(.layout-tv) body.bfx-phone-mode:has(.streamflix-modal-backdrop:not(.streamflix-modal-leave)) #streamflix-mobile-dock {
         opacity: 0 !important;
         pointer-events: none !important;
@@ -1295,6 +1303,7 @@ body.bfx-settings-route button:focus-visible {
         bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
         left: 12px !important;
         right: 12px !important;
+        max-height: calc(100vh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
         max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
         border-radius: 22px !important;
         transform-origin: bottom center !important;
@@ -1355,7 +1364,9 @@ body.bfx-settings-route button:focus-visible {
     }
 
     /* When Search is opened from the mobile dock, show a clean full-width search bar */
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav.is-search-open .streamflix-FilterPills,
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav.is-search-open .streamflix-FilterPills {
+        display: none !important;
+    }
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:has(.streamflix-search-box:focus-within) .streamflix-FilterPills,
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:has(.streamflix-search-box.has-value) .streamflix-FilterPills {
         display: none !important;

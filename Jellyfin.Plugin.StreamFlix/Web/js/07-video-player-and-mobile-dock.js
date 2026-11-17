@@ -1272,6 +1272,9 @@
         applyProfileAccent(state.activeProfile || null);
         var inVideo = isVideoPlayerActive();
         document.body.classList.toggle('streamflix-in-video-player', inVideo);
+        if (document.documentElement) {
+            document.documentElement.classList.toggle('bfx-in-video', inVideo);
+        }
         try { enhanceVideoOsd(inVideo); } catch (eOsd) {}
 
         neutralizeConflictingBrandingCss();

@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.5",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.5 Release Candidate (Dev Test Channel): Fix blank dark screen inside Jellyfin Media Player for Windows (Qt 5.15 QtWebEngine / Chromium 83–87) and WebOS/Tizen TVs by adding explicit top/right/bottom/left coordinates alongside CSS inset, splitting :has() out of shared selector lists, adding @supports not (aspect-ratio) card/poster fallbacks, keeping html transparent during mpv hardware video playback, and adding external system-browser Google & OIDC sign-in handoff via NativeShell.openUrl (#16); plus native ?Apikey= download URL fix (#18).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.5_12.0.0.zip",
+        "checksum": "660a276f016d152455754c2f2db416d3",
+        "timestamp": "2026-11-17T21:57:58Z"
+      },
+      {
+        "version": "0.9.8.5",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.5 Release Candidate (Dev Test Channel): Fix blank dark screen inside Jellyfin Media Player for Windows (Qt 5.15 QtWebEngine / Chromium 83–87) and WebOS/Tizen TVs by adding explicit top/right/bottom/left coordinates alongside CSS inset, splitting :has() out of shared selector lists, adding @supports not (aspect-ratio) card/poster fallbacks, keeping html transparent during mpv hardware video playback, and adding external system-browser Google & OIDC sign-in handoff via NativeShell.openUrl (#16); plus native ?Apikey= download URL fix (#18).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.5_10.11.0.zip",
+        "checksum": "0e504c028f9d60b6abb4a0ba39f3173b",
+        "timestamp": "2026-11-17T21:57:58Z"
+      },
+      {
+        "version": "0.9.8.5",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.5 Release Candidate (Dev Test Channel): Fix blank dark screen inside Jellyfin Media Player for Windows (Qt 5.15 QtWebEngine / Chromium 83–87) and WebOS/Tizen TVs by adding explicit top/right/bottom/left coordinates alongside CSS inset, splitting :has() out of shared selector lists, adding @supports not (aspect-ratio) card/poster fallbacks, keeping html transparent during mpv hardware video playback, and adding external system-browser Google & OIDC sign-in handoff via NativeShell.openUrl (#16); plus native ?Apikey= download URL fix (#18).",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.5_10.9.0.zip",
+        "checksum": "1ed3c099aee35b955c9478eaffaae1c8",
+        "timestamp": "2026-11-17T21:57:58Z"
+      },
+      {
         "version": "0.9.8.4",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.4 Release Candidate (Dev Test Channel): Restore full StreamFlix Cinema UI in Jellyfin Media Player for Windows while fixing idle .videoPlayerContainer detection, ServerConnections auth resolution, and preserving JMP's native mpv player (#16); update direct media download URLs to use Jellyfin's native ?Apikey= parameter (#18, #10); plus clean disable recovery (#17), household profile security (#11, #8, #3), Tailscale LAN support (#12), cold-load speedup (#13), Visible Jellyfin Libraries nav fix (#14), and Seerr Tracker fix (#15).",
         "targetAbi": "12.0.0.0",

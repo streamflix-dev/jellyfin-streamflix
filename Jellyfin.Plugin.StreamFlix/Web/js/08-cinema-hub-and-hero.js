@@ -4,7 +4,7 @@
        ---------------------------------------------------------------------- */
     function isOnHomeRoute() {
         var h = (window.location.hash || '').toLowerCase();
-        return h === '' || h === '#' || h === '#/' || h === '#!/' || h.indexOf('#/home') === 0 || h.indexOf('#!/home') === 0;
+        return h === '' || h === '#' || h === '#/' || h === '#!/' || h.indexOf('#/home') === 0 || h.indexOf('#!/home') === 0 || h.indexOf('#/index') === 0 || h.indexOf('#!/index') === 0;
     }
 
     function getJellyfinAuthContext() {

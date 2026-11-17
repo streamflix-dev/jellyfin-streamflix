@@ -14,6 +14,9 @@
                 clearInterval(state.heroTimer);
                 state.heroTimer = null;
             }
+            if (document.documentElement) {
+                document.documentElement.classList.remove('bfx-active-html', 'bfx-in-video');
+            }
             if (document.body) {
                 [
                     'bfx-active',
@@ -153,6 +156,9 @@
             return;
         }
 
+        if (document.documentElement) {
+            document.documentElement.classList.add('bfx-active-html');
+        }
         if (document.body) {
             document.body.classList.add('bfx-active');
         }
@@ -494,11 +500,17 @@
             if (typeof pollPendingOidcFlowIfActive === 'function') {
                 pollPendingOidcFlowIfActive();
             }
+            if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
+                pollPendingGoogleDesktopFlowIfActive();
+            }
             scheduleLifecycleTick(0);
         });
         window.addEventListener('focus', function () {
             if (typeof pollPendingOidcFlowIfActive === 'function') {
                 pollPendingOidcFlowIfActive();
+            }
+            if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
+                pollPendingGoogleDesktopFlowIfActive();
             }
             scheduleLifecycleTick(0);
         });
@@ -507,6 +519,9 @@
             if (!document.hidden) {
                 if (typeof pollPendingOidcFlowIfActive === 'function') {
                     pollPendingOidcFlowIfActive();
+                }
+                if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
+                    pollPendingGoogleDesktopFlowIfActive();
                 }
                 scheduleLifecycleTick(0);
             }
@@ -1318,6 +1333,9 @@
             return;
         }
         if (document.body && isStreamFlixRuntimeEnabled()) {
+            if (document.documentElement) {
+                document.documentElement.classList.add('bfx-active-html');
+            }
             document.body.classList.add('bfx-active');
         }
         installStrictCspImageHandlers();
@@ -1364,14 +1382,19 @@
                     takePendingProfileId();
                     renderGoogleAuthGate(null, oauth.error === 'access_denied' ? 'Google sign-in was cancelled.' : ('Google sign-in failed (' + oauth.error + ').'));
                 } else {
-                    verifyGoogleAccessToken(oauth.token);
+                    verifyGoogleAccessToken(oauth.token, oauth.desktopRelayStateId);
                 }
             });
         } else {
             evaluateAuthAndProfileGate();
             fetchPublicConfig().then(function () {
-                if (!hasHouseholdAccess() && typeof pollPendingOidcFlowIfActive === 'function') {
-                    pollPendingOidcFlowIfActive();
+                if (!hasHouseholdAccess()) {
+                    if (typeof pollPendingOidcFlowIfActive === 'function') {
+                        pollPendingOidcFlowIfActive();
+                    }
+                    if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
+                        pollPendingGoogleDesktopFlowIfActive();
+                    }
                 }
                 rerenderPickerIfOpen();
                 evaluateAuthAndProfileGate();

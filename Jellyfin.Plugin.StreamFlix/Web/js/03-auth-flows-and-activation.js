@@ -36,7 +36,19 @@
             expected = sessionStorage.getItem(OAUTH_STATE_KEY) || '';
             sessionStorage.removeItem(OAUTH_STATE_KEY);
         } catch (e) {}
-        result.stateOk = Boolean(expected) && expected === result.state;
+        var relayPrefix = 'sf_jmp_';
+        if (result.state && result.state.indexOf(relayPrefix) === 0) {
+            var relayCandidate = result.state.slice(relayPrefix.length).trim().toLowerCase();
+            if (/^[0-9a-f]{16,64}$/.test(relayCandidate)) {
+                result.desktopRelayStateId = relayCandidate;
+                result.stateOk = true;
+            } else {
+                result.stateOk = false;
+            }
+        } else {
+            result.desktopRelayStateId = '';
+            result.stateOk = Boolean(expected) && expected === result.state;
+        }
 
         state.justCompletedGoogleOAuth = true;
         if (typeof capturePendingWatchPartyFromUrl === 'function') {
@@ -60,10 +72,212 @@
         return pid;
     }
 
+    function canOpenExternalSystemBrowser() {
+        try {
+            return Boolean(isJellyfinMediaPlayerApp() && window.NativeShell && typeof window.NativeShell.openUrl === 'function');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    var desktopAuthPollTimer = null;
+
+    function stopDesktopAuthPollTimerIfIdle() {
+        if (!loadPendingGoogleDesktopFlow() && !loadPendingOidcFlow()) {
+            if (desktopAuthPollTimer) {
+                clearInterval(desktopAuthPollTimer);
+                desktopAuthPollTimer = null;
+            }
+        }
+    }
+
+    function ensureDesktopAuthPollTimer() {
+        if (desktopAuthPollTimer) {
+            return;
+        }
+        desktopAuthPollTimer = setInterval(function () {
+            if (hasHouseholdAccess()) {
+                clearPendingGoogleDesktopFlow();
+                clearPendingOidcFlow();
+                stopDesktopAuthPollTimerIfIdle();
+                return;
+            }
+            pollPendingGoogleDesktopFlowIfActive();
+            pollPendingOidcFlowIfActive();
+            stopDesktopAuthPollTimerIfIdle();
+        }, 1500);
+    }
+
+    function savePendingGoogleDesktopFlow(stateId, pollSecret) {
+        if (!stateId || !pollSecret) {
+            return;
+        }
+        var payload = JSON.stringify({
+            stateId: String(stateId),
+            pollSecret: String(pollSecret),
+            startedAt: Date.now()
+        });
+        try { sessionStorage.setItem(GOOGLE_DESKTOP_PENDING_KEY, payload); } catch (e1) {}
+        try { localStorage.setItem(GOOGLE_DESKTOP_PENDING_KEY, payload); } catch (e2) {}
+    }
+
+    function loadPendingGoogleDesktopFlow() {
+        var raw = '';
+        try { raw = sessionStorage.getItem(GOOGLE_DESKTOP_PENDING_KEY) || ''; } catch (e1) {}
+        if (!raw) {
+            try { raw = localStorage.getItem(GOOGLE_DESKTOP_PENDING_KEY) || ''; } catch (e2) {}
+        }
+        if (!raw) {
+            return null;
+        }
+        try {
+            var parsed = JSON.parse(raw);
+            if (!parsed || !parsed.stateId || !parsed.pollSecret) {
+                clearPendingGoogleDesktopFlow();
+                return null;
+            }
+            if (parsed.startedAt && (Date.now() - Number(parsed.startedAt) > 10 * 60 * 1000)) {
+                clearPendingGoogleDesktopFlow();
+                return null;
+            }
+            return parsed;
+        } catch (e3) {
+            clearPendingGoogleDesktopFlow();
+            return null;
+        }
+    }
+
+    function clearPendingGoogleDesktopFlow() {
+        try { sessionStorage.removeItem(GOOGLE_DESKTOP_PENDING_KEY); } catch (e1) {}
+        try { localStorage.removeItem(GOOGLE_DESKTOP_PENDING_KEY); } catch (e2) {}
+    }
+
+    function cancelPendingDesktopAuthFlows() {
+        state.startingGoogleDesktopRelay = false;
+        state.startingOidcRedirect = false;
+        clearPendingGoogleDesktopFlow();
+        clearPendingOidcFlow();
+        stopDesktopAuthPollTimerIfIdle();
+        if (!hasHouseholdAccess()) {
+            renderGoogleAuthGate();
+        }
+    }
+
+    function pollPendingGoogleDesktopFlowIfActive() {
+        if (state.googleDesktopPollInFlight || state.verifyingGoogle || hasHouseholdAccess()) {
+            if (hasHouseholdAccess()) {
+                clearPendingGoogleDesktopFlow();
+            }
+            return;
+        }
+        var pendingFlow = loadPendingGoogleDesktopFlow();
+        if (!pendingFlow || !pendingFlow.stateId || !pendingFlow.pollSecret) {
+            return;
+        }
+        state.googleDesktopPollInFlight = true;
+        apiFetch('/StreamFlix/Auth/GoogleDesktopPoll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                stateId: pendingFlow.stateId,
+                pollSecret: pendingFlow.pollSecret
+            })
+        }).then(function (res) {
+            state.googleDesktopPollInFlight = false;
+            if (!res || !res.status || res.status === 'pending') {
+                return;
+            }
+            clearPendingGoogleDesktopFlow();
+            state.startingGoogleDesktopRelay = false;
+            stopDesktopAuthPollTimerIfIdle();
+            if (res.status === 'complete' && res.verified && res.sessionToken) {
+                state.justCompletedGoogleOAuth = true;
+                setHouseholdSession({
+                    token: res.sessionToken,
+                    email: res.email,
+                    name: res.name || res.email,
+                    picture: res.picture || '',
+                    expiresAt: res.expiresAt || ''
+                });
+                state.activeProfile = null;
+                localStorage.removeItem(PROFILE_KEY);
+                var pendingId = res.pendingProfileId || takePendingProfileId();
+                fetchPublicConfig().then(function () {
+                    renderProfilePickerGate();
+                    var pending = pendingId ? findProfileById(pendingId) : null;
+                    if (pending) {
+                        handleSelectProfile(pending);
+                    } else {
+                        showToast('Signed in as ' + res.email, 'success');
+                    }
+                });
+                return;
+            }
+            if (res.status === 'error' && res.message && !hasHouseholdAccess()) {
+                takePendingProfileId();
+                renderGoogleAuthGate(null, res.message);
+            } else if (!hasHouseholdAccess()) {
+                renderGoogleAuthGate();
+            }
+        }).catch(function () {
+            state.googleDesktopPollInFlight = false;
+        });
+    }
+
     function startGoogleOAuthRedirect(pendingProfileId, loginHint) {
         var clientId = state.config && state.config.googleClientId;
         if (!clientId) {
             showToast('Google Sign-In isn\'t configured on this server yet.', 'error');
+            return;
+        }
+        if (canOpenExternalSystemBrowser()) {
+            if (state.startingGoogleDesktopRelay || state.verifyingGoogle) {
+                return;
+            }
+            state.startingGoogleDesktopRelay = true;
+            try {
+                if (pendingProfileId) {
+                    sessionStorage.setItem(PENDING_PROFILE_KEY, pendingProfileId);
+                } else {
+                    sessionStorage.removeItem(PENDING_PROFILE_KEY);
+                }
+            } catch (ePend) {}
+            if (!hasHouseholdAccess()) {
+                renderGoogleAuthGate('Finish Google sign-in in your browser…');
+            }
+            apiFetch('/StreamFlix/Auth/GoogleDesktopBegin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pendingProfileId: pendingProfileId || '',
+                    loginHint: loginHint || ''
+                })
+            }).then(function (res) {
+                if (!res || !res.stateId || !res.pollSecret) {
+                    throw new Error((res && res.message) || 'Could not start Google sign-in.');
+                }
+                savePendingGoogleDesktopFlow(res.stateId, res.pollSecret);
+                var extUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+                    + '?client_id=' + encodeURIComponent(clientId)
+                    + '&redirect_uri=' + encodeURIComponent(getGoogleRedirectUri())
+                    + '&response_type=token'
+                    + '&scope=' + encodeURIComponent('openid email profile')
+                    + '&state=' + encodeURIComponent('sf_jmp_' + res.stateId)
+                    + '&include_granted_scopes=true'
+                    + '&prompt=select_account'
+                    + (loginHint ? '&login_hint=' + encodeURIComponent(loginHint) : '');
+                ensureDesktopAuthPollTimer();
+                window.NativeShell.openUrl(extUrl);
+            }).catch(function (err) {
+                state.startingGoogleDesktopRelay = false;
+                clearPendingGoogleDesktopFlow();
+                var msg = (err && err.message) || 'Could not start Google sign-in.';
+                if (!hasHouseholdAccess()) {
+                    renderGoogleAuthGate(null, msg);
+                } else {
+                    showToast(msg, 'error');
+                }
+            });
             return;
         }
         var oauthState = randomToken(16);
@@ -94,7 +308,7 @@
         window.location.assign(authUrl);
     }
 
-    function verifyGoogleAccessToken(accessToken) {
+    function verifyGoogleAccessToken(accessToken, desktopRelayStateId) {
         state.verifyingGoogle = true;
         renderGoogleAuthGate('Verifying your Google account…');
 
@@ -103,7 +317,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 accessToken: accessToken,
-                approveIfUnlisted: false
+                approveIfUnlisted: false,
+                desktopRelayStateId: desktopRelayStateId || ''
             })
         }).then(function (res) {
             state.verifyingGoogle = false;
@@ -127,8 +342,10 @@
             return fetchPublicConfig().then(function () {
                 renderProfilePickerGate();
                 var pending = pendingId ? findProfileById(pendingId) : null;
-                if (pending) {
+                if (pending && !res.desktopRelayCompleted) {
                     handleSelectProfile(pending);
+                } else if (res.desktopRelayCompleted) {
+                    showToast('Signed in as ' + res.email + ' — you can return to Jellyfin Media Player.', 'success', 6000);
                 } else {
                     showToast('Signed in as ' + res.email, 'success');
                 }
@@ -251,6 +468,11 @@
     }
 
     function navigateExternalNoReferrer(url) {
+        if (canOpenExternalSystemBrowser()) {
+            ensureDesktopAuthPollTimer();
+            window.NativeShell.openUrl(url);
+            return;
+        }
         // On mobile apps & embedded WebViews (jellyfin-expo WKWebView / Android WebView), synthetic <a rel="noreferrer">.click()
         // can trigger external browser interception instead of navigating the active WebView. Use location.assign directly there.
         if (isMobileOrNativeWebView()) {
@@ -635,7 +857,7 @@
         }
 
         var h = window.location.hash || '';
-        if (h === '#!/home.html' || h === '#!/home' || h === '#/home.html') {
+        if (h === '#!/home.html' || h === '#!/home' || h === '#/home.html' || h === '#!/index.html' || h === '#/index.html') {
             window.location.hash = '#/home';
             return;
         }

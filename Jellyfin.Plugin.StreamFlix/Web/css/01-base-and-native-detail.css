@@ -82,12 +82,15 @@ body.bfx-active ::-webkit-scrollbar-thumb {
 }
 
 /* Global Cinema Dark Background & Netflix Sans Typography */
-html:has(body.bfx-active),
+html.bfx-active-html:not(.bfx-in-video):not(.backgroundContainer-transparent),
 body.bfx-active,
 body.bfx-active .backgroundContainer {
     background-color: var(--streamflix-bg);
     color: var(--streamflix-text) !important;
     font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+html:has(body.bfx-active:not(.streamflix-in-video-player)) {
+    background-color: var(--streamflix-bg);
 }
 
 body.bfx-active .mainAnimatedPages {
@@ -97,7 +100,9 @@ body.bfx-active .mainAnimatedPages {
     font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
 }
 
-/* Ensure HTML5 Video Player (mounted behind .backgroundContainer & .mainAnimatedPages) is NEVER covered by opaque backgrounds or modals */
+/* Ensure HTML5 / JMP mpv Video Player (mounted behind html, .backgroundContainer & .mainAnimatedPages) is NEVER covered by opaque backgrounds or modals */
+html.bfx-in-video,
+html.backgroundContainer-transparent,
 body.streamflix-in-video-player,
 body.streamflix-in-video-player .backgroundContainer,
 body.streamflix-in-video-player .backgroundContainer.withBackdrop,
@@ -529,6 +534,10 @@ body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide) {
 body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide)::before {
     content: "" !important;
     position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
     inset: 0 !important;
     z-index: 1 !important;
     background: linear-gradient(
@@ -544,6 +553,10 @@ body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide)::before {
 body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide)::after {
     content: "" !important;
     position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
     inset: 0 !important;
     z-index: 1 !important;
     background: linear-gradient(
@@ -1309,6 +1322,10 @@ body.bfx-active .navMenuOption-selected {
 #streamflix-hero-billboard::before {
     content: "";
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     background:
         linear-gradient(90deg, rgba(12, 12, 12, 0.96) 0%, rgba(16, 16, 16, 0.72) 44%, rgba(20, 20, 20, 0.12) 100%),

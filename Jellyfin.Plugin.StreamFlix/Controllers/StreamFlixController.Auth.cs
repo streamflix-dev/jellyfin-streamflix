@@ -128,12 +128,18 @@ public partial class StreamFlixController
 
             if (!StreamFlixSessionService.IsEmailApproved(config, email))
             {
+                var unapprovedMsg = $"{email} isn't approved for this StreamFlix server. Ask the owner to add it in Dashboard → Plugins → StreamFlix.";
+                if (!string.IsNullOrWhiteSpace(request.DesktopRelayStateId))
+                {
+                    StreamFlixOidcService.StoreCompletedFlow(request.DesktopRelayStateId, null, unapprovedMsg);
+                }
+
                 return StatusCode(403, new
                 {
                     verified = false,
                     unapproved = true,
                     email,
-                    message = $"{email} isn't approved for this StreamFlix server. Ask the owner to add it in Dashboard → Plugins → StreamFlix.",
+                    message = unapprovedMsg,
                 });
             }
 
@@ -144,6 +150,21 @@ public partial class StreamFlixController
             }
 
             var session = StreamFlixSessionService.Issue(config, email, out var sessionToken);
+            var relayedPendingProfileId = string.Empty;
+            if (!string.IsNullOrWhiteSpace(request.DesktopRelayStateId))
+            {
+                relayedPendingProfileId = StreamFlixOidcService.PeekPendingProfileId(request.DesktopRelayStateId) ?? string.Empty;
+                var relayHandoff = new StreamFlixOidcService.OidcHandoffPayload(
+                    SessionToken: sessionToken,
+                    ProviderName: "Google",
+                    Email: email,
+                    Username: string.Empty,
+                    Name: name,
+                    Picture: picture,
+                    ExpiresAt: session.ExpiresAt.ToString("O"),
+                    PendingProfileId: relayedPendingProfileId);
+                StreamFlixOidcService.StoreCompletedFlow(request.DesktopRelayStateId, relayHandoff, errorMessage: null);
+            }
 
             return Ok(new
             {
@@ -153,13 +174,91 @@ public partial class StreamFlixController
                 picture,
                 sessionToken,
                 expiresAt = session.ExpiresAt,
+                desktopRelayCompleted = !string.IsNullOrWhiteSpace(request.DesktopRelayStateId),
             });
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "StreamFlix: error verifying Google OAuth token.");
+            if (!string.IsNullOrWhiteSpace(request.DesktopRelayStateId))
+            {
+                StreamFlixOidcService.StoreCompletedFlow(request.DesktopRelayStateId, null, "Could not reach Google to verify your sign-in. Please try again.");
+            }
+
             return StatusCode(500, new { verified = false, message = "Could not reach Google to verify your sign-in. Please try again." });
         }
+    }
+
+    [HttpPost("Auth/GoogleDesktopBegin")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<object> BeginGoogleDesktopRelay([FromBody] BeginOidcRequest? request = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        if (!config.EnableGoogleSignIn || string.IsNullOrWhiteSpace(config.GoogleClientId))
+        {
+            return StatusCode(403, new { code = "google_disabled", message = "Google Sign-In is not enabled on this server." });
+        }
+
+        var (stateId, pollSecret) = StreamFlixOidcService.CreateDesktopRelayFlow(request?.PendingProfileId);
+        return Ok(new
+        {
+            stateId,
+            pollSecret,
+        });
+    }
+
+    [HttpPost("Auth/GoogleDesktopPoll")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<object> PollGoogleDesktopRelay([FromBody] CompleteOidcRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (request == null || string.IsNullOrWhiteSpace(request.StateId) || string.IsNullOrWhiteSpace(request.PollSecret))
+        {
+            return BadRequest(new { status = "invalid", verified = false, message = "Missing stateId or pollSecret." });
+        }
+
+        var config = Config;
+        var pollRes = StreamFlixOidcService.PollOrClaimFlow(request.StateId, request.PollSecret);
+        if (string.Equals(pollRes.Status, "pending", StringComparison.Ordinal))
+        {
+            return Ok(new { status = "pending", verified = false });
+        }
+
+        if (string.Equals(pollRes.Status, "error", StringComparison.Ordinal))
+        {
+            return Ok(new
+            {
+                status = "error",
+                verified = false,
+                message = pollRes.ErrorMessage ?? "Google sign-in failed.",
+            });
+        }
+
+        if (string.Equals(pollRes.Status, "complete", StringComparison.Ordinal) && pollRes.Handoff != null)
+        {
+            var validated = StreamFlixSessionService.Validate(config, pollRes.Handoff.SessionToken);
+            if (validated == null)
+            {
+                return StatusCode(401, new { status = "error", verified = false, message = "Google session is no longer valid." });
+            }
+
+            return Ok(new
+            {
+                status = "complete",
+                verified = true,
+                email = pollRes.Handoff.Email,
+                name = pollRes.Handoff.Name,
+                picture = pollRes.Handoff.Picture,
+                sessionToken = pollRes.Handoff.SessionToken,
+                expiresAt = pollRes.Handoff.ExpiresAt,
+                pendingProfileId = pollRes.Handoff.PendingProfileId,
+            });
+        }
+
+        return Ok(new { status = "expired", verified = false });
     }
 
     [HttpPost("Auth/StandardLogin")]

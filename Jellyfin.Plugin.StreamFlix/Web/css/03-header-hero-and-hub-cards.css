@@ -231,6 +231,10 @@ body.bfx-active .MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) 
 
 video.bfx-hero-preview-video {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -599,6 +603,9 @@ video.bfx-hero-preview-video.is-playing {
 #streamflix-hero-billboard::after {
     content: "";
     position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: auto 0 0 0;
     height: 30%;
     z-index: 1;
@@ -733,6 +740,9 @@ video.bfx-hero-preview-video.is-playing {
 }
 .streamflix-hero-progress-bar span {
     position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
     inset: 0 auto 0 0;
     border-radius: inherit;
     background: var(--streamflix-red);
@@ -806,12 +816,20 @@ video.bfx-hero-preview-video.is-playing {
 .streamflix-hero-dot::before {
     content: "";
     position: absolute;
+    top: -10px;
+    right: 0;
+    bottom: -10px;
+    left: 0;
     inset: -10px 0;
 }
 .streamflix-hero-dot:hover { background: rgba(255, 255, 255, 0.45); }
 .streamflix-hero-dot.active { width: 56px; background: rgba(255, 255, 255, 0.25); }
 .streamflix-hero-dot-fill {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     border-radius: inherit;
     background: #fff;
@@ -923,6 +941,10 @@ video.bfx-hero-preview-video.is-playing {
 /* ---------- Cards (shared) ---------- */
 .streamflix-card-fallback {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     display: flex;
     align-items: center;
@@ -940,6 +962,10 @@ video.bfx-hero-preview-video.is-playing {
 .streamflix-wide-img,
 .streamflix-top10-poster img {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -1129,6 +1155,10 @@ img.is-broken { visibility: hidden; }
 .streamflix-wide-card:hover .streamflix-wide-img { transform: scale(1.05); }
 .streamflix-wide-scrim {
     position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
     z-index: 2;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.82) 100%);
@@ -1908,7 +1938,13 @@ body.bfx-header-tucked:not(.streamflix-in-video-player) .headerSelectedPlayer { 
 /* Lockout-proof Embedded StreamFlix Admin Settings Fallback */
 .bfx-embedded-admin-backdrop {
     position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     inset: 0;
+    width: 100%;
+    height: 100%;
     z-index: 2147482500;
     background: #101014;
     color: #fff;

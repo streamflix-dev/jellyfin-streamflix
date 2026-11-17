@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.9.8.4"
+  PLUGIN_VERSION: "0.9.8.5"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
-  PLUGIN_CHANGELOG: "- Jellyfin Media Player Full StreamFlix UI Support & Native Download Apikey Fix: restore full StreamFlix Cinema UI in Jellyfin Media Player for Windows while fixing idle .videoPlayerContainer detection, ServerConnections auth resolution, and preserving JMP's native mpv player (#16); update direct media download URLs to use Jellyfin's native ?Apikey= parameter so downloads succeed without HTTP 401 (#18, #10); plus all v0.9.2.7 clean disable recovery (#17), household profile security (#11, #8, #3), Tailscale LAN support (#12), cold-load speedup (#13), Visible Jellyfin Libraries nav fix (#14), and Seerr Tracker fix (#15)"
+  PLUGIN_CHANGELOG: "- Jellyfin Media Player QtWebEngine Rendering & System-Browser SSO Handoff Fix: fix blank dark screen inside Jellyfin Media Player for Windows (Qt 5.15 QtWebEngine / Chromium 83–87) and WebOS/Tizen TVs by adding explicit top/right/bottom/left coordinates alongside CSS inset, splitting :has() out of shared selector lists, adding @supports not (aspect-ratio) card/poster fallbacks, keeping html transparent during mpv hardware video playback, and adding external system-browser Google & OIDC sign-in handoff via NativeShell.openUrl (#16); plus native ?Apikey= download URL fix (#18)"
 
 jobs:
   build-and-publish:

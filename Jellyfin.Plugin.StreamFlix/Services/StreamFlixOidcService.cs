@@ -238,6 +238,42 @@ public static class StreamFlixOidcService
         return (sb.ToString(), stateId, signedCookie, pollSecret);
     }
 
+    public static (string StateId, string PollSecret) CreateDesktopRelayFlow(string? pendingProfileId)
+    {
+        var stateId = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        var pollSecret = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        var pollSecretHash = SHA256.HashData(Encoding.ASCII.GetBytes(pollSecret));
+        var statePayload = new OidcStatePayload(
+            StateId: stateId,
+            CodeVerifier: string.Empty,
+            Nonce: string.Empty,
+            RedirectUri: string.Empty,
+            ReturnWebBase: string.Empty,
+            PendingProfileId: (pendingProfileId ?? string.Empty).Trim());
+        RegisterPendingFlow(statePayload, pollSecretHash);
+        return (stateId, pollSecret);
+    }
+
+    public static string? PeekPendingProfileId(string? rawStateId)
+    {
+        var clean = (rawStateId ?? string.Empty).Trim().ToLowerInvariant();
+        if (clean.Length < 16 || clean.Length > 64)
+        {
+            return null;
+        }
+
+        PrunePendingFlows();
+        lock (PendingFlowsLock)
+        {
+            if (PendingOidcFlows.TryGetValue(clean, out var flow) && DateTimeOffset.UtcNow < flow.StateExpiresAt)
+            {
+                return flow.State.PendingProfileId;
+            }
+        }
+
+        return null;
+    }
+
     public static OidcStatePayload? TryConsumePendingState(string? rawStateId)
     {
         var clean = (rawStateId ?? string.Empty).Trim().ToLowerInvariant();
