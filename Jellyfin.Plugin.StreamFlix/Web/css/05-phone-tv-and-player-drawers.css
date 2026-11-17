@@ -142,10 +142,19 @@
         gap: 10px !important;
         scroll-snap-type: x proximity;
     }
-    .streamflix-poster-card {
+    .streamflix-carousel-track > .streamflix-poster-card {
         flex: 0 0 clamp(106px, 28.5vw, 132px) !important;
         width: clamp(106px, 28.5vw, 132px) !important;
         scroll-snap-align: start;
+    }
+    .streamflix-grid {
+        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+        gap: 16px 10px;
+    }
+    .streamflix-grid .streamflix-poster-card {
+        flex: initial !important;
+        width: 100% !important;
+        min-width: 0 !important;
     }
     .streamflix-wide-card {
         flex: 0 0 clamp(218px, 68vw, 268px) !important;
@@ -428,10 +437,21 @@ html.layout-tv .streamflix-carousel-track {
     padding-top: 16px;
     padding-bottom: 18px;
 }
-body.bfx-tv-mode .streamflix-poster-card,
-html.layout-tv .streamflix-poster-card {
+body.bfx-tv-mode .streamflix-carousel-track > .streamflix-poster-card,
+html.layout-tv .streamflix-carousel-track > .streamflix-poster-card {
     flex: 0 0 clamp(204px, 13vw, 268px) !important;
     width: clamp(204px, 13vw, 268px) !important;
+}
+body.bfx-tv-mode .streamflix-grid,
+html.layout-tv .streamflix-grid {
+    grid-template-columns: repeat(auto-fill, minmax(clamp(190px, 12.5vw, 250px), 1fr));
+    gap: 26px 18px;
+}
+body.bfx-tv-mode .streamflix-grid .streamflix-poster-card,
+html.layout-tv .streamflix-grid .streamflix-poster-card {
+    flex: initial !important;
+    width: 100% !important;
+    min-width: 0 !important;
 }
 body.bfx-tv-mode .streamflix-wide-card,
 html.layout-tv .streamflix-wide-card {

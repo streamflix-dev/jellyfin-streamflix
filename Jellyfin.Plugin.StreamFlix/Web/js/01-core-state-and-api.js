@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.0)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.1)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.0';
+    var VERSION = '0.9.8.1';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -434,7 +434,7 @@
                 p.classList.remove('has-logo');
                 p.textContent = img.getAttribute('alt') || '';
             }
-        } else if (kind === 'preview') {
+        } else if (kind === 'preview' || kind === 'pv') {
             var d = document.createElement('div');
             d.className = 'bfx-pv-title';
             d.textContent = img.getAttribute('alt') || '';
@@ -460,25 +460,33 @@
         }
     }
 
+    function isManagedFadeImg(imgEl) {
+        if (!imgEl || !imgEl.getAttribute) {
+            return false;
+        }
+        var mode = imgEl.getAttribute('data-bfx-img');
+        return mode === 'fade' || mode === 'pv';
+    }
+
     function hydrateCompleteImages(rootEl) {
         if (!rootEl || !rootEl.querySelectorAll) {
             return;
         }
-        var imgs = rootEl.querySelectorAll('img[data-bfx-img="fade"], img[data-bfx-logo-fallback]');
+        var imgs = rootEl.querySelectorAll('img[data-bfx-img="fade"], img[data-bfx-img="pv"], img[data-bfx-logo-fallback]');
         for (var i = 0; i < imgs.length; i++) {
             var img = imgs[i];
             if (!img.complete) {
                 continue;
             }
             if (img.naturalWidth > 0) {
-                if (img.getAttribute('data-bfx-img') === 'fade') {
+                if (isManagedFadeImg(img)) {
                     img.classList.add('is-loaded');
                 }
             } else {
                 var logoKind = img.getAttribute('data-bfx-logo-fallback');
                 if (logoKind) {
                     applyLogoImgFallback(img, logoKind);
-                } else if (img.getAttribute('data-bfx-img') === 'fade') {
+                } else if (isManagedFadeImg(img)) {
                     applyFadeImgError(img, img.getAttribute('data-bfx-err') || 'broken');
                 }
             }
@@ -492,7 +500,7 @@
         window.__STREAMFLIX_CSP_IMG_HANDLERS__ = true;
         document.addEventListener('load', function (ev) {
             var t = ev && ev.target;
-            if (t && t.tagName === 'IMG' && t.getAttribute('data-bfx-img') === 'fade') {
+            if (t && t.tagName === 'IMG' && isManagedFadeImg(t)) {
                 t.classList.add('is-loaded');
             }
         }, true);
@@ -506,7 +514,7 @@
                 applyLogoImgFallback(t, logoKind);
                 return;
             }
-            if (t.getAttribute('data-bfx-img') === 'fade') {
+            if (isManagedFadeImg(t)) {
                 applyFadeImgError(t, t.getAttribute('data-bfx-err') || 'broken');
             }
         }, true);

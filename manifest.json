@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.1",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.1 Release Candidate (Dev Test Channel): Fixed movie/show grid poster card height consistency across varying poster image ratios, long titles, and Phone/TV grid layouts; fixed crisp backdrop & logo hydration on Hover Preview cards; deduplicated library bootstrap item lists.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.1_12.0.0.zip",
+        "checksum": "705753c650d602f0572158723110a797",
+        "timestamp": "2026-11-17T06:21:01Z"
+      },
+      {
+        "version": "0.9.8.1",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.1 Release Candidate (Dev Test Channel): Fixed movie/show grid poster card height consistency across varying poster image ratios, long titles, and Phone/TV grid layouts; fixed crisp backdrop & logo hydration on Hover Preview cards; deduplicated library bootstrap item lists.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.1_10.11.0.zip",
+        "checksum": "a5121140b7424691cb7b773785077c81",
+        "timestamp": "2026-11-17T06:21:01Z"
+      },
+      {
+        "version": "0.9.8.1",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.1 Release Candidate (Dev Test Channel): Fixed movie/show grid poster card height consistency across varying poster image ratios, long titles, and Phone/TV grid layouts; fixed crisp backdrop & logo hydration on Hover Preview cards; deduplicated library bootstrap item lists.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.1_10.9.0.zip",
+        "checksum": "4e0dd3e2b64e51e90cbb2496d48dc0e1",
+        "timestamp": "2026-11-17T06:21:01Z"
+      },
+      {
         "version": "0.9.8.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.0 Release Candidate (Dev Test Channel): Single-request /StreamFlix/Hub/Bootstrap + sessionStorage SWR cache; compile-time JellyfinCompat adapter across 10.9-12.x; per-tab sessionStorage profile isolation + BroadcastChannel sign-out sync; explicit UI phase state machine & non-admin credential restoration after Dashboard visits; canonical SF-xxx-NNN error codes across backend & client; 1-click 8-point Release Health Check + portable JSON backup/restore + Brand Accent Color presets; muted Hero trailer previews, Franchise Collection progress & sort hub, New & Popular upcoming/Seerr view, Notification Bell, per-profile library/Seerr quota permissions & Bedtime Window lock; xUnit + headless JS smoke test suite.",
         "targetAbi": "12.0.0.0",

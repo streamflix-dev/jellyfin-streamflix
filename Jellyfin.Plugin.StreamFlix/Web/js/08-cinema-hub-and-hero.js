@@ -1175,17 +1175,17 @@
         stampServerIdOnItems(boot.collectionsItems);
         stampServerIdOnItems(boot.filteredHeroPool);
 
-        state.hubData.allMovies = kFilter(boot.allMovies || []);
-        state.hubData.allSeries = kFilter(boot.allSeries || []);
+        state.hubData.allMovies = dedupeMediaItems(kFilter(boot.allMovies || []));
+        state.hubData.allSeries = dedupeMediaItems(kFilter(boot.allSeries || []));
         state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
         state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
         state.hubData.rawHeroItems = dedupeMediaItems([].concat(state.hubData.recentMovies, state.hubData.recentSeries)).slice(0, 15);
         state.hubData.rawTop10Items = [];
-        state.hubData.resumeItems = kFilter(boot.resumeItems || []);
-        state.hubData.nextUpItems = kFilter(boot.nextUpItems || []);
-        state.hubData.favoriteItems = kFilter(boot.favoriteItems || []);
-        state.hubData.collectionsItems = kFilter(boot.collectionsItems || []);
-        state.hubData.filteredHeroPool = kFilter(boot.filteredHeroPool || []);
+        state.hubData.resumeItems = dedupeMediaItems(kFilter(boot.resumeItems || []));
+        state.hubData.nextUpItems = dedupeMediaItems(kFilter(boot.nextUpItems || []));
+        state.hubData.favoriteItems = dedupeMediaItems(kFilter(boot.favoriteItems || []));
+        state.hubData.collectionsItems = dedupeMediaItems(kFilter(boot.collectionsItems || []));
+        state.hubData.filteredHeroPool = dedupeMediaItems(kFilter(boot.filteredHeroPool || []));
         state.hubData.views = Array.isArray(boot.views) ? boot.views : [];
         state.hubData.popularScores = (boot.popularScores && typeof boot.popularScores === 'object') ? boot.popularScores : {};
 

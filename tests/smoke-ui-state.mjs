@@ -232,8 +232,8 @@ function bootSimulatedTab(initialSessionProfile, mockConfigResponse) {
 }
 
 const baseMockConfig = {
-    version: '0.9.8.0',
-    assetVersion: '0.9.8.0',
+    version: '0.9.8.1',
+    assetVersion: '0.9.8.1',
     serverId: 'srv1',
     serverName: 'StreamFlix',
     customAccentColor: '#8B5CF6',
@@ -285,4 +285,14 @@ assert.equal(tabB.tabSession.getItem('streamflix_tab_profile_v1'), null, 'Tab B 
 testSender.close();
 console.log('[PASS] Multi-tab BroadcastChannel sign-out sync verified');
 
-console.log('ALL STREAMFLIX v0.9.8.0 SMOKE CHECKS PASSED!');
+// Verify poster card uniform height CSS invariants & hover preview image hydration
+const css03 = fs.readFileSync(path.join(cssDir, '03-header-hero-and-hub-cards.css'), 'utf8');
+const css05 = fs.readFileSync(path.join(cssDir, '05-phone-tv-and-player-drawers.css'), 'utf8');
+assert.match(css03, /\.streamflix-poster-img[\s\S]*?position:\s*absolute;/, 'Poster images must be out-of-flow (position: absolute) so varying image ratios never alter card height');
+assert.match(css03, /\.streamflix-grid\s*\{[\s\S]*?align-items:\s*start;/, 'Poster grids must enforce align-items: start');
+assert.match(css03, /\.streamflix-grid\s+\.streamflix-poster-card\s*\{[\s\S]*?min-width:\s*0;/, 'Grid poster cards must enforce min-width: 0 so long titles cannot widen/lengthen columns');
+assert.match(css05, /\.streamflix-carousel-track\s*>\s*\.streamflix-poster-card/, 'Phone/TV fixed card widths must be scoped to carousel tracks');
+assert.match(combinedJs, /img\[data-bfx-img="pv"\]/, 'Hover preview images (data-bfx-img="pv") must be hydrated by Strict-CSP image loader');
+console.log('[PASS] Uniform poster grid height & hover preview artwork invariants verified');
+
+console.log('ALL STREAMFLIX v0.9.8.1 SMOKE CHECKS PASSED!');

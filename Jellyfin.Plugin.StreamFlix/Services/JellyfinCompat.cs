@@ -369,7 +369,23 @@ public static class JellyfinCompat
     {
         try
         {
-            return libraryManager.GetItemList(query);
+            var list = libraryManager.GetItemList(query);
+            if (list.Count <= 1)
+            {
+                return list;
+            }
+
+            var seen = new HashSet<Guid>();
+            var deduped = new List<BaseItem>(list.Count);
+            foreach (var item in list)
+            {
+                if (item != null && item.Id != Guid.Empty && seen.Add(item.Id))
+                {
+                    deduped.Add(item);
+                }
+            }
+
+            return deduped;
         }
         catch
         {
