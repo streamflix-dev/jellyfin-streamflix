@@ -281,6 +281,20 @@ public partial class StreamFlixController
             return StatusCode(403, new { ok = false, code = "seerr_forbidden", message = denyReason });
         }
 
+        if (!caller.IsAdmin && resolvedProfile is { SeerrRequestQuota: > 0 })
+        {
+            var used7d = CountRecentProfileSeerrRequests(resolvedProfile.Id);
+            if (used7d >= resolvedProfile.SeerrRequestQuota)
+            {
+                return StatusCode(429, new
+                {
+                    ok = false,
+                    code = "seerr_quota_exceeded",
+                    message = $"\"{resolvedProfile.Name}\" has reached its 7-day request limit ({used7d}/{resolvedProfile.SeerrRequestQuota} requests).",
+                });
+            }
+        }
+
         var rateKey = "seerr|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
         if (!AllowSeerrSubmitRate(rateKey))
         {
@@ -301,6 +315,11 @@ public partial class StreamFlixController
                 resolvedProfile,
                 caller.Session?.Email,
                 cts.Token).ConfigureAwait(false);
+
+            if (res.Ok && resolvedProfile != null && !string.IsNullOrWhiteSpace(resolvedProfile.Id))
+            {
+                RecordProfileSeerrRequest(resolvedProfile.Id);
+            }
 
             return Ok(new
             {
@@ -691,7 +710,7 @@ public partial class StreamFlixController
             }
         }
 
-        var fresh = GetShowcaseItemsCompat(libraryManager);
+        var fresh = JellyfinCompat.GetShowcaseItems(libraryManager);
         lock (ShowcaseCacheLock)
         {
             _showcaseCache = fresh;
@@ -699,172 +718,6 @@ public partial class StreamFlixController
         }
 
         return fresh;
-    }
-
-    private static List<object> GetShowcaseItemsCompat(ILibraryManager libraryManager)
-    {
-        var result = new List<object>();
-        try
-        {
-            var queryType = typeof(ILibraryManager).Assembly.GetType("MediaBrowser.Controller.Entities.InternalItemsQuery");
-            if (queryType == null)
-            {
-                return result;
-            }
-
-            var query = Activator.CreateInstance(queryType);
-            if (query == null)
-            {
-                return result;
-            }
-
-            queryType.GetProperty("Recursive")?.SetValue(query, true);
-
-            var includeProp = queryType.GetProperty("IncludeItemTypes");
-            if (includeProp != null && includeProp.PropertyType.IsArray)
-            {
-                var elemType = includeProp.PropertyType.GetElementType();
-                if (elemType != null
-                    && elemType.IsEnum
-                    && Enum.TryParse(elemType, "Movie", ignoreCase: true, out var movieEnum)
-                    && Enum.TryParse(elemType, "Series", ignoreCase: true, out var seriesEnum)
-                    && movieEnum != null
-                    && seriesEnum != null)
-                {
-                    var arr = Array.CreateInstance(elemType, 2);
-                    arr.SetValue(movieEnum, 0);
-                    arr.SetValue(seriesEnum, 1);
-                    includeProp.SetValue(query, arr);
-                }
-            }
-
-            queryType.GetProperty("Limit")?.SetValue(query, 72);
-
-            var getItemList = typeof(ILibraryManager).GetMethod("GetItemList", new[] { queryType });
-            if (getItemList?.Invoke(libraryManager, new[] { query }) is System.Collections.IEnumerable items)
-            {
-                var fallbackWithoutBackdrop = new List<object>();
-                foreach (var item in items)
-                {
-                    if (item == null)
-                    {
-                        continue;
-                    }
-
-                    var idProp = item.GetType().GetProperty("Id");
-                    var nameProp = item.GetType().GetProperty("Name");
-                    if (idProp?.GetValue(item) is Guid id && id != Guid.Empty)
-                    {
-                        var name = nameProp?.GetValue(item)?.ToString() ?? string.Empty;
-                        var typeName = item.GetType().Name;
-                        if (string.Equals(typeName, "Movie", StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(typeName, "Series", StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(typeName, "Video", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var (hasBackdrop, hasPrimary) = InspectItemImagesCompat(item);
-                            var dto = new
-                            {
-                                id = id.ToString("N"),
-                                name,
-                                type = typeName,
-                                hasBackdrop,
-                                hasPrimary,
-                            };
-                            if (hasBackdrop)
-                            {
-                                result.Add(dto);
-                                if (result.Count >= 36)
-                                {
-                                    break;
-                                }
-                            }
-                            else if (fallbackWithoutBackdrop.Count < 36)
-                            {
-                                fallbackWithoutBackdrop.Add(dto);
-                            }
-                        }
-                    }
-                }
-
-                if (result.Count < 36 && fallbackWithoutBackdrop.Count > 0)
-                {
-                    foreach (var extra in fallbackWithoutBackdrop)
-                    {
-                        result.Add(extra);
-                        if (result.Count >= 36)
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        return result;
-    }
-
-    private static (bool HasBackdrop, bool HasPrimary) InspectItemImagesCompat(object item)
-    {
-        var hasBackdrop = false;
-        var hasPrimary = false;
-        try
-        {
-            var t = item.GetType();
-            var backdropProp = t.GetProperty("BackdropImagePaths");
-            if (backdropProp?.GetValue(item) is System.Collections.IEnumerable bpList)
-            {
-                foreach (var entry in bpList)
-                {
-                    if (entry is string s && !string.IsNullOrWhiteSpace(s))
-                    {
-                        hasBackdrop = true;
-                        break;
-                    }
-                }
-            }
-
-            var primaryProp = t.GetProperty("PrimaryImagePath");
-            if (primaryProp?.GetValue(item) is string primStr && !string.IsNullOrWhiteSpace(primStr))
-            {
-                hasPrimary = true;
-            }
-
-            if (!hasBackdrop || !hasPrimary)
-            {
-                foreach (var m in t.GetMethods().Where(m => string.Equals(m.Name, "HasImage", StringComparison.Ordinal)))
-                {
-                    var ps = m.GetParameters();
-                    if (ps.Length is 1 or 2 && ps[0].ParameterType.IsEnum)
-                    {
-                        if (!hasBackdrop && Enum.TryParse(ps[0].ParameterType, "Backdrop", ignoreCase: true, out var bdEnum) && bdEnum != null)
-                        {
-                            var args = ps.Length == 2 ? new object[] { bdEnum, 0 } : new object[] { bdEnum };
-                            if (m.Invoke(item, args) is bool b && b)
-                            {
-                                hasBackdrop = true;
-                            }
-                        }
-
-                        if (!hasPrimary && Enum.TryParse(ps[0].ParameterType, "Primary", ignoreCase: true, out var prEnum) && prEnum != null)
-                        {
-                            var args = ps.Length == 2 ? new object[] { prEnum, 0 } : new object[] { prEnum };
-                            if (m.Invoke(item, args) is bool p && p)
-                            {
-                                hasPrimary = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        return (hasBackdrop, hasPrimary);
     }
 
     private object SerializeSeerrDetail(StreamFlixSeerrService.SeerrMediaDetail d)
@@ -967,7 +820,51 @@ public partial class StreamFlixController
             return Task.FromResult<(bool, bool, StreamFlixProfileConfig?, string)>((false, true, profile, "Media requests are disabled for Kids profiles."));
         }
 
+        if (!caller.IsAdmin && profile is { SeerrRequestQuota: < 0 })
+        {
+            return Task.FromResult<(bool, bool, StreamFlixProfileConfig?, string)>((false, isKids, profile, $"Media requests are disabled for \"{profile.Name}\"."));
+        }
+
         return Task.FromResult<(bool, bool, StreamFlixProfileConfig?, string)>((true, isKids, profile, string.Empty));
+    }
+
+    private static readonly ConcurrentDictionary<string, List<DateTimeOffset>> ProfileSeerrQuotaLog = new(StringComparer.OrdinalIgnoreCase);
+
+    private static int CountRecentProfileSeerrRequests(string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId) || !ProfileSeerrQuotaLog.TryGetValue(profileId.Trim(), out var list))
+        {
+            return 0;
+        }
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-7);
+        lock (list)
+        {
+            list.RemoveAll(ts => ts < cutoff);
+            return list.Count;
+        }
+    }
+
+    private static void RecordProfileSeerrRequest(string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            return;
+        }
+
+        if (ProfileSeerrQuotaLog.Count > 256)
+        {
+            ProfileSeerrQuotaLog.Clear();
+        }
+
+        var list = ProfileSeerrQuotaLog.GetOrAdd(profileId.Trim(), _ => new List<DateTimeOffset>());
+        var now = DateTimeOffset.UtcNow;
+        var cutoff = now.AddDays(-7);
+        lock (list)
+        {
+            list.RemoveAll(ts => ts < cutoff);
+            list.Add(now);
+        }
     }
 
     private static bool AllowSeerrSubmitRate(string key)

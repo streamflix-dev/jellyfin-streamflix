@@ -48,6 +48,26 @@ public class StreamFlixProfileConfig
 
     public bool AutoplayPreviews { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets optional Jellyfin Library/View IDs that this profile is permitted to access. Empty means all libraries.
+    /// </summary>
+    public List<string> AllowedLibraryIds { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the Seerr request quota per rolling 7 days for this profile (<c>0</c> = unlimited, <c>-1</c> = disabled for this profile).
+    /// </summary>
+    public int SeerrRequestQuota { get; set; }
+
+    /// <summary>
+    /// Gets or sets optional daily bedtime lock start in 24-hour <c>HH:mm</c> local time (e.g. <c>20:30</c>). Empty disables bedtime lock.
+    /// </summary>
+    public string BedtimeStart { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets optional daily bedtime lock end in 24-hour <c>HH:mm</c> local time (e.g. <c>06:30</c>).
+    /// </summary>
+    public string BedtimeEnd { get; set; } = string.Empty;
+
     public string? JellyfinUserId { get; set; }
 
     public string? JellyfinUsername { get; set; }
@@ -100,6 +120,7 @@ public class PluginConfiguration : BasePluginConfiguration
     {
         EnableStreamFlixUi = true;
         CustomBrandName = string.Empty;
+        CustomAccentColor = "#E50914";
         RequireGoogleAuth = true;
         EnableGoogleSignIn = true;
         AllowStandardJellyfinLogin = false;
@@ -151,6 +172,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Defaults to "STREAMFLIX" / "StreamFlix" when empty.
     /// </summary>
     public string CustomBrandName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the primary brand accent hex color (defaults to Netflix Red <c>#E50914</c>).
+    /// </summary>
+    public string CustomAccentColor { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the household sign-in gate is required before "Who's watching?".

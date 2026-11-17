@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.2.5)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.0)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.2.5';
+    var VERSION = '0.9.8.0';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -18,11 +18,29 @@
     var OIDC_PENDING_KEY = 'streamflix_oidc_pending_v1';
     var PENDING_PROFILE_KEY = 'streamflix_pending_profile';
     var PROFILE_KEY = 'streamflix_active_profile_v64';
+    var TAB_PROFILE_KEY = 'streamflix_tab_profile_v1';
     var LEGACY_PROFILE_KEY = 'streamflix_active_profile_v63';
     var CACHED_CONFIG_KEY = 'streamflix_cached_config_v7';
     var CINEMA_HUB_PREF_KEY = 'streamflix_cinema_hub_enabled_v1';
     var NAV_PROFILE_PREF_PREFIX = 'streamflix_nav_prefs_v1_';
+    var HUB_SWR_CACHE_PREFIX = 'streamflix_hub_swr_v1_';
+    var NOTIF_SEEN_PREFIX = 'streamflix_notif_seen_v1_';
+    var BEDTIME_UNLOCK_PREFIX = 'streamflix_bedtime_unlock_v1_';
+    var AUTH_BUS_CHANNEL = 'streamflix_auth_bus_v1';
     var SHOWCASE_ITEMS_KEY = 'streamflix_showcase_items_v1';
+
+    var APP_PHASES = {
+        BOOTING: 'BOOTING',
+        AUTH_REQUIRED: 'AUTH_REQUIRED',
+        OIDC_PENDING: 'OIDC_PENDING',
+        PICKER_REQUIRED: 'PICKER_REQUIRED',
+        PICKER_OVERLAY: 'PICKER_OVERLAY',
+        BEDTIME_LOCKED: 'BEDTIME_LOCKED',
+        HUB_BROWSE: 'HUB_BROWSE',
+        ADMIN_ROUTE: 'ADMIN_ROUTE',
+        EMBEDDED_ADMIN: 'EMBEDDED_ADMIN',
+        VIDEO_PLAYER: 'VIDEO_PLAYER'
+    };
 
     // Pre-v7 storage: unsigned client-side Google flag and caches with hard-coded defaults
     try {
@@ -62,6 +80,7 @@
         serverId: '',
         serverName: 'StreamFlix',
         customBrandName: '',
+        customAccentColor: '#E50914',
         enableStreamFlixUi: true,
         requireGoogleAuth: true,
         enableGoogleSignIn: true,
@@ -104,16 +123,22 @@
         approvedGoogleAccounts: [],
         approvedOidcUsers: [],
         serverUsers: [],
+        serverLibraries: [],
         showcaseItems: [],
         profiles: []
     };
 
-    var initialActiveProfile = loadJson(PROFILE_KEY, null);
+    var initialTabProfile = loadSessionJson(TAB_PROFILE_KEY, null);
+    var initialActiveProfile = initialTabProfile || loadJson(PROFILE_KEY, null);
+    if (initialActiveProfile && !initialTabProfile) {
+        saveSessionJson(TAB_PROFILE_KEY, initialActiveProfile);
+    }
     var legacyProfileToMigrate = !initialActiveProfile
         ? (loadJson(LEGACY_PROFILE_KEY, null) || loadJson('streamflix_active_profile_v5', null))
         : null;
 
     var state = {
+        appPhase: APP_PHASES.BOOTING,
         config: loadJson(CACHED_CONFIG_KEY, null) || DEFAULT_CONFIG,
         googleUser: loadHouseholdSession(),
         configFresh: false,
@@ -121,6 +146,20 @@
         adminLoginExpanded: false,
         guestPassExpanded: false,
         heroPaused: false,
+        heroPreviewMuted: true,
+        heroVideoActive: false,
+        heroVideoItemId: '',
+        heroTrailerCache: {},
+        notificationsOpen: false,
+        notificationsLoadedForUser: '',
+        notificationsLoading: false,
+        notifications: [],
+        hotTabExtra: {
+            loading: false,
+            loadedForUser: '',
+            upcomingEpisodes: [],
+            seerrComingSoon: []
+        },
         activeProfile: initialActiveProfile,
         adminAuth: loadJson(ADMIN_AUTH_KEY, null),
         adminWarmAttempted: false,
@@ -204,6 +243,104 @@
                 localStorage.setItem(key, JSON.stringify(value));
             }
         } catch (e) {}
+    }
+
+    function loadSessionJson(key, fallback) {
+        try {
+            var raw = sessionStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+            return fallback;
+        }
+    }
+
+    function saveSessionJson(key, value) {
+        try {
+            if (value === null || value === undefined) {
+                sessionStorage.removeItem(key);
+            } else {
+                sessionStorage.setItem(key, JSON.stringify(value));
+            }
+        } catch (e) {}
+    }
+
+    function saveActiveProfileState(profile, updateHouseholdDefault) {
+        state.activeProfile = profile || null;
+        saveSessionJson(TAB_PROFILE_KEY, state.activeProfile);
+        if (updateHouseholdDefault !== false) {
+            saveJson(PROFILE_KEY, state.activeProfile);
+            if (state.activeProfile) {
+                saveJson(LEGACY_PROFILE_KEY, state.activeProfile);
+            } else {
+                try { localStorage.removeItem(LEGACY_PROFILE_KEY); } catch (eL) {}
+            }
+        }
+    }
+
+    function clearActiveProfileState(clearHouseholdDefault) {
+        state.activeProfile = null;
+        saveSessionJson(TAB_PROFILE_KEY, null);
+        if (clearHouseholdDefault !== false) {
+            try {
+                localStorage.removeItem(PROFILE_KEY);
+                localStorage.removeItem(LEGACY_PROFILE_KEY);
+            } catch (eC) {}
+        }
+    }
+
+    var authBroadcastBus = null;
+    var tabInstanceId = Math.random().toString(36).slice(2) + '_' + Date.now();
+    try {
+        if (typeof BroadcastChannel === 'function') {
+            authBroadcastBus = new BroadcastChannel(AUTH_BUS_CHANNEL);
+            authBroadcastBus.onmessage = function (ev) {
+                var msg = ev && ev.data;
+                if (!msg || typeof msg !== 'object' || msg.sender === tabInstanceId) {
+                    return;
+                }
+                if (msg.type === 'auth_signout') {
+                    if (typeof signOutHousehold === 'function') {
+                        signOutHousehold({ skipServerLogout: true, silent: true, fromBroadcast: true });
+                    }
+                } else if (msg.type === 'config_updated') {
+                    if (typeof fetchPublicConfig === 'function') {
+                        fetchPublicConfig().catch(function () {});
+                    }
+                }
+            };
+        }
+    } catch (eBus) {
+        authBroadcastBus = null;
+    }
+
+    function broadcastAuthBusMessage(type, extra) {
+        if (!authBroadcastBus) {
+            return;
+        }
+        try {
+            var payload = Object.assign({ type: type, sender: tabInstanceId, ts: Date.now() }, extra || {});
+            authBroadcastBus.postMessage(payload);
+        } catch (ePost) {}
+    }
+
+    function transitionAppPhase(nextPhase) {
+        if (!nextPhase || state.appPhase === nextPhase) {
+            return state.appPhase;
+        }
+        state.prevAppPhase = state.appPhase;
+        state.appPhase = nextPhase;
+        if (document.body) {
+            document.body.setAttribute('data-bfx-phase', nextPhase);
+        }
+        return nextPhase;
+    }
+
+    function isUserProtectedOverlayPhase() {
+        return state.appPhase === APP_PHASES.PICKER_OVERLAY
+            || state.appPhase === APP_PHASES.EMBEDDED_ADMIN
+            || Boolean(state.explicitPickerOpen)
+            || Boolean(state.manageMode)
+            || Boolean(state.embeddedAdminModalOpen);
     }
 
     function escapeHtml(str) {
@@ -664,6 +801,8 @@
         dockHot: '<rect x="3.4" y="6.2" width="14.2" height="11.6" rx="2.4"/><path d="M7.2 3.4h11.2a2.2 2.2 0 0 1 2.2 2.2v9.4"/><path d="M9.1 9.6v4.8l4.1-2.4z" fill="currentColor" stroke="none"/>',
         dockSearch: '<circle cx="10.8" cy="10.8" r="6.3"/><path d="M19.8 19.8l-4.1-4.1"/>',
         bookmark: '<path d="M6.2 4.2h11.6a1.3 1.3 0 0 1 1.3 1.3v14.8L12 16l-7.1 4.3V5.5a1.3 1.3 0 0 1 1.3-1.3z"/>',
+        bell: '<path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.6 8.2-2.6 8.2h17.2S18 15 18 8.5z"/><path d="M13.8 20a2 2 0 0 1-3.6 0"/>',
+        moon: '<path d="M20.4 14.6A8.5 8.5 0 0 1 9.4 3.6a8.5 8.5 0 1 0 11 11z"/>',
         seerrIcon: '<path d="M7.2 18.2h9.6a3.7 3.7 0 0 0 .55-7.36A5.2 5.2 0 0 0 7.1 9.4a3.5 3.5 0 0 0 .1 8.8z"/><path d="M12 10.6v5.2M9.4 13.2h5.2"/>'
     };
 
@@ -928,6 +1067,102 @@
         return payload;
     }
 
+    var CLIENT_ERROR_CODE_MAP = {
+        google_required: 'SF-AUTH-101',
+        jellyfin_auth_required: 'SF-AUTH-110',
+        invalid_credentials: 'SF-AUTH-102',
+        login_locked: 'SF-AUTH-103',
+        google_disabled: 'SF-AUTH-104',
+        google_unverified: 'SF-AUTH-105',
+        not_approved: 'SF-AUTH-106',
+        standard_login_disabled: 'SF-AUTH-107',
+        admin_fallback_disabled: 'SF-AUTH-108',
+        lan_only: 'SF-AUTH-108',
+        oidc_disabled: 'SF-OIDC-201',
+        oidc_unconfigured: 'SF-OIDC-201',
+        oidc_discovery_failed: 'SF-OIDC-202',
+        oidc_state_invalid: 'SF-OIDC-203',
+        oidc_handoff_expired: 'SF-OIDC-203',
+        oidc_exchange_failed: 'SF-OIDC-204',
+        oidc_not_approved: 'SF-OIDC-205',
+        oidc_poll_invalid: 'SF-OIDC-206',
+        profile_not_found: 'SF-PROF-300',
+        profile_unlinked: 'SF-PROF-301',
+        auth_failed: 'SF-PROF-302',
+        user_disabled: 'SF-PROF-303',
+        google_locked: 'SF-PROF-304',
+        google_lock_forbidden: 'SF-PROF-304',
+        admin_link_forbidden: 'SF-PROF-305',
+        link_change_forbidden: 'SF-PROF-305',
+        invalid_link: 'SF-PROF-306',
+        pin_required: 'SF-PIN-310',
+        adult_pin_required: 'SF-PIN-311',
+        pin_invalid: 'SF-PIN-312',
+        pin_locked: 'SF-PIN-313',
+        seerr_forbidden: 'SF-SEERR-401',
+        seerr_unreachable: 'SF-SEERR-402',
+        seerr_timeout: 'SF-SEERR-403',
+        seerr_request_failed: 'SF-SEERR-404',
+        seerr_cancel_failed: 'SF-SEERR-404',
+        seerr_quota_exceeded: 'SF-SEERR-405',
+        rate_limited: 'SF-SEERR-406',
+        guest_passes_disabled: 'SF-GUEST-501',
+        guest_invalid: 'SF-GUEST-502',
+        guest_expired: 'SF-GUEST-502',
+        guest_handoff_missing: 'SF-GUEST-502',
+        guest_locked: 'SF-GUEST-503',
+        guest_pass_restricted: 'SF-GUEST-504',
+        guest_profile_locked: 'SF-GUEST-504',
+        guest_admin_forbidden: 'SF-GUEST-505',
+        admin_required: 'SF-ADMIN-601',
+        room_not_found: 'SF-WP-622',
+        host_only: 'SF-WP-621',
+        watch_party_disabled: 'SF-WP-621'
+    };
+
+    function resolveStreamFlixErrorCode(status, symbolicCode, path) {
+        var sym = String(symbolicCode || '').trim().toLowerCase();
+        if (sym && CLIENT_ERROR_CODE_MAP[sym]) {
+            return CLIENT_ERROR_CODE_MAP[sym];
+        }
+        var p = String(path || '').toLowerCase();
+        if (p.indexOf('/seerr/') !== -1) {
+            if (status === 504) { return 'SF-SEERR-403'; }
+            if (status === 429) { return 'SF-SEERR-405'; }
+            if (status === 403) { return 'SF-SEERR-401'; }
+            return status >= 500 ? 'SF-SEERR-402' : 'SF-SEERR-404';
+        }
+        if (p.indexOf('/oidc/') !== -1) {
+            return (status === 401 || status === 403) ? 'SF-OIDC-205' : 'SF-OIDC-204';
+        }
+        if (p.indexOf('/guest') !== -1) {
+            return status === 429 ? 'SF-GUEST-503' : 'SF-GUEST-502';
+        }
+        if (p.indexOf('/watchparty') !== -1) {
+            return status === 404 ? 'SF-WP-622' : 'SF-WP-620';
+        }
+        if (p.indexOf('/profiles') !== -1) {
+            if (status === 409) { return 'SF-PROF-301'; }
+            if (status === 429) { return 'SF-PIN-313'; }
+            if (status === 404) { return 'SF-PROF-300'; }
+            return 'SF-PROF-306';
+        }
+        if (p.indexOf('/hub/bootstrap') !== -1) {
+            return status === 401 ? 'SF-AUTH-101' : 'SF-HUB-701';
+        }
+        if (status === 400) { return 'SF-REQ-740'; }
+        if (status === 401) { return 'SF-AUTH-101'; }
+        if (status === 403) { return 'SF-REQ-743'; }
+        if (status === 404) { return 'SF-REQ-744'; }
+        if (status === 429) { return 'SF-REQ-749'; }
+        return status >= 500 ? 'SF-SRV-750' : '';
+    }
+
+    function isPromptOnlyErrorCode(symbolicCode) {
+        var c = String(symbolicCode || '').toLowerCase();
+        return c === 'google_required' || c === 'pin_required' || c === 'adult_pin_required';
+    }
+
     function apiFetch(path, options) {
         options = options || {};
         options.headers = buildJellyfinAuthHeaders(options.headers);
@@ -952,9 +1187,17 @@
                             msg = txt;
                         }
                     }
-                    var err = new Error(msg);
+                    var symCode = (parsed && parsed.code) || '';
+                    var sfCode = (parsed && parsed.errorCode) || resolveStreamFlixErrorCode(res.status, symCode, path);
+                    var displayMsg = msg;
+                    if (sfCode && !isPromptOnlyErrorCode(symCode) && displayMsg.indexOf(sfCode) === -1) {
+                        displayMsg = displayMsg + ' (' + sfCode + ')';
+                    }
+                    var err = new Error(displayMsg);
+                    err.rawMessage = msg;
                     err.status = res.status;
-                    err.code = (parsed && parsed.code) || '';
+                    err.code = symCode;
+                    err.errorCode = sfCode;
                     err.data = parsed;
                     if (isStreamFlixApi && err.code === 'google_required') {
                         handleHouseholdSessionLost();

@@ -493,16 +493,15 @@
         }
         clearHouseholdSession();
         clearAdminAuth();
-        state.activeProfile = null;
+        clearActiveProfileState(true);
+        if (!options.fromBroadcast && typeof broadcastAuthBusMessage === 'function') {
+            broadcastAuthBusMessage('auth_signout');
+        }
         state.sessionVerifiedOnce = false;
         state.legacyProfileToMigrate = null;
         state.manageMode = false;
         state.adminLoginExpanded = false;
         state.guestPassExpanded = false;
-        try {
-            localStorage.removeItem(PROFILE_KEY);
-            localStorage.removeItem(LEGACY_PROFILE_KEY);
-        } catch (eRem) {}
         clearLocalJellyfinAuth();
 
         var openAccess = isOpenWithoutLogin(state.config);
@@ -569,8 +568,7 @@
             }).then(function (updatedState) {
                 applyConfigFromServerResponse(updatedState);
                 if (state.activeProfile && state.activeProfile.id === profile.id) {
-                    state.activeProfile = null;
-                    localStorage.removeItem(PROFILE_KEY);
+                    clearActiveProfileState(true);
                 }
                 showToast('Deleted "' + profile.name + '".', 'success');
                 rerenderPickerIfOpen();
@@ -881,6 +879,12 @@
             icon: AVATAR_ICONS[profileCount % AVATAR_ICONS.length],
             isKids: false,
             kidsExitPinRequired: true,
+            autoplayNextEpisode: true,
+            autoplayPreviews: true,
+            allowedLibraryIds: [],
+            seerrRequestQuota: 0,
+            bedtimeStart: '',
+            bedtimeEnd: '',
             maxParentalRating: MATURITY_LEVELS[0].value,
             hasPin: false,
             googleLocked: false,
@@ -1046,6 +1050,51 @@
         }).join('');
 
         var canDelete = !isNew && profileCount > 1 && (!(draft.isOwner || draft.isAdmin) || isAdmin);
+        var serverLibraries = (state.config && Array.isArray(state.config.serverLibraries)) ? state.config.serverLibraries : [];
+        var draftAllowedLibMap = {};
+        (Array.isArray(draft.allowedLibraryIds) ? draft.allowedLibraryIds : []).forEach(function (lid) {
+            var n = normalizeGuid(lid);
+            if (n) { draftAllowedLibMap[n] = true; }
+        });
+        var allowedLibsSectionHtml = (isAdmin && !draft.isAdmin && serverLibraries.length > 0)
+            ? (''
+                + '<div class="streamflix-field">'
+                + '  <label>Allowed Media Libraries (Optional)</label>'
+                + '  <div class="bfx-nav-cust-grid" id="streamflix-prof-libs-grid">'
+                + serverLibraries.map(function (lib) {
+                    var isChecked = Boolean(draftAllowedLibMap[normalizeGuid(lib.id)]);
+                    return '<label class="bfx-nav-cust-chip">'
+                        + '<input type="checkbox" data-prof-lib-id="' + escapeHtml(lib.id) + '"' + (isChecked ? ' checked' : '') + ' />'
+                        + '<span>' + escapeHtml(lib.name || 'Library') + '</span>'
+                        + '</label>';
+                }).join('')
+                + '  </div>'
+                + '  <div class="streamflix-field-hint">Leave all unchecked to grant access to every library, or select specific folders (e.g. Kids, Anime) for this profile.</div>'
+                + '</div>')
+            : '';
+
+        var curQuota = typeof draft.seerrRequestQuota === 'number' ? draft.seerrRequestQuota : 0;
+        var quotaOptions = [
+            { val: 0, label: 'Unlimited requests' },
+            { val: 5, label: 'Up to 5 requests per 7 days' },
+            { val: 10, label: 'Up to 10 requests per 7 days' },
+            { val: 20, label: 'Up to 20 requests per 7 days' },
+            { val: -1, label: 'Disabled for this profile' }
+        ];
+        if (quotaOptions.every(function (q) { return q.val !== curQuota; })) {
+            quotaOptions.splice(1, 0, { val: curQuota, label: 'Up to ' + curQuota + ' requests per 7 days' });
+        }
+        var seerrQuotaSectionHtml = (isAdmin && !draft.isAdmin && state.config && (state.config.seerrEnabled || state.config.seerrConfigured))
+            ? (''
+                + '<div class="streamflix-field">'
+                + '  <label for="streamflix-prof-seerr-quota">Seerr Request Limit</label>'
+                + '  <select id="streamflix-prof-seerr-quota" class="streamflix-select">'
+                + quotaOptions.map(function (q) {
+                    return '<option value="' + q.val + '"' + (q.val === curQuota ? ' selected' : '') + '>' + escapeHtml(q.label) + '</option>';
+                }).join('')
+                + '  </select>'
+                + '</div>')
+            : '';
 
         var m = openModal(''
             + '<div class="streamflix-editor-head">'
@@ -1091,6 +1140,29 @@
             + '  </label>'
             + '  <div class="streamflix-field-hint" style="margin-top:3px;">Prompts for any adult profile PIN (or a 4-word grown-up check if no adult PINs exist) when leaving Kids mode.</div>'
             + '</div>'
+            + '<div class="streamflix-editor-section">Playback &amp; Bedtime</div>'
+            + '<div class="streamflix-field-row">'
+            + '  <label class="streamflix-check">'
+            + '    <input type="checkbox" id="streamflix-prof-autoplay-next" ' + (draft.autoplayNextEpisode !== false ? 'checked' : '') + ' />'
+            + '    <span>Autoplay next episode</span>'
+            + '  </label>'
+            + '  <label class="streamflix-check">'
+            + '    <input type="checkbox" id="streamflix-prof-autoplay-previews" ' + (draft.autoplayPreviews !== false ? 'checked' : '') + ' />'
+            + '    <span>Muted hero video previews</span>'
+            + '  </label>'
+            + '</div>'
+            + '<div class="streamflix-field">'
+            + '  <label for="streamflix-prof-bed-start">Bedtime Window (Optional)</label>'
+            + '  <div class="streamflix-inline-row">'
+            + '    <input type="time" id="streamflix-prof-bed-start" class="streamflix-input" value="' + escapeHtml(draft.bedtimeStart || '') + '" aria-label="Bedtime start" />'
+            + '    <span style="opacity:.65;font-size:13px;">to</span>'
+            + '    <input type="time" id="streamflix-prof-bed-end" class="streamflix-input" value="' + escapeHtml(draft.bedtimeEnd || '') + '" aria-label="Bedtime end" />'
+            + '    <button type="button" class="streamflix-ghost-btn" id="streamflix-prof-bed-clear">Clear</button>'
+            + '  </div>'
+            + '  <div class="streamflix-field-hint">Shows a friendly “Time for Bed 🌙” screen during these hours (can be unlocked tonight with an Adult PIN).</div>'
+            + '</div>'
+            + allowedLibsSectionHtml
+            + seerrQuotaSectionHtml
             + '<div class="streamflix-editor-section">Security</div>'
             + '<div class="streamflix-field">'
             + '  <label for="streamflix-prof-google">' + escapeHtml(lockFieldLabel) + '</label>'
@@ -1250,6 +1322,16 @@
             });
         }
 
+        var bedStartInput = modal.querySelector('#streamflix-prof-bed-start');
+        var bedEndInput = modal.querySelector('#streamflix-prof-bed-end');
+        var bedClearBtn = modal.querySelector('#streamflix-prof-bed-clear');
+        if (bedClearBtn) {
+            bedClearBtn.addEventListener('click', function () {
+                if (bedStartInput) { bedStartInput.value = ''; }
+                if (bedEndInput) { bedEndInput.value = ''; }
+            });
+        }
+
         modal.querySelector('#streamflix-prof-cancel').addEventListener('click', function () { m.close(); });
 
         var delBtn = modal.querySelector('#streamflix-prof-delete');
@@ -1297,6 +1379,24 @@
                     }
                 }
             }
+            var autoplayNextEl = modal.querySelector('#streamflix-prof-autoplay-next');
+            var autoplayPrevEl = modal.querySelector('#streamflix-prof-autoplay-previews');
+            var bStartVal = bedStartInput ? (bedStartInput.value || '').trim() : '';
+            var bEndVal = bedEndInput ? (bedEndInput.value || '').trim() : '';
+            if ((bStartVal && !bEndVal) || (!bStartVal && bEndVal)) {
+                errEl.textContent = 'Please set both a start and end time for the Bedtime Window, or click Clear.';
+                return;
+            }
+            var selectedAllowedLibs = null;
+            var libsGridEl = modal.querySelector('#streamflix-prof-libs-grid');
+            if (libsGridEl) {
+                selectedAllowedLibs = [];
+                Array.prototype.forEach.call(libsGridEl.querySelectorAll('input[data-prof-lib-id]:checked'), function (cb) {
+                    var lid = cb.getAttribute('data-prof-lib-id');
+                    if (lid) { selectedAllowedLibs.push(lid); }
+                });
+            }
+            var quotaSelectEl = modal.querySelector('#streamflix-prof-seerr-quota');
             var resolvedJfUserId = jfUserSelect
                 ? jfUserSelect.value
                 : (isNew ? '__CREATE__' : (draft.jellyfinUserId || ''));
@@ -1307,6 +1407,12 @@
                 avatarColorHex: selectedColor,
                 isKids: kidsCheck.checked,
                 kidsExitPinRequired: kidsExitCheck ? kidsExitCheck.checked : true,
+                autoplayNextEpisode: autoplayNextEl ? Boolean(autoplayNextEl.checked) : true,
+                autoplayPreviews: autoplayPrevEl ? Boolean(autoplayPrevEl.checked) : true,
+                bedtimeStart: bStartVal,
+                bedtimeEnd: bEndVal,
+                allowedLibraryIds: selectedAllowedLibs,
+                seerrRequestQuota: quotaSelectEl ? parseInt(quotaSelectEl.value, 10) : null,
                 maturityRating: maturitySelect.value,
                 pin: clearPinRequested ? '__CLEAR__' : (rawPin || null),
                 jellyfinUserId: resolvedJfUserId,
@@ -1325,6 +1431,9 @@
                 body: JSON.stringify(payload)
             }).then(function (updatedState) {
                 applyConfigFromServerResponse(updatedState);
+                if (typeof broadcastAuthBusMessage === 'function') {
+                    broadcastAuthBusMessage('config_updated');
+                }
                 if (state.activeProfile && !isNew && state.activeProfile.id === draft.id) {
                     var updatedMatch = findProfileById(draft.id);
                     if (updatedMatch) {
@@ -1333,8 +1442,17 @@
                         state.activeProfile.icon = updatedMatch.icon;
                         state.activeProfile.isKids = updatedMatch.isKids;
                         state.activeProfile.kidsExitPinRequired = updatedMatch.kidsExitPinRequired !== false;
-                        saveJson(PROFILE_KEY, state.activeProfile);
+                        state.activeProfile.autoplayNextEpisode = updatedMatch.autoplayNextEpisode !== false;
+                        state.activeProfile.autoplayPreviews = updatedMatch.autoplayPreviews !== false;
+                        state.activeProfile.bedtimeStart = updatedMatch.bedtimeStart || '';
+                        state.activeProfile.bedtimeEnd = updatedMatch.bedtimeEnd || '';
+                        state.activeProfile.allowedLibraryIds = Array.isArray(updatedMatch.allowedLibraryIds) ? updatedMatch.allowedLibraryIds.slice() : [];
+                        state.activeProfile.seerrRequestQuota = typeof updatedMatch.seerrRequestQuota === 'number' ? updatedMatch.seerrRequestQuota : 0;
+                        saveActiveProfileState(state.activeProfile, true);
                         ensureHeaderWidgets();
+                        if (selectedAllowedLibs !== null && state.hubData && state.hubData.loaded) {
+                            loadCinemaHubData(true);
+                        }
                     }
                 }
                 m.close();

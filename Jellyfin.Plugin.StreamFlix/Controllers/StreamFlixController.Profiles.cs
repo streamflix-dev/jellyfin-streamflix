@@ -182,7 +182,7 @@ public partial class StreamFlixController
                 needsUserUpdate = true;
             }
 
-            if (StreamFlixStartupTask.EnsureUserLibraryAccessAndPermissions(user, primaryAdmin))
+            if (StreamFlixStartupTask.EnsureUserLibraryAccessAndPermissions(user, primaryAdmin, profile.AllowedLibraryIds))
             {
                 needsUserUpdate = true;
             }
@@ -584,6 +584,40 @@ public partial class StreamFlixController
 
             existing.AutoplayNextEpisode = request.AutoplayNextEpisode;
             existing.AutoplayPreviews = request.AutoplayPreviews;
+
+            if (caller.IsAdmin)
+            {
+                if (request.AllowedLibraryIds != null)
+                {
+                    existing.AllowedLibraryIds = request.AllowedLibraryIds
+                        .Where(id => !string.IsNullOrWhiteSpace(id))
+                        .Select(id => id.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                }
+
+                if (request.SeerrRequestQuota.HasValue)
+                {
+                    existing.SeerrRequestQuota = Math.Clamp(request.SeerrRequestQuota.Value, -1, 500);
+                }
+            }
+
+            if (request.BedtimeStart != null || request.BedtimeEnd != null)
+            {
+                var nextStart = NormalizeTimeString(request.BedtimeStart ?? existing.BedtimeStart);
+                var nextEnd = NormalizeTimeString(request.BedtimeEnd ?? existing.BedtimeEnd);
+                var hadExistingKidsBedtime = existing.IsKids
+                    && !string.IsNullOrEmpty(existing.BedtimeStart)
+                    && !string.IsNullOrEmpty(existing.BedtimeEnd);
+                var canModifyKidsBedtime = caller.IsAdmin
+                    || !hadExistingKidsBedtime
+                    || CheckAdultPin(config, request.CurrentPin ?? string.Empty) == null;
+                if (canModifyKidsBedtime)
+                {
+                    existing.BedtimeStart = string.IsNullOrEmpty(nextStart) || string.IsNullOrEmpty(nextEnd) ? string.Empty : nextStart;
+                    existing.BedtimeEnd = string.IsNullOrEmpty(nextStart) || string.IsNullOrEmpty(nextEnd) ? string.Empty : nextEnd;
+                }
+            }
 
             if (targetUser != null)
             {
@@ -1229,6 +1263,10 @@ public partial class StreamFlixController
             googleLockSatisfied = isGuest || lockEmail == null || callerOwnsLock || caller.IsAdmin,
             autoplayNextEpisode = p.AutoplayNextEpisode,
             autoplayPreviews = p.AutoplayPreviews,
+            allowedLibraryIds = (p.AllowedLibraryIds ?? new List<string>()).ToList(),
+            seerrRequestQuota = p.SeerrRequestQuota,
+            bedtimeStart = NormalizeTimeString(p.BedtimeStart),
+            bedtimeEnd = NormalizeTimeString(p.BedtimeEnd),
             jellyfinUserId = p.JellyfinUserId,
             jellyfinUsername = p.JellyfinUsername,
         };

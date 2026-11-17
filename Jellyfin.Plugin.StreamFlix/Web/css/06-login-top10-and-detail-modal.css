@@ -884,3 +884,69 @@ html.layout-tv .streamflix-surprise-btn {
     width: 14px;
     height: 14px;
 }
+
+/* ---------- Rich Franchise / Collection Hub ---------- */
+.bfx-franchise-hub {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 18px;
+}
+.bfx-franchise-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.bfx-franchise-heading {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    color: #fff;
+}
+.bfx-franchise-sub {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.68);
+    margin-top: 3px;
+}
+.bfx-franchise-sorts {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.bfx-fran-sort-pill {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.78);
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.bfx-fran-sort-pill:hover {
+    background: rgba(255, 255, 255, 0.11);
+    color: #fff;
+}
+.bfx-fran-sort-pill.active {
+    background: var(--streamflix-red, #E50914);
+    border-color: var(--streamflix-red, #E50914);
+    color: #fff;
+}
+.bfx-franchise-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+.bfx-franchise-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--streamflix-red, #E50914), #46d369);
+    transition: width 0.3s ease;
+}

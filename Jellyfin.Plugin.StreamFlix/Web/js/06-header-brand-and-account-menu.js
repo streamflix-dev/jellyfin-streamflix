@@ -644,6 +644,208 @@
         }
     }
 
+    function getProfileSeenNotifMap() {
+        var pid = (state.activeProfile && state.activeProfile.id) || 'default';
+        return loadJson(NOTIF_SEEN_PREFIX + pid, {}) || {};
+    }
+
+    function markAllNotificationsSeen() {
+        var pid = (state.activeProfile && state.activeProfile.id) || 'default';
+        var seen = getProfileSeenNotifMap();
+        (state.notifications || []).forEach(function (n) {
+            if (n && n.key) {
+                seen[n.key] = 1;
+            }
+        });
+        var keys = Object.keys(seen);
+        if (keys.length > 250) {
+            var trimmed = {};
+            keys.slice(keys.length - 200).forEach(function (k) { trimmed[k] = 1; });
+            seen = trimmed;
+        }
+        saveJson(NOTIF_SEEN_PREFIX + pid, seen);
+        syncHeaderBellBadge();
+    }
+
+    function countUnreadNotifications() {
+        var seen = getProfileSeenNotifMap();
+        var unread = 0;
+        (state.notifications || []).forEach(function (n) {
+            if (n && n.key && !seen[n.key]) {
+                unread++;
+            }
+        });
+        return unread;
+    }
+
+    function syncHeaderBellBadge() {
+        var bellBtn = document.getElementById('streamflix-header-bell-btn');
+        if (!bellBtn) {
+            return;
+        }
+        var unread = countUnreadNotifications();
+        var badge = bellBtn.querySelector('.bfx-bell-badge');
+        if (unread > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'bfx-bell-badge';
+                bellBtn.appendChild(badge);
+            }
+            badge.textContent = unread > 9 ? '9+' : String(unread);
+        } else if (badge && badge.parentNode) {
+            badge.parentNode.removeChild(badge);
+        }
+    }
+
+    function refreshNotificationsSilently() {
+        var auth = getJellyfinAuthContext();
+        if (!auth || !auth.userId || !auth.token || !state.activeProfile) {
+            return;
+        }
+        var userScope = normalizeGuid(auth.userId) + ':' + (state.activeProfile.id || '');
+        if (state.notificationsLoading || state.notificationsLoadedForUser === userScope) {
+            syncHeaderBellBadge();
+            return;
+        }
+        state.notificationsLoading = true;
+        var pid = state.activeProfile.id || '';
+        var pSeerr = isCurrentProfileSeerrAllowed()
+            ? apiFetch('/StreamFlix/Seerr/Requests?profileId=' + encodeURIComponent(pid))
+                .then(function (r) { return (r && Array.isArray(r.requests)) ? r.requests : []; })
+                .catch(function () { return []; })
+            : Promise.resolve([]);
+
+        pSeerr.then(function (reqs) {
+            state.notificationsLoading = false;
+            state.notificationsLoadedForUser = userScope;
+            var items = [];
+            (reqs || []).forEach(function (req) {
+                if (!req || !req.title) {
+                    return;
+                }
+                var isAvail = Number(req.mediaStatus) === 5 || req.statusKey === 'available' || Boolean(req.jellyfinMediaId);
+                if (isAvail) {
+                    items.push({
+                        key: 'seerr_avail_' + (req.requestId || req.tmdbId),
+                        kind: 'seerr_ready',
+                        title: req.title,
+                        sub: 'Your requested title is now ready to watch!',
+                        posterUrl: req.posterUrl || '',
+                        jellyfinMediaId: req.jellyfinMediaId || '',
+                        seerrItem: req
+                    });
+                }
+            });
+
+            var d = state.hubData || {};
+            var sevenDaysAgo = Date.now() - (7 * 24 * 3600 * 1000);
+            var recentPool = dedupeMediaItems([].concat(d.recentMovies || [], d.recentSeries || [])).filter(function (it) {
+                var c = it && it.DateCreated ? Date.parse(it.DateCreated) : 0;
+                return c >= sevenDaysAgo;
+            }).slice(0, 6);
+            recentPool.forEach(function (it) {
+                items.push({
+                    key: 'new_lib_' + normalizeGuid(it.Id),
+                    kind: 'new_arrival',
+                    title: it.Name || 'New Arrival',
+                    sub: 'Added to ' + getBrandName() + (it.ProductionYear ? ' · ' + it.ProductionYear : ''),
+                    posterUrl: getItemPosterUrl(it, 160),
+                    jellyfinMediaId: it.Id,
+                    mediaItem: it
+                });
+            });
+
+            state.notifications = items.slice(0, 12);
+            syncHeaderBellBadge();
+        }).catch(function () {
+            state.notificationsLoading = false;
+        });
+    }
+
+    function closeNotificationsDropdown() {
+        state.notificationsOpen = false;
+        var nd = document.getElementById('streamflix-notif-dropdown');
+        if (nd && nd.parentNode) {
+            nd.parentNode.removeChild(nd);
+        }
+        var bell = document.getElementById('streamflix-header-bell-btn');
+        if (bell) {
+            bell.classList.remove('open');
+        }
+    }
+
+    function toggleNotificationsDropdown() {
+        if (state.notificationsOpen && document.getElementById('streamflix-notif-dropdown')) {
+            closeNotificationsDropdown();
+            return;
+        }
+        closeAccountDropdown();
+        state.notificationsOpen = true;
+        var bell = document.getElementById('streamflix-header-bell-btn');
+        if (bell) {
+            bell.classList.add('open');
+        }
+        markAllNotificationsSeen();
+
+        var list = state.notifications || [];
+        var rowsHtml = list.length > 0
+            ? list.map(function (n, idx) {
+                var badgeText = n.kind === 'seerr_ready' ? 'NOW AVAILABLE' : 'NEW ARRIVAL';
+                var badgeCls = n.kind === 'seerr_ready' ? 'is-ready' : 'is-new';
+                return ''
+                    + '<button type="button" class="bfx-notif-row" data-notif-idx="' + idx + '">'
+                    + '  <span class="bfx-notif-thumb">'
+                    + (n.posterUrl ? '<img src="' + escapeHtml(n.posterUrl) + '" alt="" loading="lazy" />' : icon('film'))
+                    + '  </span>'
+                    + '  <span class="bfx-notif-copy">'
+                    + '    <span class="bfx-notif-tag ' + badgeCls + '">' + badgeText + '</span>'
+                    + '    <span class="bfx-notif-title">' + escapeHtml(n.title) + '</span>'
+                    + '    <span class="bfx-notif-sub">' + escapeHtml(n.sub) + '</span>'
+                    + '  </span>'
+                    + '</button>';
+            }).join('')
+            : '<div class="bfx-notif-empty">No new arrivals or fulfilled requests right now.</div>';
+
+        var nd = document.createElement('div');
+        nd.id = 'streamflix-notif-dropdown';
+        nd.setAttribute('role', 'menu');
+        nd.innerHTML = ''
+            + '<div class="bfx-notif-head">'
+            + '  <span>Notifications</span>'
+            + (isCurrentProfileSeerrAllowed()
+                ? '<button type="button" class="streamflix-ghost-btn bfx-btn-xs" id="bfx-notif-open-seerr">Requests</button>'
+                : '')
+            + '</div>'
+            + '<div class="bfx-notif-list">' + rowsHtml + '</div>';
+        document.body.appendChild(nd);
+
+        var seerrBtn = nd.querySelector('#bfx-notif-open-seerr');
+        if (seerrBtn) {
+            seerrBtn.addEventListener('click', function () {
+                closeNotificationsDropdown();
+                openSeerrRequestsModal();
+            });
+        }
+        Array.prototype.forEach.call(nd.querySelectorAll('[data-notif-idx]'), function (row) {
+            row.addEventListener('click', function () {
+                var entry = list[parseInt(row.getAttribute('data-notif-idx'), 10)];
+                closeNotificationsDropdown();
+                if (!entry) {
+                    return;
+                }
+                if (entry.mediaItem) {
+                    openHeroDetailModal(entry.mediaItem);
+                } else if (entry.jellyfinMediaId) {
+                    fetchFullItemDetails(entry.jellyfinMediaId).then(function (full) {
+                        if (full) { openHeroDetailModal(full); }
+                    }).catch(function () {});
+                } else if (entry.seerrItem && typeof openSeerrRequestModal === 'function') {
+                    openSeerrRequestModal(entry.seerrItem);
+                }
+            });
+        });
+    }
+
     function closeAccountDropdown() {
         state.accountDropdownOpen = false;
         var dd = document.getElementById('streamflix-account-dropdown');
@@ -662,6 +864,7 @@
             closeAccountDropdown();
             return;
         }
+        closeNotificationsDropdown();
         var active = state.activeProfile;
         if (!active) {
             return;
@@ -923,6 +1126,13 @@
 
     // Close dropdown when clicking outside
     document.addEventListener('click', function (ev) {
+        if (state.notificationsOpen) {
+            var nd = document.getElementById('streamflix-notif-dropdown');
+            var bell = document.getElementById('streamflix-header-bell-btn');
+            if (nd && !nd.contains(ev.target) && (!bell || !bell.contains(ev.target))) {
+                closeNotificationsDropdown();
+            }
+        }
         if (!state.accountDropdownOpen) {
             return;
         }

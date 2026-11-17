@@ -39,8 +39,23 @@
     }
 
     function getItemPosterUrl(item, maxWidth) {
-        if (!item) {
+        if (!item || !item.Id) {
             return '';
+        }
+        if (item.ImageTags && typeof item.ImageTags === 'object') {
+            var isEp = item.Type === 'Episode' && Boolean(item.SeriesId);
+            var hasTag = isEp
+                ? Boolean(item.SeriesPrimaryImageTag || item.ImageTags.Primary || item.ImageTags.Thumb)
+                : Boolean(item.ImageTags.Primary || item.ImageTags.Thumb || (Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0));
+            if (!hasTag) {
+                return '';
+            }
+            if (!isEp && !item.ImageTags.Primary && item.ImageTags.Thumb) {
+                return apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Thumb?maxWidth=' + (maxWidth || 420) + '&quality=85';
+            }
+            if (!isEp && !item.ImageTags.Primary && Array.isArray(item.BackdropImageTags) && item.BackdropImageTags.length > 0) {
+                return apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Backdrop/0?maxWidth=' + (maxWidth || 420) + '&quality=85';
+            }
         }
         var w = maxWidth || 420;
         var targetId = (item.Type === 'Episode' && item.SeriesId) ? item.SeriesId : item.Id;
@@ -1143,6 +1158,79 @@
         }
     }
 
+    function getHubSwrStorageKey(userId) {
+        var pid = (state.activeProfile && state.activeProfile.id) ? state.activeProfile.id : 'default';
+        return HUB_SWR_CACHE_PREFIX + normalizeGuid(userId) + '_' + pid;
+    }
+
+    function applyHubBootstrapPayload(boot, silentRefresh, saveToSwrCache, userIdForCache) {
+        var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (arr) { return arr || []; };
+        var kidsActive = typeof isKidsProfileActive === 'function' && isKidsProfileActive();
+
+        stampServerIdOnItems(boot.allMovies);
+        stampServerIdOnItems(boot.allSeries);
+        stampServerIdOnItems(boot.resumeItems);
+        stampServerIdOnItems(boot.nextUpItems);
+        stampServerIdOnItems(boot.favoriteItems);
+        stampServerIdOnItems(boot.collectionsItems);
+        stampServerIdOnItems(boot.filteredHeroPool);
+
+        state.hubData.allMovies = kFilter(boot.allMovies || []);
+        state.hubData.allSeries = kFilter(boot.allSeries || []);
+        state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
+        state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
+        state.hubData.rawHeroItems = dedupeMediaItems([].concat(state.hubData.recentMovies, state.hubData.recentSeries)).slice(0, 15);
+        state.hubData.rawTop10Items = [];
+        state.hubData.resumeItems = kFilter(boot.resumeItems || []);
+        state.hubData.nextUpItems = kFilter(boot.nextUpItems || []);
+        state.hubData.favoriteItems = kFilter(boot.favoriteItems || []);
+        state.hubData.collectionsItems = kFilter(boot.collectionsItems || []);
+        state.hubData.filteredHeroPool = kFilter(boot.filteredHeroPool || []);
+        state.hubData.views = Array.isArray(boot.views) ? boot.views : [];
+        state.hubData.popularScores = (boot.popularScores && typeof boot.popularScores === 'object') ? boot.popularScores : {};
+
+        var rawMoviesTotal = Number(boot.totalMoviesCount) || 0;
+        var rawSeriesTotal = Number(boot.totalSeriesCount) || 0;
+        var rawColsTotal = Number(boot.totalCollectionsCount) || 0;
+        state.hubData.totalMoviesCount = kidsActive ? state.hubData.allMovies.length : Math.max(rawMoviesTotal, state.hubData.allMovies.length);
+        state.hubData.totalSeriesCount = kidsActive ? state.hubData.allSeries.length : Math.max(rawSeriesTotal, state.hubData.allSeries.length);
+        state.hubData.totalCollectionsCount = kidsActive ? state.hubData.collectionsItems.length : Math.max(rawColsTotal, state.hubData.collectionsItems.length);
+
+        recomputeHubDerivedLists();
+        state.hubData.loading = false;
+        state.hubData.loaded = true;
+
+        if (saveToSwrCache && userIdForCache) {
+            saveSessionJson(getHubSwrStorageKey(userIdForCache), {
+                savedAt: Date.now(),
+                payload: boot
+            });
+        }
+
+        try {
+            var wallCache = getShowcaseItemsForWall().slice(0, 36);
+            if (wallCache.length > 0) {
+                saveJson(SHOWCASE_ITEMS_KEY, wallCache);
+            }
+        } catch (eWall) {}
+
+        if (!silentRefresh) {
+            state.heroIndex = 0;
+        }
+        if (state.searchQuery) {
+            var freshLocalHits = matchHubItemsLocally(state.searchQuery);
+            if (freshLocalHits.length > 0) {
+                state.searchResults = mergeUniqueMediaItems(freshLocalHits, state.searchResults || []);
+            }
+        }
+        renderCinemaHubContents();
+        enhanceLibraryListPages();
+        loadPersonalRows(false);
+        if (typeof refreshNotificationsSilently === 'function') {
+            refreshNotificationsSilently();
+        }
+    }
+
     function loadCinemaHubData(silentRefresh) {
         var auth = getJellyfinAuthContext();
         if (!auth.userId || !auth.token) {
@@ -1153,6 +1241,35 @@
         state.hubData.loading = true;
         state.hubData.userId = auth.userId;
 
+        // Instant Stale-While-Revalidate (SWR) paint from sessionStorage if fresh (< 10 min)
+        if (!silentRefresh && !state.hubData.loaded) {
+            var swrCached = loadSessionJson(getHubSwrStorageKey(auth.userId), null);
+            if (swrCached && swrCached.payload && swrCached.savedAt && (Date.now() - Number(swrCached.savedAt) < 10 * 60 * 1000)) {
+                try {
+                    applyHubBootstrapPayload(swrCached.payload, false, false, auth.userId);
+                    silentRefresh = true;
+                } catch (eSwr) {}
+            }
+        }
+
+        var pid = (state.activeProfile && state.activeProfile.id) || '';
+        apiFetch('/StreamFlix/Hub/Bootstrap?profileId=' + encodeURIComponent(pid)).then(function (boot) {
+            if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return;
+            }
+            if (!boot || !Array.isArray(boot.allMovies) || !Array.isArray(boot.allSeries)) {
+                throw new Error('Invalid bootstrap payload');
+            }
+            applyHubBootstrapPayload(boot, silentRefresh, true, auth.userId);
+        }).catch(function () {
+            if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return;
+            }
+            loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh);
+        });
+    }
+
+    function loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh) {
         var uid = encodeURIComponent(auth.userId);
         // Only pass valid C# ItemFields enum names
         var fields = 'Overview,Genres,PrimaryImageAspectRatio,DateCreated';
@@ -1889,10 +2006,10 @@
             });
         });
         var map = {};
-        (state.seerrSearchResults || []).forEach(function (s) {
+        (state.seerrSearchResults || []).concat((state.hotTabExtra && state.hotTabExtra.seerrComingSoon) || []).forEach(function (s) {
             if (s && s.tmdbId) {
                 var k = (String(s.mediaType || '').toLowerCase() === 'tv' ? 'tv' : 'movie') + ':' + s.tmdbId;
-                map[k] = s;
+                if (!map[k]) { map[k] = s; }
             }
         });
         Array.prototype.forEach.call(containerEl.querySelectorAll('[data-seerr-key]'), function (card) {
@@ -1948,7 +2065,7 @@
             + '<div class="streamflix-poster-card" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml((topRank ? '#' + topRank + ' ' : '') + item.Name) + '">'
             + '  <div class="streamflix-poster-img-wrap">'
             + '    <div class="streamflix-card-fallback">' + escapeHtml(item.Name) + '</div>'
-            + '    <img class="streamflix-poster-img" loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" data-bfx-img="fade" />'
+            + (posterUrl ? '    <img class="streamflix-poster-img" loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" data-bfx-img="fade" />' : '')
             + (topRank
                 ? '<span class="streamflix-top10-rank-badge" title="Ranked #' + topRank + ' in Top 10">#' + topRank + '</span>'
                 : (isRecentlyAdded(item) ? '<span class="streamflix-card-flag">New</span>' : ''))
@@ -2010,7 +2127,7 @@
             + '  <span class="streamflix-top10-num" aria-hidden="true">' + rank + '</span>'
             + '  <div class="streamflix-top10-poster">'
             + '    <div class="streamflix-card-fallback">' + escapeHtml(item.Name) + '</div>'
-            + '    <img loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" data-bfx-img="fade" />'
+            + (posterUrl ? '    <img loading="lazy" src="' + escapeHtml(posterUrl) + '" alt="" data-bfx-img="fade" />' : '')
             + '    <span class="streamflix-top10-rank-badge" aria-hidden="true">#' + rank + '</span>'
             + '    <div class="streamflix-card-hover-overlay">'
             + '      <div class="streamflix-card-info"><div class="streamflix-card-title">' + escapeHtml(item.Name) + '</div></div>'

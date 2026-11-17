@@ -572,7 +572,28 @@
         return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
     }
 
+    function applyBrandAccentTheme() {
+        var accentHex = sanitizeHexColor((state.config && state.config.customAccentColor) || '#E50914', '#E50914');
+        if (state.brandAccentSig === accentHex) {
+            return;
+        }
+        state.brandAccentSig = accentHex;
+        var root = document.documentElement;
+        var rgb = hexToRgb(accentHex) || [229, 9, 20];
+        var brighten = rgb.map(function (v) { return Math.min(255, Math.round(v + (255 - v) * 0.12)); });
+        var hoverHex = '#' + brighten.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+        var softRgba = 'rgba(' + rgb.join(', ') + ', 0.22)';
+        root.style.setProperty('--streamflix-red', accentHex);
+        root.style.setProperty('--streamflix-red-hover', hoverHex);
+        root.style.setProperty('--streamflix-red-soft', softRgba);
+        root.style.setProperty('--accent', accentHex);
+        root.style.setProperty('--deftraback', softRgba);
+        root.style.setProperty('--theme-primary-color', accentHex);
+        root.style.setProperty('--theme-accent-text-color', accentHex);
+    }
+
     function applyProfileAccent(profile) {
+        applyBrandAccentTheme();
         var color = (profile && profile.color) || '';
         if (state.accentSig === color) {
             return;

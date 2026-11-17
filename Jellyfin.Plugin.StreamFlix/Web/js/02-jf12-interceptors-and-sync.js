@@ -231,12 +231,8 @@
                         } else {
                             clearAdminAuth();
                             clearLocalJellyfinAuth();
-                            state.activeProfile = null;
+                            clearActiveProfileState(false);
                             state.sessionVerifiedOnce = false;
-                            try {
-                                localStorage.removeItem(PROFILE_KEY);
-                                localStorage.removeItem(LEGACY_PROFILE_KEY);
-                            } catch (e401) {}
                             fetchPublicConfig().then(function () {
                                 scheduleLifecycleTick(0);
                             }).catch(function () {
@@ -1084,6 +1080,11 @@
             isAdmin: Boolean(p.isAdmin),
             isOwner: Boolean(p.isOwner || p.id === 'streamflix_owner'),
             autoplayNextEpisode: p.autoplayNextEpisode !== false,
+            autoplayPreviews: p.autoplayPreviews !== false,
+            allowedLibraryIds: Array.isArray(p.allowedLibraryIds) ? p.allowedLibraryIds.slice() : [],
+            seerrRequestQuota: typeof p.seerrRequestQuota === 'number' ? p.seerrRequestQuota : 0,
+            bedtimeStart: String(p.bedtimeStart || ''),
+            bedtimeEnd: String(p.bedtimeEnd || ''),
             maxParentalRating: p.maturityRating || p.maxParentalRating || (p.isKids ? 'Older Kids (TV-Y7 / PG)' : 'TV-MA / R (All Maturity Levels)'),
             hasPin: Boolean(p.hasPin),
             pinLength: typeof p.pinLength === 'number' ? p.pinLength : 0,
@@ -1161,6 +1162,9 @@
             return false;
         }
         if (state.activeProfile && state.activeProfile.isKids && !cfg.seerrAllowKids) {
+            return false;
+        }
+        if (state.activeProfile && Number(state.activeProfile.seerrRequestQuota) < 0 && !isHouseholdAdmin()) {
             return false;
         }
         return Boolean(state.activeProfile && state.activeProfile.id);
@@ -1286,6 +1290,7 @@
             serverId: cfg.serverId || (prevCfg && prevCfg.serverId) || '',
             serverName: cfg.serverName || 'StreamFlix',
             customBrandName: typeof cfg.customBrandName === 'string' ? cfg.customBrandName.trim() : '',
+            customAccentColor: sanitizeHexColor(cfg.customAccentColor, '#E50914'),
             enableStreamFlixUi: cfg.enableStreamFlixUi !== false,
             requireGoogleAuth: requireGoogle,
             enableGoogleSignIn: cfg.enableGoogleSignIn !== false,
@@ -1330,6 +1335,7 @@
             approvedGoogleAccounts: Array.isArray(cfg.approvedGoogleAccounts) ? cfg.approvedGoogleAccounts : [],
             approvedOidcUsers: Array.isArray(cfg.approvedOidcUsers) ? cfg.approvedOidcUsers : [],
             serverUsers: Array.isArray(cfg.serverUsers) ? cfg.serverUsers : [],
+            serverLibraries: Array.isArray(cfg.serverLibraries) ? cfg.serverLibraries : [],
             showcaseItems: serverShowcase,
             profiles: normalizedProfiles
         };
@@ -1373,15 +1379,15 @@
         if (!resolvedAccess) {
             clearAdminAuth();
             if (state.activeProfile) {
-                state.activeProfile = null;
+                clearActiveProfileState(true);
                 state.sessionVerifiedOnce = false;
-                try {
-                    localStorage.removeItem(PROFILE_KEY);
-                    localStorage.removeItem(LEGACY_PROFILE_KEY);
-                } catch (eProf) {}
             }
             clearLocalJellyfinAuth();
             scheduleLifecycleTick(0);
+        }
+
+        if (typeof applyBrandAccentTheme === 'function') {
+            applyBrandAccentTheme();
         }
 
         if (state.config.assetVersion) {

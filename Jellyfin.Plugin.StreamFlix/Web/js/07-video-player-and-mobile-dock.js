@@ -1283,6 +1283,9 @@
         if (inVideo && state.accountDropdownOpen) {
             closeAccountDropdown();
         }
+        if (inVideo && state.notificationsOpen && typeof closeNotificationsDropdown === 'function') {
+            closeNotificationsDropdown();
+        }
 
         // Merged Top-Right Profile & Account Pill
         var active = state.activeProfile;
@@ -1294,6 +1297,10 @@
             var staleBtn = document.getElementById('streamflix-header-profile-btn');
             if (staleBtn) {
                 staleBtn.style.setProperty('display', 'none', 'important');
+            }
+            var staleBell = document.getElementById('streamflix-header-bell-btn');
+            if (staleBell) {
+                staleBell.style.setProperty('display', 'none', 'important');
             }
             ensureMobileDock(true, inVideo);
             if (typeof syncKidsModeChrome === 'function') {
@@ -1338,6 +1345,39 @@
                 + '<span class="streamflix-header-caret">' + icon('chevronDown') + '</span>';
         }
         syncHeaderCastIndicator(btn);
+
+        var bellBtn = document.getElementById('streamflix-header-bell-btn');
+        if (!bellBtn) {
+            bellBtn = document.createElement('button');
+            bellBtn.type = 'button';
+            bellBtn.id = 'streamflix-header-bell-btn';
+            bellBtn.setAttribute('aria-label', 'Notifications');
+            bellBtn.setAttribute('aria-haspopup', 'menu');
+            bellBtn.innerHTML = icon('bell');
+            bellBtn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                if (typeof toggleNotificationsDropdown === 'function') {
+                    toggleNotificationsDropdown();
+                }
+            });
+            document.body.appendChild(bellBtn);
+        }
+        var hideBell = overlayOpen || inVideo || isMobileDockViewportActive() || isAdminConfigRoute() || isKidsProfileActive();
+        if (hideBell) {
+            bellBtn.style.setProperty('display', 'none', 'important');
+        } else {
+            bellBtn.style.removeProperty('display');
+            try {
+                var profRect = btn.getBoundingClientRect();
+                if (profRect && profRect.width > 10) {
+                    bellBtn.style.right = Math.max(64, Math.round(window.innerWidth - profRect.left + 8)) + 'px';
+                }
+            } catch (eBellPos) {}
+            if (typeof syncHeaderBellBadge === 'function') {
+                syncHeaderBellBadge();
+            }
+        }
+
         if (typeof syncKidsModeChrome === 'function') {
             syncKidsModeChrome();
         }

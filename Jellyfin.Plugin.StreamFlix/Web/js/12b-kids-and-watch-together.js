@@ -592,3 +592,159 @@
             renderProfilePickerGate();
         });
     }
+
+    /* ======================================================================
+       PART B. BEDTIME WINDOW LOCK & ADULT TONIGHT OVERRIDE
+       ====================================================================== */
+    function parseTimeMinutes(hhmm) {
+        var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+        if (!m) {
+            return -1;
+        }
+        var hh = parseInt(m[1], 10);
+        var mm = parseInt(m[2], 10);
+        if (hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+            return -1;
+        }
+        return hh * 60 + mm;
+    }
+
+    function isTimeInBedtimeWindow(startStr, endStr, nowMinutes) {
+        var s = parseTimeMinutes(startStr);
+        var e = parseTimeMinutes(endStr);
+        if (s < 0 || e < 0 || s === e) {
+            return false;
+        }
+        var cur = typeof nowMinutes === 'number'
+            ? nowMinutes
+            : (function () {
+                var d = new Date();
+                return d.getHours() * 60 + d.getMinutes();
+            })();
+        if (s < e) {
+            return cur >= s && cur < e;
+        }
+        return cur >= s || cur < e;
+    }
+
+    function hasActiveBedtimeOverrideTonight(profileId) {
+        if (!profileId) {
+            return false;
+        }
+        var saved = loadJson(BEDTIME_UNLOCK_PREFIX + profileId, null);
+        if (!saved || !saved.expiresAt) {
+            return false;
+        }
+        if (Number(saved.expiresAt) > Date.now()) {
+            return true;
+        }
+        saveJson(BEDTIME_UNLOCK_PREFIX + profileId, null);
+        return false;
+    }
+
+    function grantBedtimeOverrideTonight(profileId) {
+        if (!profileId) {
+            return;
+        }
+        // Grant 10 hours of unlocked time (covers the rest of tonight's bedtime window)
+        saveJson(BEDTIME_UNLOCK_PREFIX + profileId, {
+            expiresAt: Date.now() + 10 * 3600 * 1000
+        });
+    }
+
+    function isProfileCurrentlyInBedtime(profile) {
+        var p = profile || state.activeProfile;
+        if (!p || !p.id || p.isAdmin || !p.bedtimeStart || !p.bedtimeEnd) {
+            return false;
+        }
+        if (hasActiveBedtimeOverrideTonight(p.id)) {
+            return false;
+        }
+        return isTimeInBedtimeWindow(p.bedtimeStart, p.bedtimeEnd);
+    }
+
+    function removeBedtimeLockOverlay() {
+        var el = document.getElementById('bfx-bedtime-lock-overlay');
+        if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
+        }
+        if (document.body) {
+            document.body.classList.remove('bfx-bedtime-locked');
+        }
+    }
+
+    function enforceBedtimeLockOverlay() {
+        var active = state.activeProfile;
+        if (!isProfileCurrentlyInBedtime(active)) {
+            removeBedtimeLockOverlay();
+            return false;
+        }
+
+        // Pause any playing HTML5 video element immediately when bedtime triggers
+        try {
+            var vids = document.querySelectorAll('video');
+            Array.prototype.forEach.call(vids, function (v) {
+                if (v && !v.paused) {
+                    v.pause();
+                }
+            });
+        } catch (ePause) {}
+
+        if (document.body) {
+            document.body.classList.add('bfx-bedtime-locked');
+        }
+
+        var existing = document.getElementById('bfx-bedtime-lock-overlay');
+        if (existing) {
+            return true;
+        }
+
+        var overlay = document.createElement('div');
+        overlay.id = 'bfx-bedtime-lock-overlay';
+        overlay.className = 'bfx-bedtime-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Time for Bed');
+        overlay.innerHTML = ''
+            + '<div class="bfx-bedtime-card">'
+            + '  <div class="bfx-bedtime-moon">' + icon('moon') + '</div>'
+            + '  <h2>Time for Bed, ' + escapeHtml(active.name || 'Friend') + '!</h2>'
+            + '  <p>' + escapeHtml(getBrandName()) + ' is resting from <strong>' + escapeHtml(active.bedtimeStart) + '</strong> to <strong>' + escapeHtml(active.bedtimeEnd) + '</strong> so everyone gets great sleep.</p>'
+            + '  <div class="bfx-bedtime-actions">'
+            + (isGuestPassSession()
+                ? ''
+                : '    <button type="button" class="streamflix-btn-primary" id="bfx-bedtime-switch-btn">' + icon('users') + '<span>Switch Profile</span></button>'
+                    + '    <button type="button" class="streamflix-ghost-btn" id="bfx-bedtime-unlock-btn">' + icon('lock') + '<span>Adult Unlock Tonight</span></button>')
+            + '  </div>'
+            + '</div>';
+        document.body.appendChild(overlay);
+
+        var switchBtn = overlay.querySelector('#bfx-bedtime-switch-btn');
+        if (switchBtn) {
+            switchBtn.addEventListener('click', function () {
+                if (isKidsExitLockRequired()) {
+                    exitKidsModeToPicker();
+                } else {
+                    removeBedtimeLockOverlay();
+                    window.__STREAMFLIX_OPEN_PROFILE_PICKER__(false);
+                }
+            });
+        }
+        var unlockBtn = overlay.querySelector('#bfx-bedtime-unlock-btn');
+        if (unlockBtn) {
+            unlockBtn.addEventListener('click', function () {
+                var verifyPromise = (state.config && state.config.hasAnyAdultPin)
+                    ? openAdultPinExitModal('')
+                    : openGrownUpChallengeModal();
+                verifyPromise.then(function (res) {
+                    if (res && res.verified && state.activeProfile) {
+                        grantBedtimeOverrideTonight(state.activeProfile.id);
+                        removeBedtimeLockOverlay();
+                        showToast('Bedtime unlocked for tonight.', 'success');
+                        scheduleLifecycleTick(0);
+                    }
+                });
+            });
+        }
+        return true;
+    }

@@ -1,0 +1,45 @@
+name: CI Dev Verification
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8, 9 & 10 SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Jellyfin 12.x Target (net10.0)
+        run: dotnet build Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj -c Release -p:JellyfinTarget=jf12
+
+      - name: Build Jellyfin 10.11 Target (net9.0)
+        run: dotnet build Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj -c Release -p:JellyfinTarget=jf1011
+
+      - name: Build Jellyfin 10.9/10.10 Target (net8.0)
+        run: dotnet build Jellyfin.Plugin.StreamFlix/Jellyfin.Plugin.StreamFlix.csproj -c Release -p:JellyfinTarget=jf109
+
+      - name: Run C# Unit Tests (xUnit)
+        run: dotnet test Jellyfin.Plugin.StreamFlix.Tests/Jellyfin.Plugin.StreamFlix.Tests.csproj -c Release -p:JellyfinTarget=jf12
+
+      - name: Run Frontend JS/CSS Headless Smoke Suite
+        run: node tests/smoke-ui-state.mjs

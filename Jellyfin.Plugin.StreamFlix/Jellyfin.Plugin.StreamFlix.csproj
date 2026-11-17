@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <JellyfinTarget Condition="'$(JellyfinTarget)' == ''">jf109</JellyfinTarget>
-    <StreamFlixVersion Condition="'$(StreamFlixVersion)' == ''">0.9.2.5</StreamFlixVersion>
+    <StreamFlixVersion Condition="'$(StreamFlixVersion)' == ''">0.9.8.0</StreamFlixVersion>
     <RootNamespace>Jellyfin.Plugin.StreamFlix</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.StreamFlix</AssemblyName>
     <Version>$(StreamFlixVersion)</Version>
@@ -15,6 +15,10 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.StreamFlix.Tests" />
+  </ItemGroup>
 
   <!-- Jellyfin 10.9 & 10.10 (.NET 8.0) -->
   <PropertyGroup Condition="'$(JellyfinTarget)' == 'jf109'">

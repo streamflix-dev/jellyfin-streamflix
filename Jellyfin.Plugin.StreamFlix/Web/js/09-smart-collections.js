@@ -553,6 +553,9 @@
         if (!hiddenBuiltInMap.movies) {
             pills.push({ id: 'movies', label: 'Movies', hide: !d.allMovies.length });
         }
+        if (!hiddenBuiltInMap.hot) {
+            pills.push({ id: 'hot', label: 'New & Popular', hide: !(d.allMovies.length || d.allSeries.length) });
+        }
 
         eligibleViews.forEach(function (v) {
             var normId = normalizeGuid(v.Id);
@@ -598,6 +601,7 @@
         var builtIns = [
             { id: 'series', label: 'Shows' },
             { id: 'movies', label: 'Movies' },
+            { id: 'hot', label: 'New & Popular' },
             { id: 'collections', label: 'Collections' },
             { id: 'top10', label: 'Top 10' },
             { id: 'mylist', label: 'My List' }
@@ -1365,6 +1369,79 @@
             + '</button>';
     }
 
+    function ensureHotTabExtraLoaded() {
+        var auth = getJellyfinAuthContext();
+        if (!auth || !auth.userId || !auth.token) {
+            return;
+        }
+        var cacheKey = normalizeGuid(auth.userId) + ':' + ((state.activeProfile && state.activeProfile.id) || '');
+        if (!state.hotTabExtra) {
+            state.hotTabExtra = { loading: false, loadedForUser: '', upcomingEpisodes: [], seerrComingSoon: [] };
+        }
+        if (state.hotTabExtra.loading || state.hotTabExtra.loadedForUser === cacheKey) {
+            return;
+        }
+        state.hotTabExtra.loading = true;
+        var uid = encodeURIComponent(auth.userId);
+        var pUpcoming = apiFetch('/Shows/Upcoming?userId=' + uid + '&Limit=18&Fields=Overview,PrimaryImageAspectRatio')
+            .then(function (r) { return (r && Array.isArray(r.Items)) ? r.Items : []; })
+            .catch(function () { return []; });
+
+        var seerrOk = isCurrentProfileSeerrAllowed();
+        var pid = (state.activeProfile && state.activeProfile.id) || '';
+        var pSeerrReqs = seerrOk
+            ? apiFetch('/StreamFlix/Seerr/Requests?profileId=' + encodeURIComponent(pid))
+                .then(function (r) { return (r && Array.isArray(r.requests)) ? r.requests : []; })
+                .catch(function () { return []; })
+            : Promise.resolve([]);
+
+        Promise.all([pUpcoming, pSeerrReqs]).then(function (arr) {
+            var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (x) { return x || []; };
+            state.hotTabExtra.upcomingEpisodes = kFilter(arr[0] || []);
+            state.hotTabExtra.seerrComingSoon = (arr[1] || []).filter(function (req) {
+                var st = Number(req && req.mediaStatus) || 0;
+                return req && req.tmdbId && req.title && st !== 5 && st !== 6 && !req.jellyfinMediaId;
+            }).slice(0, 18);
+            state.hotTabExtra.loading = false;
+            state.hotTabExtra.loadedForUser = cacheKey;
+            if (document.getElementById('streamflix-cinema-hub') && state.activeCategory === 'hot') {
+                renderCinemaHubContents();
+            }
+        }).catch(function () {
+            state.hotTabExtra.loading = false;
+            state.hotTabExtra.loadedForUser = cacheKey;
+        });
+    }
+
+    function buildUpcomingEpisodeWideCardHtml(ep) {
+        var backdropUrl = getItemBackdropUrl(ep, 640);
+        var title = ep.SeriesName || ep.Name || 'Upcoming Episode';
+        var airLabel = '';
+        if (ep.PremiereDate) {
+            var ms = Date.parse(ep.PremiereDate);
+            if (!isNaN(ms)) {
+                try {
+                    airLabel = 'Airs ' + new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                } catch (eD) {}
+            }
+        }
+        var epCode = 'S' + (ep.ParentIndexNumber || 1) + ':E' + (ep.IndexNumber || 1);
+        var sub = [airLabel, epCode, ep.Name].filter(Boolean).join(' · ');
+        return ''
+            + '<div class="streamflix-wide-card" data-item-id="' + escapeHtml(ep.SeriesId || ep.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml(title + ' ' + sub) + '">'
+            + '  <div class="streamflix-wide-img-wrap">'
+            + '    <div class="streamflix-card-fallback">' + escapeHtml(title) + '</div>'
+            + '    <img class="streamflix-wide-img" loading="lazy" src="' + escapeHtml(backdropUrl) + '" alt="" data-bfx-img="fade" />'
+            + '    <div class="streamflix-wide-scrim"></div>'
+            + (airLabel ? '    <span class="streamflix-card-flag" style="top:10px;left:10px;">' + escapeHtml(airLabel) + '</span>' : '')
+            + '    <div class="streamflix-wide-caption">'
+            + '      <div class="streamflix-wide-title">' + escapeHtml(title) + '</div>'
+            + '      <div class="streamflix-wide-sub">' + escapeHtml(sub) + '</div>'
+            + '    </div>'
+            + '  </div>'
+            + '</div>';
+    }
+
     function renderCinemaHubContents() {
         var hub = document.getElementById('streamflix-cinema-hub');
         if (!hub) {
@@ -1541,8 +1618,24 @@
                 rowsHtml += buildGridSectionHtml('top10-grid', rowTitle('Top 10 Lineup', d.top10Items.length), d.top10Items);
             }
         } else if (cat === 'hot') {
+            ensureHotTabExtraLoaded();
+            var hotEx = state.hotTabExtra || { upcomingEpisodes: [], seerrComingSoon: [] };
+            var sevenDaysAgo = Date.now() - (7 * 24 * 3600 * 1000);
+            var addedThisWeek = dedupeMediaItems([].concat(d.recentMovies || [], d.recentSeries || [])).filter(function (it) {
+                var c = it && it.DateCreated ? Date.parse(it.DateCreated) : 0;
+                return c >= sevenDaysAgo;
+            }).slice(0, 20);
             if (d.top10Items.length > 0) {
                 rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10' });
+            }
+            if (Array.isArray(hotEx.upcomingEpisodes) && hotEx.upcomingEpisodes.length > 0) {
+                rowsHtml += buildRowHtml('hot-upcoming', rowTitle('Upcoming Episodes', hotEx.upcomingEpisodes.length), hotEx.upcomingEpisodes.map(buildUpcomingEpisodeWideCardHtml).join(''), { className: 'streamflix-row-wide' });
+            }
+            if (Array.isArray(hotEx.seerrComingSoon) && hotEx.seerrComingSoon.length > 0) {
+                rowsHtml += buildRowHtml('hot-seerr-soon', rowTitle('Coming Soon via Seerr', hotEx.seerrComingSoon.length), hotEx.seerrComingSoon.map(buildSeerrCardHtml).join(''));
+            }
+            if (addedThisWeek.length >= 3) {
+                rowsHtml += buildRowHtml('hot-week', rowTitle('Worth the Wait · Added This Week', addedThisWeek.length), addedThisWeek.map(buildPosterCardHtml).join(''));
             }
             if (d.recentMovies.length > 0) {
                 rowsHtml += buildRowHtml('hot-movies', rowTitle('New Movies on ' + getBrandName()), d.recentMovies.map(buildPosterCardHtml).join(''));
@@ -2061,6 +2154,7 @@
                 + '    <button type="button" class="streamflix-hero-play" id="streamflix-hero-play-btn">' + iconLabel('play', hasResume ? 'Resume' : 'Play') + '</button>'
                 + '    <button type="button" class="streamflix-hero-secondary" id="streamflix-hero-info-btn">' + iconLabel('info', 'More Info') + '</button>'
                 + '    <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-hero-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="' + (isFav ? 'Remove from My List' : 'Add to My List') + '">' + icon(isFav ? 'check' : 'plus') + '</button>'
+                + '    <button type="button" class="streamflix-hero-icon-btn bfx-hero-mute-btn is-hidden" id="streamflix-hero-mute-btn" title="' + (state.heroPreviewMuted !== false ? 'Unmute preview' : 'Mute preview') + '" aria-label="' + (state.heroPreviewMuted !== false ? 'Unmute preview' : 'Mute preview') + '">' + icon(state.heroPreviewMuted !== false ? 'volumeOff' : 'volume') + '</button>'
                 + '  </div>'
                 + '</div>';
             hydrateCompleteImages(slot);
@@ -2083,6 +2177,24 @@
                 toggleFavoriteItem(item, null);
                 renderHeroSlide();
             });
+            var muteHeroBtn = document.getElementById('streamflix-hero-mute-btn');
+            if (muteHeroBtn) {
+                muteHeroBtn.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    state.heroPreviewMuted = !Boolean(state.heroPreviewMuted !== false);
+                    var vidEl = hero.querySelector('video.bfx-hero-preview-video');
+                    if (vidEl) {
+                        vidEl.muted = Boolean(state.heroPreviewMuted);
+                    }
+                    muteHeroBtn.innerHTML = icon(state.heroPreviewMuted ? 'volumeOff' : 'volume');
+                    muteHeroBtn.title = state.heroPreviewMuted ? 'Unmute preview' : 'Mute preview';
+                    muteHeroBtn.setAttribute('aria-label', muteHeroBtn.title);
+                });
+            }
+        }
+
+        if (itemChanged) {
+            scheduleHeroVideoPreview(item);
         }
 
         Array.prototype.forEach.call(dotsEl.querySelectorAll('.streamflix-hero-dot'), function (dot) {
@@ -2160,7 +2272,10 @@
                 return;
             }
             heroEl.classList.remove('is-static-rotation');
-            var paused = heroHardPaused() || state.heroPaused || curHero.length <= 1;
+            var paused = heroHardPaused() || state.heroPaused || state.heroVideoActive || curHero.length <= 1;
+            if (heroHardPaused() && state.heroVideoActive) {
+                stopHeroVideoPreview();
+            }
             heroEl.classList.toggle('is-paused', Boolean(paused));
             if (paused) {
                 return;
@@ -2279,6 +2394,144 @@
             }
         };
         img.src = url;
+    }
+
+    var heroPreviewTimer = null;
+
+    function stopHeroVideoPreview() {
+        if (heroPreviewTimer) {
+            clearTimeout(heroPreviewTimer);
+            heroPreviewTimer = null;
+        }
+        state.heroVideoActive = false;
+        state.heroVideoItemId = '';
+        var hero = document.getElementById('streamflix-hero-billboard');
+        if (!hero) {
+            return;
+        }
+        hero.classList.remove('is-video-playing');
+        var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+        if (muteBtn) {
+            muteBtn.classList.add('is-hidden');
+        }
+        var vids = hero.querySelectorAll('video.bfx-hero-preview-video');
+        Array.prototype.forEach.call(vids, function (v) {
+            try {
+                v.pause();
+                v.removeAttribute('src');
+                v.load();
+            } catch (eV) {}
+            if (v.parentNode) {
+                v.parentNode.removeChild(v);
+            }
+        });
+    }
+
+    function canAutoplayHeroVideoPreview() {
+        if (!state.activeProfile || state.activeProfile.autoplayPreviews === false) {
+            return false;
+        }
+        if (prefersReducedMotion() || heroHardPaused()) {
+            return false;
+        }
+        if (typeof isMobileDockViewportActive === 'function' && isMobileDockViewportActive()) {
+            return false;
+        }
+        try {
+            if (navigator.connection && navigator.connection.saveData) {
+                return false;
+            }
+        } catch (eConn) {}
+        return true;
+    }
+
+    function scheduleHeroVideoPreview(item) {
+        stopHeroVideoPreview();
+        if (!item || !item.Id || !canAutoplayHeroVideoPreview()) {
+            return;
+        }
+        var targetId = item.Id;
+        heroPreviewTimer = setTimeout(function () {
+            heroPreviewTimer = null;
+            if (!canAutoplayHeroVideoPreview()) {
+                return;
+            }
+            var hero = document.getElementById('streamflix-hero-billboard');
+            if (!hero || hero.getAttribute('data-hero-item') !== targetId) {
+                return;
+            }
+            var auth = getJellyfinAuthContext();
+            if (!auth || !auth.userId || !auth.token) {
+                return;
+            }
+            if (!state.heroTrailerCache) {
+                state.heroTrailerCache = {};
+            }
+            var resolveTrailer = state.heroTrailerCache.hasOwnProperty(targetId)
+                ? Promise.resolve(state.heroTrailerCache[targetId])
+                : apiFetch('/Users/' + encodeURIComponent(auth.userId) + '/Items/' + encodeURIComponent(targetId) + '/LocalTrailers')
+                    .then(function (list) {
+                        var hit = (Array.isArray(list) && list.length > 0 && list[0] && list[0].Id) ? list[0].Id : null;
+                        state.heroTrailerCache[targetId] = hit;
+                        return hit;
+                    })
+                    .catch(function () {
+                        state.heroTrailerCache[targetId] = null;
+                        return null;
+                    });
+
+            resolveTrailer.then(function (trailerId) {
+                if (!trailerId || !canAutoplayHeroVideoPreview()) {
+                    return;
+                }
+                var curHero = document.getElementById('streamflix-hero-billboard');
+                var bgStack = curHero && curHero.querySelector('.streamflix-hero-bg-stack');
+                if (!curHero || !bgStack || curHero.getAttribute('data-hero-item') !== targetId) {
+                    return;
+                }
+                var streamUrl = apiBase() + '/Videos/' + encodeURIComponent(trailerId) + '/stream?static=true&api_key=' + encodeURIComponent(auth.token);
+                var vid = document.createElement('video');
+                vid.className = 'bfx-hero-preview-video';
+                vid.muted = Boolean(state.heroPreviewMuted !== false);
+                vid.playsInline = true;
+                vid.setAttribute('playsinline', '');
+                vid.setAttribute('webkit-playsinline', '');
+                vid.preload = 'metadata';
+                vid.src = streamUrl;
+
+                var onCleanup = function () {
+                    if (state.heroVideoItemId === targetId) {
+                        stopHeroVideoPreview();
+                        restartHeroTimer();
+                    }
+                };
+                vid.addEventListener('playing', function () {
+                    if (curHero.getAttribute('data-hero-item') !== targetId || heroHardPaused()) {
+                        stopHeroVideoPreview();
+                        return;
+                    }
+                    state.heroVideoActive = true;
+                    state.heroVideoItemId = targetId;
+                    vid.classList.add('is-playing');
+                    curHero.classList.add('is-video-playing');
+                    var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+                    if (muteBtn) {
+                        muteBtn.classList.remove('is-hidden');
+                        muteBtn.innerHTML = icon(vid.muted ? 'volumeOff' : 'volume');
+                    }
+                });
+                vid.addEventListener('ended', onCleanup);
+                vid.addEventListener('error', onCleanup);
+
+                bgStack.appendChild(vid);
+                var playPromise = vid.play();
+                if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch(function () {
+                        stopHeroVideoPreview();
+                    });
+                }
+            });
+        }, 2600);
     }
 
     function applyHeroAmbient(url) {

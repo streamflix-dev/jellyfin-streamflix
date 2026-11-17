@@ -429,29 +429,95 @@
 
         var auth = getJellyfinAuthContext();
 
-        // If BoxSet (Collection), load all Movies/Series in this Collection!
+        // If BoxSet (Collection / Franchise Hub), load all Movies/Series with progress & sort controls!
         if (item.Type === 'BoxSet' && auth.userId) {
             var colContainer = qModal('#streamflix-detail-episodes-section');
             if (colContainer) {
-                colContainer.innerHTML = '<div style="color:#888;font-size:13px;">Loading collection titles…</div>';
-                fetchUserItems(encodeURIComponent(auth.userId), 'ParentId=' + encodeURIComponent(item.Id) + '&Recursive=true&IncludeItemTypes=Movie,Series,Video&SortBy=PremiereDate,ProductionYear,SortName&Limit=100&Fields=Overview,Genres,PrimaryImageAspectRatio')
+                colContainer.innerHTML = '<div style="color:#888;font-size:13px;">Loading franchise titles…</div>';
+                fetchUserItems(encodeURIComponent(auth.userId), 'ParentId=' + encodeURIComponent(item.Id) + '&Recursive=true&IncludeItemTypes=Movie,Series,Video&SortBy=PremiereDate,ProductionYear,SortName&SortOrder=Ascending&Limit=100&Fields=Overview,Genres,PrimaryImageAspectRatio,DateCreated')
                     .then(function (res) {
-                        var colItems = (res && res.Items) || [];
-                        if (!colItems.length || !modalBackdrop.parentNode || modalClosed) {
+                        var rawColItems = (res && res.Items) || [];
+                        if (!rawColItems.length || !modalBackdrop.parentNode || modalClosed) {
                             colContainer.innerHTML = '';
                             return;
                         }
-                        firstPlayableTarget = colItems[0];
-                        var playBtnEl = qModal('#streamflix-modal-play-btn');
-                        if (playBtnEl && colItems[0] && colItems[0].Name) {
-                            playBtnEl.innerHTML = iconLabel('play', 'Play ' + colItems[0].Name);
-                        }
-                        colContainer.innerHTML = ''
-                            + '<h3 style="margin:0 0 14px 0;font-size:19px;font-weight:800;border-top:1px solid rgba(255,255,255,0.1);padding-top:18px;">Titles in this Collection (' + colItems.length + ')</h3>'
-                            + '<div class="streamflix-grid">' + colItems.map(buildPosterCardHtml).join('') + '</div>';
-                        bindInteractiveCardsInContainer(colContainer, colItems, function () {
-                            closeModal(true);
+                        var watchedCount = 0;
+                        var totalRuntimeTicks = 0;
+                        var resumableColItem = null;
+                        var firstUnwatchedColItem = null;
+
+                        rawColItems.forEach(function (ci) {
+                            if (!ci) { return; }
+                            if (ci.RunTimeTicks > 0) {
+                                totalRuntimeTicks += Number(ci.RunTimeTicks);
+                            }
+                            var ud = ci.UserData || {};
+                            if (ud.Played) {
+                                watchedCount++;
+                            } else if (!firstUnwatchedColItem) {
+                                firstUnwatchedColItem = ci;
+                            }
+                            if (!resumableColItem && Number(ud.PlaybackPositionTicks) > 0) {
+                                resumableColItem = ci;
+                            }
                         });
+
+                        firstPlayableTarget = resumableColItem || firstUnwatchedColItem || rawColItems[0];
+                        var playBtnEl = qModal('#streamflix-modal-play-btn');
+                        if (playBtnEl && firstPlayableTarget && firstPlayableTarget.Name) {
+                            var ctaPrefix = resumableColItem
+                                ? 'Resume '
+                                : (watchedCount > 0 && firstUnwatchedColItem ? 'Continue: ' : (watchedCount === rawColItems.length ? 'Rewatch ' : 'Play '));
+                            playBtnEl.innerHTML = iconLabel('play', ctaPrefix + firstPlayableTarget.Name);
+                        }
+
+                        var progressPct = Math.round((watchedCount / rawColItems.length) * 100);
+                        var totalRtText = formatRuntimeTicks(totalRuntimeTicks);
+                        var colSortMode = 'release';
+
+                        var renderCollectionView = function () {
+                            if (modalClosed || !modalBackdrop.parentNode) {
+                                return;
+                            }
+                            var sorted = rawColItems.slice();
+                            if (colSortMode === 'newest') {
+                                sorted.sort(function (a, b) {
+                                    return (Number(b.ProductionYear) || 0) - (Number(a.ProductionYear) || 0);
+                                });
+                            } else if (colSortMode === 'rating') {
+                                sorted.sort(function (a, b) {
+                                    return (Number(b.CommunityRating) || 0) - (Number(a.CommunityRating) || 0);
+                                });
+                            }
+                            colContainer.innerHTML = ''
+                                + '<div class="bfx-franchise-hub">'
+                                + '  <div class="bfx-franchise-top">'
+                                + '    <div>'
+                                + '      <h3 class="bfx-franchise-heading">Franchise Collection (' + rawColItems.length + ')</h3>'
+                                + '      <div class="bfx-franchise-sub">Watched ' + watchedCount + ' of ' + rawColItems.length + ' (' + progressPct + '%)' + (totalRtText ? ' · ' + escapeHtml(totalRtText.trim()) + ' total' : '') + '</div>'
+                                + '    </div>'
+                                + '    <div class="bfx-franchise-sorts" role="tablist" aria-label="Sort collection">'
+                                + '      <button type="button" class="bfx-fran-sort-pill' + (colSortMode === 'release' ? ' active' : '') + '" data-col-sort="release">Release Order</button>'
+                                + '      <button type="button" class="bfx-fran-sort-pill' + (colSortMode === 'newest' ? ' active' : '') + '" data-col-sort="newest">Newest</button>'
+                                + '      <button type="button" class="bfx-fran-sort-pill' + (colSortMode === 'rating' ? ' active' : '') + '" data-col-sort="rating">Top Rated</button>'
+                                + '    </div>'
+                                + '  </div>'
+                                + '  <div class="bfx-franchise-bar"><span style="width:' + progressPct + '%;"></span></div>'
+                                + '  <div class="streamflix-grid">' + sorted.map(buildPosterCardHtml).join('') + '</div>'
+                                + '</div>';
+
+                            Array.prototype.forEach.call(colContainer.querySelectorAll('[data-col-sort]'), function (sBtn) {
+                                sBtn.addEventListener('click', function () {
+                                    colSortMode = sBtn.getAttribute('data-col-sort') || 'release';
+                                    renderCollectionView();
+                                });
+                            });
+                            bindInteractiveCardsInContainer(colContainer, sorted, function () {
+                                closeModal(true);
+                            });
+                        };
+
+                        renderCollectionView();
                     })
                     .catch(function () {
                         if (colContainer) {

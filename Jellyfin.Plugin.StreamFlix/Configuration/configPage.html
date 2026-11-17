@@ -149,6 +149,11 @@
             #StreamFlixConfigPage .bfx-device-main { flex:1; min-width:190px; }
             #StreamFlixConfigPage .bfx-device-title { font-weight:700; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
             #StreamFlixConfigPage .bfx-device-sub { font-size:.81em; opacity:.7; margin-top:3px; line-height:1.4; }
+            #StreamFlixConfigPage .bfx-accent-presets { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
+            #StreamFlixConfigPage .bfx-accent-swatch { width:30px; height:30px; border-radius:8px; border:2px solid rgba(255,255,255,.18); cursor:pointer; padding:0; transition:transform .14s, border-color .14s; }
+            #StreamFlixConfigPage .bfx-accent-swatch:hover { transform:scale(1.08); }
+            #StreamFlixConfigPage .bfx-accent-swatch.is-selected { border-color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.35); transform:scale(1.08); }
+            #StreamFlixConfigPage .bfx-hc-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.74em; font-weight:700; padding:1px 6px; border-radius:4px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.82); margin-right:6px; }
             @keyframes bfxShimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
             @media (prefers-reduced-motion: reduce) { #StreamFlixConfigPage .bfx-skeleton { animation:none; } }
         </style>
@@ -166,10 +171,16 @@
                         </div>
                         <div class="bfx-row">
                             <a class="bfx-btn" href="#/home" id="StreamFlixBackHomeBtn">← Home</a>
+                            <button type="button" class="bfx-btn" id="StreamFlixHealthCheckBtn">🩺 Health Check</button>
+                            <button type="button" class="bfx-btn" id="StreamFlixExportBackupBtn">⬇ Export JSON</button>
+                            <button type="button" class="bfx-btn" id="StreamFlixImportBackupBtn">⬆ Import JSON</button>
+                            <input type="file" id="StreamFlixImportFileInput" accept=".json,application/json" class="hide" />
                             <button type="button" class="bfx-btn" id="StreamFlixManageProfilesBtn">✎ Manage profiles</button>
                             <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixOpenPickerBtn">Who's watching?</button>
                         </div>
                     </div>
+
+                    <div class="bfx-oauth-results hide" id="StreamFlixHealthCheckPanel" role="status" aria-live="polite" style="margin:0 0 16px;"></div>
 
                     <div class="bfx-cards">
                         <button type="button" class="bfx-card" data-jump-tab="signin">
@@ -244,10 +255,27 @@
                             <div class="fieldDescription checkboxFieldDescription">Applies the dark cinema home, Top 10 rows, profile switcher, and custom player overlay. Individual devices can also switch between StreamFlix Home and classic Jellyfin Home in <strong>Settings</strong>.</div>
                         </div>
 
-                        <div id="StreamFlixUiBrandingBox" class="inputContainer" style="margin-top:6px;">
-                            <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom upper-left logo text (optional)</label>
-                            <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
-                            <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
+                        <div id="StreamFlixUiBrandingBox" class="bfx-grid-2" style="margin-top:6px;">
+                            <div class="inputContainer" style="margin-bottom:6px;">
+                                <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom upper-left logo text (optional)</label>
+                                <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
+                                <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
+                            </div>
+                            <div class="inputContainer" style="margin-bottom:6px;">
+                                <label class="inputLabel inputLabelUnfocused" for="CustomAccentColor">Brand accent color</label>
+                                <div class="bfx-row" style="gap:8px;">
+                                    <input type="color" id="CustomAccentColorPicker" value="#E50914" style="width:42px;height:38px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:transparent;cursor:pointer;padding:2px;" aria-label="Pick brand accent color" />
+                                    <input id="CustomAccentColor" name="CustomAccentColor" type="text" maxlength="7" is="emby-input" autocomplete="off" value="#E50914" placeholder="#E50914" style="max-width:130px;font-family:monospace;" />
+                                </div>
+                                <div class="bfx-accent-presets" id="StreamFlixAccentPresets">
+                                    <button type="button" class="bfx-accent-swatch is-selected" data-accent-preset="#E50914" style="background:#E50914;" title="Netflix Red (#E50914)"></button>
+                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#F59E0B" style="background:#F59E0B;" title="Cinema Gold (#F59E0B)"></button>
+                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#8B5CF6" style="background:#8B5CF6;" title="Royal Purple (#8B5CF6)"></button>
+                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#06B6D4" style="background:#06B6D4;" title="Ocean Cyan (#06B6D4)"></button>
+                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#10B981" style="background:#10B981;" title="Emerald (#10B981)"></button>
+                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#EC4899" style="background:#EC4899;" title="Rose Pink (#EC4899)"></button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:10px;">
@@ -591,6 +619,10 @@
                                     <label class="bfx-lib-chip">
                                         <input type="checkbox" data-nav-builtin="movies" checked />
                                         <span>Movies</span>
+                                    </label>
+                                    <label class="bfx-lib-chip">
+                                        <input type="checkbox" data-nav-builtin="hot" checked />
+                                        <span>New &amp; Popular</span>
                                     </label>
                                     <label class="bfx-lib-chip">
                                         <input type="checkbox" data-nav-builtin="collections" checked />
@@ -1191,8 +1223,11 @@
                         return ApiClient.ajax(options).catch(function (err) {
                             if (err && typeof err.json === 'function') {
                                 return err.json().catch(function () { return {}; }).then(function (data) {
-                                    var e = new Error((data && data.message) || ('Request failed (' + err.status + ')'));
+                                    var baseMsg = (data && data.message) || ('Request failed (' + err.status + ')');
+                                    var errCode = (data && data.errorCode) || '';
+                                    var e = new Error(errCode && baseMsg.indexOf(errCode) === -1 ? (baseMsg + ' (' + errCode + ')') : baseMsg);
                                     e.status = err.status;
+                                    e.errorCode = errCode;
                                     throw e;
                                 });
                             }
@@ -1210,8 +1245,11 @@
                     return window.fetch('/StreamFlix/' + path, fOpts).then(function (res) {
                         if (!res.ok) {
                             return res.json().catch(function () { return {}; }).then(function (d) {
-                                var e2 = new Error((d && d.message) || ('HTTP ' + res.status));
+                                var baseMsg2 = (d && d.message) || ('HTTP ' + res.status);
+                                var errCode2 = (d && d.errorCode) || '';
+                                var e2 = new Error(errCode2 && baseMsg2.indexOf(errCode2) === -1 ? (baseMsg2 + ' (' + errCode2 + ')') : baseMsg2);
                                 e2.status = res.status;
+                                e2.errorCode = errCode2;
                                 throw e2;
                             });
                         }
@@ -2256,10 +2294,11 @@
                     var rows = ((res && res.checks) || []).map(function (c) {
                         var cst = c.status || 'ok';
                         var pillLabel = cst === 'ok' ? 'PASS' : (cst === 'warn' ? 'WARN' : 'ERROR');
+                        var codeBadge = c.code ? '<span class="bfx-hc-code">' + esc(c.code) + '</span>' : '';
                         return ''
                             + '<div class="bfx-oauth-check">'
                             + '  <span class="bfx-oauth-pill ' + esc(cst) + '">' + pillLabel + '</span>'
-                            + '  <div><strong>' + esc(c.label) + ':</strong> ' + esc(c.detail) + '</div>'
+                            + '  <div>' + codeBadge + '<strong>' + esc(c.label) + ':</strong> ' + esc(c.detail) + '</div>'
                             + '</div>';
                     }).join('');
                     outBox.innerHTML = ''
@@ -2384,6 +2423,119 @@
                 ['#GoogleClientId', '#ApprovedGoogleEmails', '#OidcProviderName', '#OidcIssuerUrl', '#OidcClientId', '#ApprovedOidcUsers', '#SeerrUrl', '#SeerrApiKey'].forEach(function (sel) {
                     $(sel).addEventListener('input', onAuthOrStatusChange);
                 });
+                function syncAccentUi(hex) {
+                    var clean = safeHexColor(hex);
+                    $('#CustomAccentColor').value = clean.toUpperCase();
+                    $('#CustomAccentColorPicker').value = clean.length === 4
+                        ? ('#' + clean[1] + clean[1] + clean[2] + clean[2] + clean[3] + clean[3]).toLowerCase()
+                        : clean.toLowerCase();
+                    $('#StreamFlixConfigLogo').style.background = clean;
+                    Array.prototype.forEach.call(page.querySelectorAll('[data-accent-preset]'), function (sw) {
+                        sw.classList.toggle('is-selected', String(sw.getAttribute('data-accent-preset') || '').toLowerCase() === clean.toLowerCase());
+                    });
+                }
+
+                $('#CustomAccentColorPicker').addEventListener('input', function () {
+                    syncAccentUi($('#CustomAccentColorPicker').value);
+                });
+                $('#CustomAccentColor').addEventListener('change', function () {
+                    syncAccentUi($('#CustomAccentColor').value);
+                });
+                $('#StreamFlixAccentPresets').addEventListener('click', function (e) {
+                    var sw = e.target.closest('button[data-accent-preset]');
+                    if (sw) {
+                        syncAccentUi(sw.getAttribute('data-accent-preset'));
+                    }
+                });
+
+                $('#StreamFlixHealthCheckBtn').addEventListener('click', function () {
+                    var btn = $('#StreamFlixHealthCheckBtn');
+                    var panel = $('#StreamFlixHealthCheckPanel');
+                    btn.disabled = true;
+                    btn.textContent = '🩺 Checking…';
+                    panel.classList.remove('hide');
+                    panel.innerHTML = '<div class="bfx-oauth-summary">Running 8-point StreamFlix release health check…</div>';
+                    streamflixApi('GET', 'AdminConfig/HealthCheck').then(function (res) {
+                        btn.disabled = false;
+                        btn.textContent = '🩺 Health Check';
+                        renderDiagnosticOutput(panel, res, 'Health check complete.');
+                    }).catch(function (err) {
+                        btn.disabled = false;
+                        btn.textContent = '🩺 Health Check';
+                        panel.innerHTML = '<div class="bfx-oauth-summary"><span class="bfx-dot bad"></span><span>' + esc((err && err.message) || 'Health check failed.') + '</span></div>';
+                    });
+                });
+
+                $('#StreamFlixExportBackupBtn').addEventListener('click', function () {
+                    var btn = $('#StreamFlixExportBackupBtn');
+                    btn.disabled = true;
+                    streamflixApi('GET', 'AdminConfig/Export').then(function (backup) {
+                        btn.disabled = false;
+                        var jsonStr = JSON.stringify(backup, null, 2);
+                        var blob = new Blob([jsonStr], { type: 'application/json' });
+                        var url = URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        var datePart = new Date().toISOString().slice(0, 10);
+                        a.href = url;
+                        a.download = 'streamflix-backup-' + datePart + '.json';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+                        toast('Exported StreamFlix backup JSON.');
+                    }).catch(function (err) {
+                        btn.disabled = false;
+                        toast((err && err.message) || 'Export failed.');
+                    });
+                });
+
+                $('#StreamFlixImportBackupBtn').addEventListener('click', function () {
+                    $('#StreamFlixImportFileInput').value = '';
+                    $('#StreamFlixImportFileInput').click();
+                });
+                $('#StreamFlixImportFileInput').addEventListener('change', function () {
+                    var file = $('#StreamFlixImportFileInput').files && $('#StreamFlixImportFileInput').files[0];
+                    if (!file) {
+                        return;
+                    }
+                    var reader = new FileReader();
+                    reader.onload = function () {
+                        var parsed = null;
+                        try {
+                            parsed = JSON.parse(String(reader.result || ''));
+                        } catch (eJson) {
+                            toast('Selected file is not valid JSON (SF-REQ-740).');
+                            return;
+                        }
+                        var pCount = (parsed && Array.isArray(parsed.profiles)) ? parsed.profiles.length : 0;
+                        confirmAction(
+                            'Import settings' + (pCount ? (' and ' + pCount + ' profile(s)') : '') + ' from "' + file.name + '"? Existing OAuth/OIDC/Seerr secrets on this server are preserved.',
+                            'Import StreamFlix Backup?',
+                            'Import Backup'
+                        ).then(function (ok) {
+                            if (!ok) {
+                                return;
+                            }
+                            Dashboard.showLoadingMsg();
+                            streamflixApi('POST', 'AdminConfig/Import', parsed).then(function (res) {
+                                Dashboard.hideLoadingMsg();
+                                if (res && res.adminConfig) {
+                                    applyAdminConfig(res.adminConfig);
+                                }
+                                loadProfiles();
+                                if (typeof window.__STREAMFLIX_REFRESH_CONFIG__ === 'function') {
+                                    window.__STREAMFLIX_REFRESH_CONFIG__();
+                                }
+                                toast('Backup imported successfully.');
+                            }).catch(function (err) {
+                                Dashboard.hideLoadingMsg();
+                                toast((err && err.message) || 'Backup import failed.');
+                            });
+                        });
+                    };
+                    reader.readAsText(file);
+                });
+
                 $('#CustomBrandName').addEventListener('input', function () {
                     var val = $('#CustomBrandName').value.trim();
                     $('#StreamFlixConfigLogo').textContent = (val || 'STREAMFLIX').toUpperCase();
@@ -2443,6 +2595,7 @@
                     $('#EnableStreamFlixUi').checked = cfg.enableStreamFlixUi !== false;
                     $('#CustomBrandName').value = cfg.customBrandName || '';
                     $('#StreamFlixConfigLogo').textContent = ((cfg.customBrandName || '').trim() || 'STREAMFLIX').toUpperCase();
+                    syncAccentUi(cfg.customAccentColor || '#E50914');
                     $('#EnableGoogleSignIn').checked = cfg.enableGoogleSignIn !== false;
                     $('#AllowStandardJellyfinLogin').checked = Boolean(cfg.allowStandardJellyfinLogin);
                     $('#AllowAdminFallbackLogin').checked = Boolean(cfg.allowAdminFallbackLogin);
@@ -2562,6 +2715,7 @@
                     var payload = {
                         enableStreamFlixUi: $('#EnableStreamFlixUi').checked,
                         customBrandName: $('#CustomBrandName').value.trim().slice(0, 32),
+                        customAccentColor: safeHexColor($('#CustomAccentColor').value),
                         requireGoogleAuth: true,
                         enableGoogleSignIn: $('#EnableGoogleSignIn').checked,
                         allowStandardJellyfinLogin: $('#AllowStandardJellyfinLogin').checked,

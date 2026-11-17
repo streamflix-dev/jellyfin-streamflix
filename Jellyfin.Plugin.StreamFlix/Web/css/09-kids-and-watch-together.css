@@ -1319,3 +1319,64 @@ body.bfx-tv-mode .bfx-kids-world-chip {
     padding: 0 22px;
     font-size: 16px;
 }
+
+/* ---------- Bedtime Window Lock Screen ---------- */
+.bfx-bedtime-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147482000;
+    background: radial-gradient(circle at 50% 24%, rgba(49, 46, 129, 0.52) 0%, rgba(10, 12, 26, 0.98) 68%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+}
+.bfx-bedtime-card {
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+    background: rgba(20, 22, 42, 0.78);
+    border: 1px solid rgba(165, 180, 252, 0.22);
+    border-radius: 24px;
+    padding: 36px 28px 30px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.75);
+    color: #f8fafc;
+}
+.bfx-bedtime-moon {
+    width: 68px;
+    height: 68px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(129, 140, 248, 0.28), rgba(250, 204, 21, 0.22));
+    border: 1px solid rgba(250, 204, 21, 0.38);
+    color: #fde047;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.bfx-bedtime-moon .bfx-icon {
+    width: 34px;
+    height: 34px;
+}
+.bfx-bedtime-card h2 {
+    margin: 0 0 10px;
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+.bfx-bedtime-card p {
+    margin: 0 0 24px;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: rgba(226, 232, 240, 0.82);
+}
+.bfx-bedtime-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}

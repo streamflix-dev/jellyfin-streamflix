@@ -51,6 +51,7 @@ namespace Jellyfin.Plugin.StreamFlix.Controllers;
 /// </remarks>
 [ApiController]
 [Route("StreamFlix")]
+[StreamFlixErrorEnvelope]
 public partial class StreamFlixController : ControllerBase
 {
     private const int MaxProfilesCount = 24;
@@ -199,6 +200,10 @@ public partial class StreamFlixController : ControllerBase
             config.EnableStreamFlixUi = request.EnableStreamFlixUi;
             var brand = (request.CustomBrandName ?? string.Empty).Trim();
             config.CustomBrandName = brand.Length > 32 ? brand.Substring(0, 32).Trim() : brand;
+            if (!string.IsNullOrWhiteSpace(request.CustomAccentColor))
+            {
+                config.CustomAccentColor = SanitizeHexColor(request.CustomAccentColor);
+            }
 
             // Household sign-in before "Who's watching?" is always enforced for security
             config.RequireGoogleAuth = true;
@@ -256,6 +261,7 @@ public partial class StreamFlixController : ControllerBase
                 {
                     "series",
                     "movies",
+                    "hot",
                     "collections",
                     "top10",
                     "mylist",
@@ -624,6 +630,7 @@ public partial class StreamFlixController : ControllerBase
             serverId = _appHost.SystemId,
             serverName = _appHost.FriendlyName,
             customBrandName = (config.CustomBrandName ?? string.Empty).Trim(),
+            customAccentColor = SanitizeHexColor(config.CustomAccentColor),
             enableStreamFlixUi = config.EnableStreamFlixUi,
             requireGoogleAuth = true,
             enableGoogleSignIn = config.EnableGoogleSignIn,
@@ -679,6 +686,7 @@ public partial class StreamFlixController : ControllerBase
             approvedGoogleAccounts = hasAccess && caller.IsAdmin ? approvedSnapshot : new List<string>(),
             approvedOidcUsers = hasAccess && caller.IsAdmin ? approvedOidcSnapshot : new List<string>(),
             serverUsers,
+            serverLibraries = hasAccess ? JellyfinCompat.GetServerMediaLibraries(_libraryManager) : new List<object>(),
             profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(config, p, caller)).ToList() : new List<object>(),
             showcaseItems = hasAccess && !isGuestPass ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
         };
@@ -697,6 +705,7 @@ public partial class StreamFlixController : ControllerBase
             version = Plugin.VersionString,
             enableStreamFlixUi = config.EnableStreamFlixUi,
             customBrandName = config.CustomBrandName ?? string.Empty,
+            customAccentColor = SanitizeHexColor(config.CustomAccentColor),
             requireGoogleAuth = true,
             enableGoogleSignIn = config.EnableGoogleSignIn,
             allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,

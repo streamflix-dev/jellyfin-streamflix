@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.9.2.5"
+version: "0.9.8.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,4 +18,4 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - Full Paginated Library Browser, Custom Library Nav Bar, Manage Profiles Fix & Mobile OIDC/Admin Reliability: add full catalog browser with server-side sort/filter (alphabetical, date added, release year, rating, runtime, genre, decade/year, watch state, favorites, official rating, studio, A-Z jump) and infinite-scroll pagination plus accurate TotalRecordCount totals (#5); surface user-accessible Jellyfin libraries as top navigation pills with server & per-profile nav customization (#4); fix Manage Profiles overlay auto-closing on lifecycle/config ticks and eliminate HTTP 404s on showcase items without backdrops (#6); sync iOS/Safari Admin sessions in-memory without WKWebView page reloads plus add lockout-proof embedded Plugin Settings fallback; add cookie-free & external-browser OIDC mobile handoff
+  - v0.9.8.0 Release Candidate (Dev Test Channel): Single-request /StreamFlix/Hub/Bootstrap + sessionStorage SWR cache; compile-time JellyfinCompat adapter across 10.9–12.x; per-tab sessionStorage profile isolation + BroadcastChannel sign-out sync; explicit UI phase state machine & non-admin credential restoration after Dashboard visits; canonical SF-xxx-NNN error codes across backend & client; 1-click 8-point Release Health Check + portable JSON backup/restore + Brand Accent Color presets; muted Hero trailer previews, Franchise Collection progress & sort hub, New & Popular upcoming/Seerr view, Notification Bell, per-profile library/Seerr quota permissions & Bedtime Window lock; xUnit + headless JS smoke test suite.
