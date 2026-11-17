@@ -762,7 +762,8 @@ public partial class StreamFlixController
                 config,
                 safeWebBase,
                 request?.LoginHint,
-                request?.PendingProfileId).ConfigureAwait(false);
+                request?.PendingProfileId,
+                request?.DesktopRelay == true).ConfigureAwait(false);
             return Ok(new
             {
                 authorizeUrl = authUrl,
@@ -818,7 +819,8 @@ public partial class StreamFlixController
         PluginConfiguration config,
         string safeWebBase,
         string? loginHint,
-        string? pendingProfileId)
+        string? pendingProfileId,
+        bool desktopRelay = false)
     {
         var callbackUri = BuildAbsoluteOidcCallbackUri();
         var (authUrl, stateId, signedStateCookie, pollSecret) = await StreamFlixOidcService.CreateAuthorizationRedirectAsync(
@@ -827,7 +829,8 @@ public partial class StreamFlixController
             safeWebBase,
             loginHint,
             pendingProfileId,
-            HttpContext.RequestAborted).ConfigureAwait(false);
+            HttpContext.RequestAborted,
+            desktopRelay).ConfigureAwait(false);
 
         // Clean up any legacy root-scoped state cookies (Path=/) and keep at most 2 concurrent per-tab state cookies
         if (Request.Cookies.ContainsKey(StreamFlixOidcService.StateCookieName))
@@ -983,13 +986,13 @@ public partial class StreamFlixController
                 signedHandoff,
                 BuildOidcCookieOptions(TimeSpan.FromSeconds(75)));
 
-            return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: null, stateId: statePayload.StateId));
+            return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: null, stateId: statePayload.StateId, desktopRelay: statePayload.DesktopRelay));
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "StreamFlix: OIDC callback verification failed.");
             StreamFlixOidcService.StoreCompletedFlow(statePayload.StateId, null, ex.Message);
-            return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: ex.Message, stateId: statePayload.StateId));
+            return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: ex.Message, stateId: statePayload.StateId, desktopRelay: statePayload.DesktopRelay));
         }
     }
 
@@ -1256,17 +1259,18 @@ public partial class StreamFlixController
         return trimmed;
     }
 
-    private static string BuildOidcReturnUrl(string safeRelativeWebPath, string? errorMessage, string? stateId = null)
+    private static string BuildOidcReturnUrl(string safeRelativeWebPath, string? errorMessage, string? stateId = null, bool desktopRelay = false)
     {
         var stateSuffix = !string.IsNullOrWhiteSpace(stateId)
             ? $"&sf_state={Uri.EscapeDataString(stateId.Trim())}"
             : string.Empty;
+        var desktopSuffix = desktopRelay ? "&sf_desktop=1" : string.Empty;
         if (string.IsNullOrWhiteSpace(errorMessage))
         {
-            return $"{safeRelativeWebPath}?sf_oidc=1{stateSuffix}#/home";
+            return $"{safeRelativeWebPath}?sf_oidc=1{stateSuffix}{desktopSuffix}#/home";
         }
 
-        return $"{safeRelativeWebPath}?sf_oidc_error={Uri.EscapeDataString(errorMessage.Trim())}{stateSuffix}#/home";
+        return $"{safeRelativeWebPath}?sf_oidc_error={Uri.EscapeDataString(errorMessage.Trim())}{stateSuffix}{desktopSuffix}#/home";
     }
 
     private bool IsEffectiveHttps()

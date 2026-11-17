@@ -308,9 +308,45 @@
         window.location.assign(authUrl);
     }
 
+    function tryCloseCurrentBrowserTab() {
+        try { window.close(); } catch (e1) {}
+        try {
+            var selfWin = window.open('', '_self');
+            if (selfWin) {
+                selfWin.close();
+            }
+        } catch (e2) {}
+        try { window.close(); } catch (e3) {}
+    }
+
+    function completeDesktopBrowserTabClose(whoLabel) {
+        state.desktopRelayTabClosed = true;
+        tryCloseCurrentBrowserTab();
+        setTimeout(tryCloseCurrentBrowserTab, 60);
+
+        var subCopy = whoLabel
+            ? ('Signed in as <strong>' + escapeHtml(whoLabel) + '</strong>. Jellyfin Media Player has been unlocked automatically — you can close this browser tab.')
+            : 'Jellyfin Media Player has been unlocked automatically — you can close this browser tab.';
+        var root = setGateView('desktop-complete', '', ''
+            + '<div class="streamflix-center-stage">'
+            + '  <div class="streamflix-auth-card" style="text-align:center;">'
+            + '    <div class="streamflix-qc-badge streamflix-qc-success" style="margin:0 auto 16px auto;">' + icon('check') + '</div>'
+            + '    <h1 style="font-size:24px;margin-bottom:10px;">Signed in to ' + escapeHtml(getBrandName()) + '</h1>'
+            + '    <p style="margin-bottom:22px;">' + subCopy + '</p>'
+            + '    <button type="button" class="streamflix-btn-primary" id="streamflix-close-relay-tab-btn" style="width:100%;">Close Tab</button>'
+            + '  </div>'
+            + '</div>');
+        var closeBtn = root && root.querySelector('#streamflix-close-relay-tab-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+                tryCloseCurrentBrowserTab();
+            });
+        }
+    }
+
     function verifyGoogleAccessToken(accessToken, desktopRelayStateId) {
         state.verifyingGoogle = true;
-        renderGoogleAuthGate('Verifying your Google account…');
+        renderGoogleAuthGate(desktopRelayStateId ? 'Signing in to Jellyfin Media Player…' : 'Verifying your Google account…');
 
         return apiFetch('/StreamFlix/VerifyGoogle', {
             method: 'POST',
@@ -328,6 +364,12 @@
                 return null;
             }
 
+            if (res.desktopRelayCompleted) {
+                takePendingProfileId();
+                completeDesktopBrowserTabClose(res.email || res.name || '');
+                return res;
+            }
+
             setHouseholdSession({
                 token: res.sessionToken,
                 email: res.email,
@@ -342,10 +384,8 @@
             return fetchPublicConfig().then(function () {
                 renderProfilePickerGate();
                 var pending = pendingId ? findProfileById(pendingId) : null;
-                if (pending && !res.desktopRelayCompleted) {
+                if (pending) {
                     handleSelectProfile(pending);
-                } else if (res.desktopRelayCompleted) {
-                    showToast('Signed in as ' + res.email + ' — you can return to Jellyfin Media Player.', 'success', 6000);
                 } else {
                     showToast('Signed in as ' + res.email, 'success');
                 }
@@ -389,6 +429,7 @@
         var okFlag = param('sf_oidc');
         var errMsg = param('sf_oidc_error');
         var stateId = param('sf_state');
+        var isDesktop = param('sf_desktop') === '1';
         if (!okFlag && !errMsg) {
             return null;
         }
@@ -404,7 +445,8 @@
         return {
             complete: okFlag === '1',
             error: errMsg,
-            stateId: stateId || ''
+            stateId: stateId || '',
+            desktopRelay: isDesktop
         };
     }
 
@@ -532,7 +574,8 @@
             body: JSON.stringify({
                 returnWebBase: window.location.pathname || '/web/',
                 pendingProfileId: pendingProfileId || '',
-                loginHint: loginHint || ''
+                loginHint: loginHint || '',
+                desktopRelay: canOpenExternalSystemBrowser()
             })
         }).then(function (res) {
             if (!res || !res.authorizeUrl) {
@@ -589,6 +632,11 @@
     }
 
     function completeOidcHandoff(oidcCb) {
+        if (oidcCb && oidcCb.desktopRelay && oidcCb.complete && !oidcCb.error) {
+            takePendingProfileId();
+            completeDesktopBrowserTabClose('');
+            return Promise.resolve(null);
+        }
         state.verifyingGoogle = true;
         var providerLabel = getOidcProviderLabel();
         renderGoogleAuthGate('Completing ' + providerLabel + ' sign-in…');

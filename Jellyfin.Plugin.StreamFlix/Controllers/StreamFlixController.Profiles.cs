@@ -1265,6 +1265,7 @@ public partial class StreamFlixController
 
         var sess = caller.Session;
         var sessKind = sess?.AuthKind ?? string.Empty;
+        var isOwnerSso = sess != null && IsVerifiedSsoAdminOwner(config, sess);
 
         if (isAdminUser)
         {
@@ -1281,7 +1282,7 @@ public partial class StreamFlixController
                         return true;
                     }
                 }
-                else if (IsPrimaryClaimedSsoOwner(config, sess!))
+                else if (isOwnerSso)
                 {
                     return true;
                 }
@@ -1293,6 +1294,11 @@ public partial class StreamFlixController
                 message = "Sign in with an administrator account to use this profile.",
             });
             return false;
+        }
+
+        if (isOwnerSso)
+        {
+            return true;
         }
 
         var isLanBypassOnly = sess == null && config.BypassLoginGateOnLan && caller.IsLocalLan;
@@ -1327,7 +1333,7 @@ public partial class StreamFlixController
         var isOpenOidcGate = string.Equals(sessKind, StreamFlixSessionService.AuthKindOidc, StringComparison.Ordinal)
             && !config.OidcRequireAllowlist;
 
-        if (!profile.IsPluginCreatedJellyfinUser || isOpenOidcGate)
+        if (isOpenOidcGate && !profile.IsPluginCreatedJellyfinUser)
         {
             var hasOwnedExplicitLock = !string.IsNullOrWhiteSpace(profile.GoogleAccountEmail)
                 && DoesCallerOwnExplicitLock(config, profile.GoogleAccountEmail, profile.AccountLockKind, caller);
@@ -1337,7 +1343,7 @@ public partial class StreamFlixController
                 errorResult = StatusCode(403, new
                 {
                     code = "profile_protection_required",
-                    message = $"\"{profile.Name}\" is linked to an existing server account and requires a PIN or account lock before non-admin household switching is allowed.",
+                    message = $"\"{profile.Name}\" is linked to an existing server account and requires a PIN or account lock when OIDC allowlist is disabled.",
                 });
                 return false;
             }
@@ -1346,7 +1352,23 @@ public partial class StreamFlixController
         return true;
     }
 
-    private static bool IsPrimaryClaimedSsoOwner(
+    private bool IsVerifiedSsoAdminOwner(
+        PluginConfiguration config,
+        StreamFlixSessionService.SessionInfo session)
+    {
+        var tempCaller = new CallerContext(session, false, false);
+        var adminProfilesWithLock = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Where(p => IsProfileLinkedToAdmin(p) && !string.IsNullOrWhiteSpace(p.GoogleAccountEmail))
+            .ToList();
+        if (adminProfilesWithLock.Count > 0)
+        {
+            return adminProfilesWithLock.Any(p => DoesCallerOwnExplicitLock(config, p.GoogleAccountEmail!, p.AccountLockKind, tempCaller));
+        }
+
+        return IsPrimaryClaimedSsoOwner(config, session);
+    }
+
+    public static bool IsPrimaryClaimedSsoOwner(
         PluginConfiguration config,
         StreamFlixSessionService.SessionInfo session)
     {

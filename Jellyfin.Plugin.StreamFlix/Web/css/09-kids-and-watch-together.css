@@ -1220,10 +1220,12 @@ button.headerSyncButton {
     font-weight: 700;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.22s ease, transform 0.22s ease;
+    visibility: hidden;
+    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
 }
 #bfx-wp-osd-banner.is-visible {
     opacity: 1;
+    visibility: visible;
     transform: translate(-50%, 0);
 }
 
@@ -1385,4 +1387,90 @@ body.bfx-tv-mode .bfx-kids-world-chip {
     justify-content: center;
     gap: 10px;
     flex-wrap: wrap;
+}
+html.bfx-no-flex-gap .bfx-bedtime-actions > * + * {
+    margin-left: 10px;
+}
+
+/* ==========================================================================
+   Legacy WebView / QtWebEngine 5.15 (Chromium 83) Flexbox Gap Fallbacks
+   Activated only when runtime check detects missing flex `gap` support.
+   ========================================================================== */
+html.bfx-no-flex-gap #streamflix-header-profile-btn > * + *,
+html.bfx-no-flex-gap .streamflix-subnav-right > * + *,
+html.bfx-no-flex-gap .streamflix-hero-meta-row > * + *,
+html.bfx-no-flex-gap .streamflix-hero-progress > * + *,
+html.bfx-no-flex-gap .streamflix-hero-play > * + *,
+html.bfx-no-flex-gap .streamflix-hero-secondary > * + *,
+html.bfx-no-flex-gap .streamflix-dd-item > * + *,
+html.bfx-no-flex-gap .streamflix-topbar-actions > * + *,
+html.bfx-no-flex-gap .streamflix-modal-actions > * + *,
+html.bfx-no-flex-gap .streamflix-detail-actions > * + *,
+html.bfx-no-flex-gap .streamflix-modal-hero-actions > * + *,
+html.bfx-no-flex-gap .streamflix-detail-meta > * + *,
+html.bfx-no-flex-gap .streamflix-modal-meta > * + *,
+html.bfx-no-flex-gap .bfx-kids-worlds > * + * {
+    margin-left: 10px;
+}
+html.bfx-no-flex-gap .streamflix-subnav > * + * {
+    margin-left: 14px;
+}
+html.bfx-no-flex-gap #streamflix-surprise-btn > * + *,
+html.bfx-no-flex-gap .streamflix-hero-genres > * + *,
+html.bfx-no-flex-gap .streamflix-hero-dots > * + *,
+html.bfx-no-flex-gap .streamflix-row-title > * + *,
+html.bfx-no-flex-gap .streamflix-wide-actions > * + *,
+html.bfx-no-flex-gap .bfx-dd-tiles > * + *,
+html.bfx-no-flex-gap .streamflix-ghost-btn > * + *,
+html.bfx-no-flex-gap .streamflix-manage-btn > * + *,
+html.bfx-no-flex-gap .streamflix-btn-primary > * + *,
+html.bfx-no-flex-gap .streamflix-btn-danger > * + *,
+html.bfx-no-flex-gap .streamflix-btn-secondary > * + *,
+html.bfx-no-flex-gap .streamflix-modal-tracks-row > * + *,
+html.bfx-no-flex-gap .bfx-kids-world-chip > * + * {
+    margin-left: 8px;
+}
+html.bfx-no-flex-gap .streamflix-FilterPills > * + *,
+html.bfx-no-flex-gap .streamflix-card-quick-btns > * + *,
+html.bfx-no-flex-gap .streamflix-card-meta > * + *,
+html.bfx-no-flex-gap .streamflix-dd-active-name > * + *,
+html.bfx-no-flex-gap .streamflix-profile-meta > * + *,
+html.bfx-no-flex-gap .streamflix-profile-reorder-bar > * + *,
+html.bfx-no-flex-gap .streamflix-modal-track-pill > * + * {
+    margin-left: 6px;
+}
+html.bfx-no-flex-gap .streamflix-hero-brand-row > * + * {
+    margin-left: 9px;
+}
+html.bfx-no-flex-gap .streamflix-hero-rating > * + *,
+html.bfx-no-flex-gap .streamflix-row-link > * + * {
+    margin-left: 5px;
+}
+html.bfx-no-flex-gap .streamflix-hero-actions > * + *,
+html.bfx-no-flex-gap .streamflix-row-header > * + *,
+html.bfx-no-flex-gap .streamflix-carousel-track > * + *,
+html.bfx-no-flex-gap .streamflix-dd-active-header > * + *,
+html.bfx-no-flex-gap .streamflix-google-btn > * + *,
+html.bfx-no-flex-gap .streamflix-oidc-btn > * + *,
+html.bfx-no-flex-gap .streamflix-pin-boxes > * + *,
+html.bfx-no-flex-gap .bfx-notif-row > * + * {
+    margin-left: 12px;
+}
+html.bfx-no-flex-gap .streamflix-episode-row > * + * {
+    margin-left: 16px;
+}
+html.bfx-no-flex-gap .bfx-dd-profiles > * + * {
+    margin-top: 4px;
+}
+html.bfx-no-flex-gap .bfx-dd-tile > * + * {
+    margin-top: 6px;
+}
+html.bfx-no-flex-gap .streamflix-sso-stack > * + * {
+    margin-top: 12px;
+}
+html.bfx-no-flex-gap .streamflix-profiles-grid {
+    margin: -12px;
+}
+html.bfx-no-flex-gap .streamflix-profiles-grid > * {
+    margin: 12px;
 }

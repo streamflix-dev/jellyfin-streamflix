@@ -672,6 +672,9 @@
                     try {
                         sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
                     } catch (ePend) {}
+                    if (profile.isAdmin && state.config && state.config.canShowAdminFallback) {
+                        state.adminLoginExpanded = true;
+                    }
                     clearHouseholdSession();
                     if (state.config) {
                         state.config.hasAccess = false;

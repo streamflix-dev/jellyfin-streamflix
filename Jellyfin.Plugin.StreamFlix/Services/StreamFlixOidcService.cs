@@ -49,7 +49,8 @@ public static class StreamFlixOidcService
         string Nonce,
         string RedirectUri,
         string ReturnWebBase,
-        string PendingProfileId);
+        string PendingProfileId,
+        bool DesktopRelay = false);
 
     public sealed record OidcHandoffPayload(
         string SessionToken,
@@ -185,7 +186,8 @@ public static class StreamFlixOidcService
         string returnWebBase,
         string? loginHint,
         string? pendingProfileId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool desktopRelay = false)
     {
         var doc = await GetDiscoveryAsync(config.OidcIssuerUrl, forceRefresh: false, cancellationToken).ConfigureAwait(false);
         var clientId = (config.OidcClientId ?? string.Empty).Trim();
@@ -209,7 +211,8 @@ public static class StreamFlixOidcService
             Nonce: nonce,
             RedirectUri: callbackUri,
             ReturnWebBase: returnWebBase,
-            PendingProfileId: (pendingProfileId ?? string.Empty).Trim());
+            PendingProfileId: (pendingProfileId ?? string.Empty).Trim(),
+            DesktopRelay: desktopRelay);
 
         RegisterPendingFlow(statePayload, pollSecretHash);
 

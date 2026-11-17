@@ -2179,7 +2179,7 @@
             : (timeLeft || buildCardMetaText(item));
 
         return ''
-            + '<div class="streamflix-wide-card" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml(title) + '">'
+            + '<div class="streamflix-wide-card' + (pct > 0 ? ' has-progress' : '') + '" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml(title) + '">'
             + '  <div class="streamflix-wide-img-wrap">'
             + '    <div class="streamflix-card-fallback">' + escapeHtml(title) + '</div>'
             + '    <img class="streamflix-wide-img" loading="lazy" src="' + escapeHtml(backdropUrl) + '" alt="" data-bfx-img="fade" />'

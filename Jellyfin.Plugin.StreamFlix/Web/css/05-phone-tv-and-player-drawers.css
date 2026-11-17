@@ -104,11 +104,11 @@
         min-height: clamp(370px, 56vh, 480px) !important;
         min-height: clamp(370px, 56svh, 480px) !important;
         margin-bottom: -20px !important;
-        padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 64px) !important;
+        padding-top: var(--bfx-hero-pad-top, 128px) !important;
         padding-bottom: 44px !important;
     }
     .streamflix-subnav.is-search-open + #streamflix-hero-billboard {
-        padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 112px) !important;
+        padding-top: var(--bfx-hero-pad-top, 176px) !important;
     }
     .streamflix-hero-brand-row { margin-bottom: 6px; }
     .streamflix-hero-title {
@@ -394,7 +394,7 @@ body.bfx-tv-mode #streamflix-hero-billboard,
 html.layout-tv #streamflix-hero-billboard {
     min-height: clamp(540px, 72vh, 860px);
     margin-bottom: -84px !important;
-    padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 64px);
+    padding-top: var(--bfx-hero-pad-top, 148px);
     padding-bottom: 132px !important;
 }
 body.bfx-tv-mode .streamflix-hero-title,
@@ -1042,7 +1042,8 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
     right: clamp(16px, 3vw, 48px);
     bottom: clamp(84px, 12vh, 110px);
     z-index: 1;
-    width: min(496px, calc(100vw - 24px));
+    width: 496px;
+    max-width: calc(100vw - 24px);
     max-height: min(420px, 68vh);
     box-sizing: border-box;
     padding: 18px 20px;
@@ -1151,7 +1152,8 @@ html.layout-tv body.streamflix-nf-player .videoOsdBottom .buttons .streamflix-os
     right: clamp(20px, 3.4vw, 52px);
     bottom: clamp(92px, 13vh, 126px);
     z-index: 10012;
-    width: min(432px, calc(100vw - 28px));
+    width: 432px;
+    max-width: calc(100vw - 28px);
     box-sizing: border-box;
     display: flex;
     align-items: center;

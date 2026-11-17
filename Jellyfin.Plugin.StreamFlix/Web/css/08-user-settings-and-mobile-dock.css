@@ -1146,7 +1146,8 @@ body.bfx-settings-route button:focus-visible {
         left: 50%;
         bottom: calc(11px + env(safe-area-inset-bottom, 0px));
         transform: translateX(-50%);
-        width: min(calc(100vw - 44px), 348px);
+        width: calc(100vw - 44px);
+        max-width: 348px;
         height: 58px;
         padding: 4px;
         box-sizing: border-box;
@@ -1372,7 +1373,7 @@ body.bfx-settings-route button:focus-visible {
         display: none !important;
     }
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav.is-search-open + #streamflix-hero-billboard {
-        padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 66px) !important;
+        padding-top: var(--bfx-hero-pad-top, 130px) !important;
     }
 
     /* Bottom clearance so the floating dock never overlaps content rows, settings cards, or toasts */

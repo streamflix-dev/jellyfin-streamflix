@@ -322,6 +322,10 @@ assert.match(css02, /@supports\s+not\s*\(aspect-ratio:\s*1\s*\/\s*1\)/, 'Card as
 assert.match(combinedJs, /function\s+canOpenExternalSystemBrowser\s*\(/, 'JMP external system-browser SSO detection helper must be present');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopBegin/, 'Desktop Google OAuth relay begin endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopPoll/, 'Desktop Google OAuth relay poll endpoint must be wired');
-console.log('[PASS] QtWebEngine CSS fallbacks & JMP external system-browser SSO relay verified');
+assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto-closing desktop SSO browser tab helper must be wired');
+assert.match(combinedJs, /function\s+checkFlexGapSupport\s*\(/, 'Chromium 83 Flexbox gap runtime feature detection must be wired');
+const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'), 'utf8');
+assert.match(css09, /html\.bfx-no-flex-gap\s+\.streamflix-hero-meta-row\s*>\s*\*\s*\+\s*\*/, 'Chromium 83 Flexbox gap fallback rules must be present');
+console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill & auto-closing JMP SSO tab verified');
 
-console.log('ALL STREAMFLIX v0.9.8.5 SMOKE CHECKS PASSED!');
+console.log('ALL STREAMFLIX v0.9.8.6 SMOKE CHECKS PASSED!');

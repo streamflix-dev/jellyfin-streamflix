@@ -167,7 +167,7 @@
         patchJellyfinApiClientMethods();
         fixBrokenJellyfinRoutes();
 
-        if (state.verifyingGoogle || state.activatingProfileId) {
+        if (state.verifyingGoogle || state.activatingProfileId || state.desktopRelayTabClosed) {
             return;
         }
 
@@ -761,6 +761,29 @@
         }
     }
 
+    var flexGapSupportedCached = null;
+
+    function checkFlexGapSupport() {
+        if (flexGapSupportedCached !== null) {
+            return flexGapSupportedCached;
+        }
+        try {
+            if (!document.body) {
+                return true;
+            }
+            var flex = document.createElement('div');
+            flex.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute;top:-9999px;visibility:hidden;pointer-events:none;';
+            flex.appendChild(document.createElement('div'));
+            flex.appendChild(document.createElement('div'));
+            document.body.appendChild(flex);
+            flexGapSupportedCached = flex.scrollHeight === 1;
+            flex.parentNode.removeChild(flex);
+        } catch (e) {
+            flexGapSupportedCached = true;
+        }
+        return flexGapSupportedCached;
+    }
+
     function syncDeviceLayoutClasses() {
         if (!document.body) {
             return;
@@ -769,6 +792,9 @@
         var isPhone = !isTv && detectPhoneEnvironment();
         document.body.classList.toggle('bfx-tv-mode', isTv);
         document.body.classList.toggle('bfx-phone-mode', isPhone);
+        if (document.documentElement) {
+            document.documentElement.classList.toggle('bfx-no-flex-gap', !checkFlexGapSupport());
+        }
     }
 
     function isTvOrDpadActive() {

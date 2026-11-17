@@ -184,10 +184,13 @@ body.bfx-hover-previews .streamflix-top10-card:hover:not(:focus-visible) .stream
 /* ---------- Hero: always leave the first row peeking in ---------- */
 #streamflix-hero-billboard {
     min-height: clamp(440px, 78vh, 900px);
-    padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 48px);
+    padding-top: var(--bfx-hero-pad-top, 148px);
     padding-bottom: clamp(96px, 9vw, 150px);
 }
-.streamflix-hero-title { font-size: clamp(2.2rem, min(5.4vw, 9vh), 5rem); }
+.streamflix-hero-title {
+    font-size: clamp(2.2rem, 5.4vw, 5rem);
+    font-size: clamp(2.2rem, min(5.4vw, 9vh), 5rem);
+}
 .streamflix-hero-logo { max-height: clamp(70px, 18vh, 170px); max-width: min(460px, 70vw); }
 .streamflix-hero-overview {
     display: -webkit-box;
@@ -195,10 +198,10 @@ body.bfx-hover-previews .streamflix-top10-card:hover:not(:focus-visible) .stream
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
-.streamflix-hero-dots { bottom: calc(clamp(96px, 9vw, 150px) + 18px); }
+.streamflix-hero-dots { bottom: clamp(114px, 10.5vw, 168px); }
 @media (max-height: 760px) {
     #streamflix-hero-billboard {
-        padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 24px);
+        padding-top: var(--bfx-hero-pad-top, 132px);
         padding-bottom: clamp(84px, 8vw, 120px);
     }
     .streamflix-hero-brand-row { margin-bottom: 10px; }
@@ -211,7 +214,7 @@ body.bfx-hover-previews .streamflix-top10-card:hover:not(:focus-visible) .stream
     .streamflix-hero-play,
     .streamflix-hero-secondary { height: 44px; }
     .streamflix-hero-icon-btn { width: 44px; height: 44px; }
-    .streamflix-hero-dots { bottom: calc(clamp(84px, 8vw, 120px) + 16px); }
+    .streamflix-hero-dots { bottom: clamp(100px, 9.5vw, 136px); }
 }
 @media (max-height: 480px) {
     .streamflix-hero-overview { display: none; }
@@ -219,7 +222,7 @@ body.bfx-hover-previews .streamflix-top10-card:hover:not(:focus-visible) .stream
 @media (max-width: 860px) {
     #streamflix-hero-billboard {
         min-height: clamp(460px, 74vh, 760px);
-        padding-top: calc(max(var(--bfx-bleed, 0px), var(--bfx-header-h)) + 120px);
+        padding-top: var(--bfx-hero-pad-top, 176px);
     }
 }
 
@@ -234,6 +237,7 @@ body.bfx-hover-previews .streamflix-top10-card:hover:not(:focus-visible) .stream
 body.streamflix-nf-player .videoOsdBottom {
     background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.45) 38%, rgba(0, 0, 0, 0.88) 100%) !important;
     padding-top: clamp(80px, 16vh, 160px) !important;
+    padding-bottom: clamp(10px, 2.2vh, 24px) !important;
     padding-bottom: max(clamp(10px, 2.2vh, 24px), env(safe-area-inset-bottom)) !important;
 }
 body.streamflix-nf-player .videoOsdBottom .osdControls { padding: 0 clamp(16px, 3vw, 48px) !important; }
@@ -421,9 +425,10 @@ body.streamflix-nf-player .videoOsdBottom .osdVolumeSlider::-moz-range-thumb { b
     color: #fff;
     pointer-events: none;
     opacity: 0;
+    visibility: hidden;
 }
 #streamflix-osd-flash .bfx-icon { width: 42px; height: 42px; }
-#streamflix-osd-flash.is-on { animation: bfxOsdFlash 0.7s ease-out both; }
+#streamflix-osd-flash.is-on { visibility: visible; animation: bfxOsdFlash 0.7s ease-out both; }
 @keyframes bfxOsdFlash {
     0% { opacity: 0; transform: scale(0.7); }
     18% { opacity: 1; transform: scale(1); }

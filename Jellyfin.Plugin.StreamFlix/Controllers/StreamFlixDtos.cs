@@ -87,6 +87,8 @@ public class BeginOidcRequest
     public string? PendingProfileId { get; set; }
 
     public string? LoginHint { get; set; }
+
+    public bool DesktopRelay { get; set; }
 }
 
 public class CompleteOidcRequest

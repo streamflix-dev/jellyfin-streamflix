@@ -148,4 +148,30 @@ public class StreamFlixCoreTests
         var ip = System.Net.IPAddress.Parse(ipStr);
         Assert.Equal(expected, StreamFlixSessionService.IsPrivateOrLoopbackIp(ip, allowTailscale));
     }
+
+    [Fact]
+    public void IsPrimaryClaimedSsoOwner_DistinguishesPrimaryOwnerFromSecondaryHouseholdViewer()
+    {
+        var cfg = new PluginConfiguration
+        {
+            SessionSigningKey = Convert.ToBase64String(new byte[32] { 9, 8, 7, 6, 5, 4, 3, 2, 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32 }),
+            ApprovedGoogleAccounts = new List<string> { "owner@example.com", "viewer@example.com" },
+            OidcRequireAllowlist = true,
+            ApprovedOidcUsers = new List<string> { "oidc-owner@example.com", "oidc-member" },
+        };
+
+        var ownerGoogle = StreamFlixSessionService.Issue(cfg, "owner@example.com", out _);
+        var memberGoogle = StreamFlixSessionService.Issue(cfg, "viewer@example.com", out _);
+        Assert.True(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, ownerGoogle));
+        Assert.False(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, memberGoogle));
+
+        var ownerOidc = new StreamFlixSessionService.SessionInfo("oidc-owner@example.com", DateTimeOffset.UtcNow.AddDays(1), StreamFlixSessionService.AuthKindOidc, JellyfinUserId: "sub-1", Username: "owner_u");
+        var memberOidc = new StreamFlixSessionService.SessionInfo(string.Empty, DateTimeOffset.UtcNow.AddDays(1), StreamFlixSessionService.AuthKindOidc, JellyfinUserId: "sub-2", Username: "oidc-member");
+        Assert.True(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, ownerOidc));
+        Assert.False(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, memberOidc));
+
+        // Open OIDC (no allowlist) must never auto-claim primary owner admin status
+        cfg.OidcRequireAllowlist = false;
+        Assert.False(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, ownerOidc));
+    }
 }
