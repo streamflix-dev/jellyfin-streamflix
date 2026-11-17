@@ -698,12 +698,15 @@
     function fetchFullItemDetails(itemId) {
         var auth = getJellyfinAuthContext();
         var uid = auth && auth.userId ? encodeURIComponent(auth.userId) : '';
-        // Only pass valid Jellyfin C# ItemFields enum names (SeriesId and SeasonId are returned by default on BaseItemDto and are NOT valid ItemFields enum values)
+        // Only pass valid Jellyfin C# ItemFields enum names (SeriesId, SeasonId, and CanDownload are returned by default on BaseItemDto)
         var fields = 'Overview,Genres,MediaSources,MediaStreams,People,ExternalUrls,Studios,Taglines,ParentId,Chapters';
         if (uid) {
-            return apiFetch('/Users/' + uid + '/Items/' + encodeURIComponent(itemId) + '?Fields=' + fields)
+            return apiFetch('/Items/' + encodeURIComponent(itemId) + '?userId=' + uid + '&Fields=' + fields)
                 .catch(function () {
-                    return apiFetch('/Items/' + encodeURIComponent(itemId) + '?userId=' + uid + '&Fields=' + fields);
+                    return apiFetch('/Users/' + uid + '/Items/' + encodeURIComponent(itemId) + '?Fields=' + fields);
+                })
+                .catch(function () {
+                    return apiFetch('/Items/' + encodeURIComponent(itemId) + '?userId=' + uid);
                 })
                 .catch(function () {
                     return apiFetch('/Users/' + uid + '/Items/' + encodeURIComponent(itemId));
@@ -730,32 +733,23 @@
         fetchFullItemDetails(itemId).then(function (fullItem) {
             if (fullItem && fullItem.Id) {
                 openHeroDetailModal(fullItem, options);
+            } else {
+                var sid = resolveKnownServerId();
+                window.location.hash = '#/details?id=' + encodeURIComponent(itemId) + (sid ? '&serverId=' + encodeURIComponent(sid) : '');
             }
-        }).catch(function () {});
+        }).catch(function () {
+            var sid = resolveKnownServerId();
+            window.location.hash = '#/details?id=' + encodeURIComponent(itemId) + (sid ? '&serverId=' + encodeURIComponent(sid) : '');
+        });
     }
 
     function fetchUserItems(uid, queryString) {
         var hasFilters = queryString.indexOf('Filters=') !== -1;
         return apiFetch('/Items?userId=' + uid + '&' + queryString).then(function (res) {
-            if (res && Array.isArray(res.Items) && res.Items.length > 0) {
+            if (res && Array.isArray(res.Items)) {
                 return res;
             }
-            return apiFetch('/Users/' + uid + '/Items?' + queryString).then(function (res2) {
-                if (res2 && Array.isArray(res2.Items) && res2.Items.length > 0) {
-                    return res2;
-                }
-                if (hasFilters) {
-                    return res2 || res || { Items: [] };
-                }
-                return apiFetch('/Items?' + queryString).catch(function () {
-                    return res2 || res || { Items: [] };
-                });
-            }).catch(function () {
-                if (hasFilters) {
-                    return res || { Items: [] };
-                }
-                return apiFetch('/Items?' + queryString);
-            });
+            return apiFetch('/Users/' + uid + '/Items?' + queryString);
         }).catch(function () {
             return apiFetch('/Users/' + uid + '/Items?' + queryString);
         }).catch(function () {
@@ -781,19 +775,10 @@
 
     function fetchUserViews(uid) {
         return apiFetch('/UserViews?userId=' + uid).then(function (res) {
-            if (res && Array.isArray(res.Items) && res.Items.length > 0) {
+            if (res && Array.isArray(res.Items)) {
                 return res;
             }
-            return apiFetch('/Users/' + uid + '/Views').then(function (res2) {
-                if (res2 && Array.isArray(res2.Items) && res2.Items.length > 0) {
-                    return res2;
-                }
-                return apiFetch('/UserViews').catch(function () {
-                    return res2 || res || { Items: [] };
-                });
-            }).catch(function () {
-                return apiFetch('/UserViews');
-            });
+            return apiFetch('/Users/' + uid + '/Views');
         }).catch(function () {
             return apiFetch('/Users/' + uid + '/Views');
         }).catch(function () {
@@ -1225,16 +1210,87 @@
         }
         renderCinemaHubContents();
         enhanceLibraryListPages();
-        loadPersonalRows(false);
+        setTimeout(function () {
+            if (normalizeGuid(getJellyfinAuthContext().userId) === normalizeGuid(userIdForCache || '')) {
+                loadPersonalRows(false);
+            }
+        }, 1200);
         if (typeof refreshNotificationsSilently === 'function') {
             refreshNotificationsSilently();
         }
+    }
+
+    var HUB_SWR_KEY_PREFIX = 'streamflix_hub_swr_v2_';
+
+    function tryHydrateHubFromSessionSwr(userId) {
+        if (!userId || state.hubData.loaded) {
+            return false;
+        }
+        try {
+            var raw = sessionStorage.getItem(HUB_SWR_KEY_PREFIX + normalizeGuid(userId));
+            if (!raw) {
+                return false;
+            }
+            var snap = JSON.parse(raw);
+            if (!snap || typeof snap !== 'object' || Date.now() - (Number(snap.ts) || 0) > 30 * 60 * 1000) {
+                return false;
+            }
+            state.hubData.userId = userId;
+            state.hubData.rawHeroItems = Array.isArray(snap.rawHeroItems) ? snap.rawHeroItems : [];
+            state.hubData.resumeItems = Array.isArray(snap.resumeItems) ? snap.resumeItems : [];
+            state.hubData.nextUpItems = Array.isArray(snap.nextUpItems) ? snap.nextUpItems : [];
+            state.hubData.favoriteItems = Array.isArray(snap.favoriteItems) ? snap.favoriteItems : [];
+            state.hubData.allMovies = Array.isArray(snap.allMovies) ? snap.allMovies : [];
+            state.hubData.allSeries = Array.isArray(snap.allSeries) ? snap.allSeries : [];
+            state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
+            state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
+            state.hubData.collectionsItems = Array.isArray(snap.collectionsItems) ? snap.collectionsItems : [];
+            state.hubData.totalMoviesCount = Number(snap.totalMoviesCount) || state.hubData.allMovies.length;
+            state.hubData.totalSeriesCount = Number(snap.totalSeriesCount) || state.hubData.allSeries.length;
+            state.hubData.totalCollectionsCount = Number(snap.totalCollectionsCount) || state.hubData.collectionsItems.length;
+            state.hubData.views = Array.isArray(snap.views) ? snap.views : [];
+            state.hubData.popularScores = (snap.popularScores && typeof snap.popularScores === 'object') ? snap.popularScores : {};
+            recomputeHubDerivedLists();
+            state.hubData.loaded = true;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function saveHubToSessionSwr(userId) {
+        if (!userId) {
+            return;
+        }
+        try {
+            var d = state.hubData;
+            sessionStorage.setItem(HUB_SWR_KEY_PREFIX + normalizeGuid(userId), JSON.stringify({
+                ts: Date.now(),
+                rawHeroItems: (d.rawHeroItems || []).slice(0, 15),
+                resumeItems: (d.resumeItems || []).slice(0, 12),
+                nextUpItems: (d.nextUpItems || []).slice(0, 12),
+                favoriteItems: (d.favoriteItems || []).slice(0, 24),
+                allMovies: (d.allMovies || []).slice(0, 48),
+                allSeries: (d.allSeries || []).slice(0, 48),
+                collectionsItems: (d.collectionsItems || []).slice(0, 36),
+                totalMoviesCount: d.totalMoviesCount || 0,
+                totalSeriesCount: d.totalSeriesCount || 0,
+                totalCollectionsCount: d.totalCollectionsCount || 0,
+                views: (d.views || []).slice(0, 24),
+                popularScores: d.popularScores || {}
+            }));
+        } catch (e) {}
     }
 
     function loadCinemaHubData(silentRefresh) {
         var auth = getJellyfinAuthContext();
         if (!auth.userId || !auth.token) {
             return;
+        }
+
+        var hadSwr = tryHydrateHubFromSessionSwr(auth.userId);
+        if (hadSwr && !silentRefresh) {
+            renderCinemaHubContents();
         }
 
         var reqSeq = (state.hubLoadSeq = (state.hubLoadSeq || 0) + 1);
@@ -1265,45 +1321,63 @@
             if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
                 return;
             }
-            loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh);
+            loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh, hadSwr);
         });
     }
 
-    function loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh) {
+    function loadCinemaHubDataClassicFallback(auth, reqSeq, silentRefresh, hadSwr) {
         var uid = encodeURIComponent(auth.userId);
         // Only pass valid C# ItemFields enum names
         var fields = 'Overview,Genres,PrimaryImageAspectRatio,DateCreated';
+        var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (arr) { return arr || []; };
 
+        // Stage 1: Fast above-the-fold queries (Hero, Continue Watching, Next Up, Navigation Views) so initial paint never waits on full library scans
         var pHero = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=15&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
         var pResume = fetchResumeItems(uid, fields);
         var pNextUp = apiFetch('/Shows/NextUp?userId=' + uid + '&Limit=12&Fields=' + fields).catch(function () { return { Items: [] }; });
-        var pTop10 = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=15&SortBy=CommunityRating,DateCreated&SortOrder=Descending&Fields=' + fields);
-        var pFavs = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series,Episode,BoxSet&Recursive=true&Filters=IsFavorite&Limit=48&Fields=' + fields);
-        var pMovies = fetchUserItems(uid, 'IncludeItemTypes=Movie&Recursive=true&Limit=120&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
-        var pSeries = fetchUserItems(uid, 'IncludeItemTypes=Series&Recursive=true&Limit=120&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields + ',ChildCount');
-        var pCollections = fetchUserItems(uid, 'IncludeItemTypes=BoxSet&Recursive=true&Limit=100&SortBy=SortName&SortOrder=Ascending&Fields=' + fields);
         var pViews = fetchUserViews(uid);
-        var pPopular = apiFetch('/StreamFlix/PopularScores').catch(function () { return { scores: {} }; });
 
-        Promise.all([pHero, pResume, pNextUp, pTop10, pFavs, pMovies, pSeries, pCollections, pViews, pPopular]).then(function (results) {
+        Promise.all([pHero, pResume, pNextUp, pViews]).then(function (stage1) {
             if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
                 return null;
             }
-            var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (arr) { return arr || []; };
+            state.hubData.rawHeroItems = kFilter((stage1[0] && stage1[0].Items) || []);
+            state.hubData.resumeItems = kFilter((stage1[1] && stage1[1].Items) || []);
+            state.hubData.nextUpItems = kFilter((stage1[2] && stage1[2].Items) || []);
+            state.hubData.views = (stage1[3] && stage1[3].Items) || [];
+            if (!state.hubData.rawTop10Items || !state.hubData.rawTop10Items.length) {
+                state.hubData.rawTop10Items = state.hubData.rawHeroItems.slice(0, 10);
+            }
+
+            if (!hadSwr && !silentRefresh && (state.hubData.rawHeroItems.length || state.hubData.resumeItems.length || state.hubData.views.length)) {
+                recomputeHubDerivedLists();
+                state.hubData.loaded = true;
+                state.heroIndex = 0;
+                renderCinemaHubContents();
+            }
+
+            // Stage 2: Full catalog rows & non-blocking SWR popularity scores
+            var pFavs = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series,Episode,BoxSet&Recursive=true&Filters=IsFavorite&Limit=48&Fields=' + fields);
+            var pMovies = fetchUserItems(uid, 'IncludeItemTypes=Movie&Recursive=true&Limit=96&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
+            var pSeries = fetchUserItems(uid, 'IncludeItemTypes=Series&Recursive=true&Limit=96&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields + ',ChildCount');
+            var pCollections = fetchUserItems(uid, 'IncludeItemTypes=BoxSet&Recursive=true&Limit=72&SortBy=SortName&SortOrder=Ascending&Fields=' + fields);
+            var pPopular = apiFetch('/StreamFlix/PopularScores').catch(function () { return { scores: {} }; });
+
+            return Promise.all([pFavs, pMovies, pSeries, pCollections, pPopular]);
+        }).then(function (results) {
+            if (!results || state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return null;
+            }
             var kidsActive = typeof isKidsProfileActive === 'function' && isKidsProfileActive();
-            state.hubData.rawHeroItems = kFilter((results[0] && results[0].Items) || []);
-            state.hubData.resumeItems = kFilter((results[1] && results[1].Items) || []);
-            state.hubData.nextUpItems = kFilter((results[2] && results[2].Items) || []);
-            state.hubData.rawTop10Items = kFilter((results[3] && results[3].Items) || []);
-            state.hubData.favoriteItems = kFilter((results[4] && results[4].Items) || []);
-            state.hubData.allMovies = kFilter((results[5] && results[5].Items) || []);
-            state.hubData.allSeries = kFilter((results[6] && results[6].Items) || []);
+            state.hubData.favoriteItems = kFilter((results[0] && results[0].Items) || []);
+            state.hubData.allMovies = kFilter((results[1] && results[1].Items) || []);
+            state.hubData.allSeries = kFilter((results[2] && results[2].Items) || []);
             state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
             state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
-            state.hubData.collectionsItems = kFilter((results[7] && results[7].Items) || []);
-            var rawMoviesTotal = Number(results[5] && results[5].TotalRecordCount) || 0;
-            var rawSeriesTotal = Number(results[6] && results[6].TotalRecordCount) || 0;
-            var rawCollectionsTotal = Number(results[7] && results[7].TotalRecordCount) || 0;
+            state.hubData.collectionsItems = kFilter((results[3] && results[3].Items) || []);
+            var rawMoviesTotal = Number(results[1] && results[1].TotalRecordCount) || 0;
+            var rawSeriesTotal = Number(results[2] && results[2].TotalRecordCount) || 0;
+            var rawCollectionsTotal = Number(results[3] && results[3].TotalRecordCount) || 0;
             state.hubData.totalMoviesCount = kidsActive
                 ? state.hubData.allMovies.length
                 : Math.max(rawMoviesTotal, state.hubData.allMovies.length);
@@ -1313,8 +1387,7 @@
             state.hubData.totalCollectionsCount = kidsActive
                 ? state.hubData.collectionsItems.length
                 : Math.max(rawCollectionsTotal, state.hubData.collectionsItems.length);
-            state.hubData.views = (results[8] && results[8].Items) || [];
-            state.hubData.popularScores = (results[9] && results[9].scores) || {};
+            state.hubData.popularScores = (results[4] && results[4].scores) || {};
             state.hubData.filteredHeroPool = [];
 
             var extraPromises = [];
@@ -1336,30 +1409,32 @@
                 );
             }
 
-            // Also query any Collections/BoxSets library view by ParentId if present
-            var boxsetViews = state.hubData.views.filter(function (v) {
-                var ct = (v && v.CollectionType || '').toLowerCase();
-                var nm = (v && v.Name || '').toLowerCase();
-                return ct === 'boxsets' || nm.indexOf('collection') !== -1;
-            });
-            boxsetViews.forEach(function (bv) {
-                extraPromises.push(
-                    fetchUserItems(uid, 'ParentId=' + encodeURIComponent(bv.Id) + '&Recursive=true&Limit=100&SortBy=SortName&SortOrder=Ascending&Fields=' + fields)
-                        .then(function (bRes) {
-                            var seenCol = {};
-                            state.hubData.collectionsItems.forEach(function (c) {
-                                if (c && c.Id) { seenCol[normalizeGuid(c.Id)] = true; }
-                            });
-                            ((bRes && bRes.Items) || []).forEach(function (it) {
-                                if (it && it.Id && !seenCol[normalizeGuid(it.Id)] && it.Type !== 'Episode' && it.Type !== 'Season') {
-                                    seenCol[normalizeGuid(it.Id)] = true;
-                                    state.hubData.collectionsItems.push(it);
-                                }
-                            });
-                        })
-                        .catch(function () {})
-                );
-            });
+            // Only query Collections/BoxSets library views by ParentId when top-level BoxSet query returned nothing
+            if (state.hubData.collectionsItems.length === 0) {
+                var boxsetViews = state.hubData.views.filter(function (v) {
+                    var ct = (v && v.CollectionType || '').toLowerCase();
+                    var nm = (v && v.Name || '').toLowerCase();
+                    return ct === 'boxsets' || nm.indexOf('collection') !== -1;
+                });
+                boxsetViews.forEach(function (bv) {
+                    extraPromises.push(
+                        fetchUserItems(uid, 'ParentId=' + encodeURIComponent(bv.Id) + '&Recursive=true&Limit=72&SortBy=SortName&SortOrder=Ascending&Fields=' + fields)
+                            .then(function (bRes) {
+                                var seenCol = {};
+                                state.hubData.collectionsItems.forEach(function (c) {
+                                    if (c && c.Id) { seenCol[normalizeGuid(c.Id)] = true; }
+                                });
+                                ((bRes && bRes.Items) || []).forEach(function (it) {
+                                    if (it && it.Id && !seenCol[normalizeGuid(it.Id)] && it.Type !== 'Episode' && it.Type !== 'Season') {
+                                        seenCol[normalizeGuid(it.Id)] = true;
+                                        state.hubData.collectionsItems.push(it);
+                                    }
+                                });
+                            })
+                            .catch(function () {})
+                    );
+                });
+            }
 
             // Fallback: if top-level Recursive queries returned no movies/series but the user has library views, query each view by ParentId
             if (state.hubData.allMovies.length === 0 && state.hubData.allSeries.length === 0 && state.hubData.views.length > 0) {
@@ -1407,15 +1482,13 @@
             recomputeHubDerivedLists();
             state.hubData.loading = false;
             state.hubData.loaded = true;
+            saveHubToSessionSwr(auth.userId);
             try {
                 var wallCache = getShowcaseItemsForWall().slice(0, 36);
                 if (wallCache.length > 0) {
                     saveJson(SHOWCASE_ITEMS_KEY, wallCache);
                 }
             } catch (eWall) {}
-            if (!silentRefresh) {
-                state.heroIndex = 0;
-            }
             if (state.searchQuery) {
                 var freshLocalHits = matchHubItemsLocally(state.searchQuery);
                 if (freshLocalHits.length > 0) {
@@ -1424,7 +1497,11 @@
             }
             renderCinemaHubContents();
             enhanceLibraryListPages();
-            loadPersonalRows(false);
+            setTimeout(function () {
+                if (normalizeGuid(getJellyfinAuthContext().userId) === normalizeGuid(auth.userId)) {
+                    loadPersonalRows(false);
+                }
+            }, 1200);
         }).catch(function () {
             if (state.hubLoadSeq === reqSeq) {
                 state.hubData.loading = false;

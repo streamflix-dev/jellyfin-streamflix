@@ -133,4 +133,19 @@ public class StreamFlixCoreTests
         Assert.False(newUser.Permissions.Find(p => p.Kind == "EnableContentDownloading")!.Value);
         Assert.False(newUser.Permissions.Find(p => p.Kind == "EnableRemoteAccess")!.Value);
     }
+
+    [Theory]
+    [InlineData("100.64.0.1", true, true)]
+    [InlineData("100.101.202.42", true, true)]
+    [InlineData("100.127.255.254", true, true)]
+    [InlineData("100.101.202.42", false, false)]
+    [InlineData("100.63.255.255", true, false)]
+    [InlineData("100.128.0.1", true, false)]
+    [InlineData("192.168.1.50", false, true)]
+    [InlineData("8.8.8.8", true, false)]
+    public void SessionService_IsPrivateOrLoopbackIp_HandlesTailscaleCgnatCorrectly(string ipStr, bool allowTailscale, bool expected)
+    {
+        var ip = System.Net.IPAddress.Parse(ipStr);
+        Assert.Equal(expected, StreamFlixSessionService.IsPrivateOrLoopbackIp(ip, allowTailscale));
+    }
 }

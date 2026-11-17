@@ -256,7 +256,7 @@
         if (isMyWatchPartyHostProfile(r)) {
             return true;
         }
-        return Boolean(!isGuestPassSession() && (isHouseholdAdmin() || (state.activeProfile && state.activeProfile.isAdmin)));
+        return Boolean(!isGuestPassSession() && isProfileManagementAdmin());
     }
 
     function canDeleteWatchPartyRoom(room) {
@@ -267,7 +267,7 @@
         if (r.hostParticipantId && r.hostParticipantId === getMyWatchPartyParticipantId()) {
             return true;
         }
-        if (!isGuestPassSession() && (isHouseholdAdmin() || (state.activeProfile && state.activeProfile.isAdmin))) {
+        if (!isGuestPassSession() && isProfileManagementAdmin()) {
             return true;
         }
         if (isMyWatchPartyHostProfile(r)) {

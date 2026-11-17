@@ -32,6 +32,7 @@
         var isFav = item.UserData && item.UserData.IsFavorite;
         var isPlayed = item.UserData && item.UserData.Played;
         var canManageMedia = typeof canManageMediaItems === 'function' && canManageMediaItems();
+        var showModalDownload = typeof canUserDownloadItem === 'function' && canUserDownloadItem(item);
         var hasResume = item.UserData && item.UserData.PlaybackPositionTicks && item.UserData.PlaybackPositionTicks > 0;
         var resumePct = hasResume && item.RunTimeTicks
             ? Math.min(100, Math.max(2, Math.round(item.UserData.PlaybackPositionTicks / item.RunTimeTicks * 100)))
@@ -114,6 +115,7 @@
             + ((typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
                 ? '          <button type="button" class="streamflix-hero-icon-btn' + ((typeof watchPartyState !== 'undefined' && watchPartyState.activeGroup) ? ' active is-live' : '') + '" id="streamflix-modal-watchparty-btn" title="Watch Together" aria-label="Watch Together">' + icon('party') + '</button>'
                 : '')
+            + '          <button type="button" class="streamflix-hero-icon-btn" id="streamflix-modal-download-btn" title="Download" aria-label="Download"' + (showModalDownload ? '' : ' style="display:none;"') + '>' + icon('download') + '</button>'
             + (canManageMedia
                 ? '          <button type="button" class="streamflix-hero-icon-btn" id="streamflix-modal-manage-btn" title="Manage media" aria-label="Manage media">' + icon('edit') + '</button>'
                 : '')
@@ -257,6 +259,16 @@
             });
         }
 
+        var downloadModalBtn = qModal('#streamflix-modal-download-btn');
+        if (downloadModalBtn) {
+            downloadModalBtn.addEventListener('click', function () {
+                var targetDl = resolvedItem || item;
+                if (typeof triggerDirectMediaDownload === 'function' && targetDl && targetDl.Id) {
+                    triggerDirectMediaDownload(targetDl);
+                }
+            });
+        }
+
         var manageMediaBtn = qModal('#streamflix-modal-manage-btn');
         if (manageMediaBtn) {
             manageMediaBtn.addEventListener('click', function () {
@@ -391,6 +403,10 @@
                 return;
             }
             resolvedItem = fullItem;
+            var dlBtn = qModal('#streamflix-modal-download-btn');
+            if (dlBtn && typeof canUserDownloadItem === 'function') {
+                dlBtn.style.display = canUserDownloadItem(fullItem) ? '' : 'none';
+            }
             var betterBg = safeCssUrl(getItemBackdropUrl(fullItem, 1600));
             var heroBanner = qModal('#streamflix-modal-hero-banner');
             if (heroBanner && betterBg) {
@@ -698,6 +714,7 @@
                                 var pct = (ep.UserData && ep.UserData.PlayedPercentage) ? Math.round(ep.UserData.PlayedPercentage) : 0;
                                 var isCurrentEp = (item.Type === 'Episode' && normalizeGuid(ep.Id) === normalizeGuid(item.Id))
                                     || (firstPlayableTarget && normalizeGuid(ep.Id) === normalizeGuid(firstPlayableTarget.Id));
+                                var canDlEp = typeof canUserDownloadItem === 'function' && canUserDownloadItem(ep);
                                 return ''
                                     + '<div class="streamflix-episode-row" tabindex="0" role="button" data-ep-id="' + escapeHtml(ep.Id) + '" style="' + (isCurrentEp ? 'background:rgba(229,9,20,0.14);border-left:3px solid #E50914;' : '') + '">'
                                     + '  <div class="streamflix-ep-index">' + (ep.IndexNumber || (idx + 1)) + '</div>'
@@ -714,6 +731,9 @@
                                     + escapeHtml(ep.Overview || '')
                                     + '    </div>'
                                     + '  </div>'
+                                    + (canDlEp
+                                        ? '  <button type="button" class="streamflix-ep-download-btn" data-ep-download-id="' + escapeHtml(ep.Id) + '" title="Download Episode" aria-label="Download Episode">' + icon('download') + '</button>'
+                                        : '')
                                     + '</div>';
                             }).join('');
 
@@ -733,6 +753,23 @@
                                     renderSeasonEpisodes();
                                 });
                             }
+
+                            Array.prototype.forEach.call(epContainer.querySelectorAll('[data-ep-download-id]'), function (dlBtn) {
+                                dlBtn.addEventListener('click', function (ev) {
+                                    ev.preventDefault();
+                                    ev.stopPropagation();
+                                    var epId = dlBtn.getAttribute('data-ep-download-id');
+                                    var epObj = epMap[epId] || epId;
+                                    if (typeof triggerDirectMediaDownload === 'function') {
+                                        triggerDirectMediaDownload(epObj);
+                                    }
+                                });
+                                dlBtn.addEventListener('keydown', function (ev) {
+                                    if (ev.key === 'Enter' || ev.key === ' ') {
+                                        ev.stopPropagation();
+                                    }
+                                });
+                            });
 
                             Array.prototype.forEach.call(epContainer.querySelectorAll('[data-ep-id]'), function (row) {
                                 var triggerEp = function () {

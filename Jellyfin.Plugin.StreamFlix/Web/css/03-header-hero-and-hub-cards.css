@@ -1,9 +1,9 @@
 /* StreamFlix Styles (03/08) — Frosted Header, Account Menu, Hero Billboard & Hub Cards */
 /* ---------- Header: transparent over the hero, frosted glass on scroll ---------- */
-.skinHeader,
-.appHeader,
-header.MuiAppBar-root,
-.skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred {
+body.bfx-active .skinHeader,
+body.bfx-active .appHeader,
+body.bfx-active header.MuiAppBar-root,
+body.bfx-active .skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred {
     min-height: 54px !important;
     background: linear-gradient(180deg, rgba(10, 10, 12, 0.78) 0%, rgba(10, 10, 12, 0.35) 60%, rgba(10, 10, 12, 0) 100%) !important;
     backdrop-filter: none !important;
@@ -11,16 +11,16 @@ header.MuiAppBar-root,
     transition: background-color 0.35s var(--bfx-ease), box-shadow 0.35s ease !important;
     border-bottom: 0 !important;
 }
-.skinHeader .headerTop {
+body.bfx-active .skinHeader .headerTop {
     min-height: 54px !important;
     box-sizing: border-box !important;
 }
-body.streamflix-scrolled .skinHeader,
-body.streamflix-scrolled .appHeader,
-body.streamflix-scrolled header.MuiAppBar-root,
-body.streamflix-scrolled .skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred,
-body:not(.streamflix-on-home) .skinHeader,
-body:not(.streamflix-on-home) header.MuiAppBar-root {
+body.bfx-active.streamflix-scrolled .skinHeader,
+body.bfx-active.streamflix-scrolled .appHeader,
+body.bfx-active.streamflix-scrolled header.MuiAppBar-root,
+body.bfx-active.streamflix-scrolled .skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred,
+body.bfx-active:not(.streamflix-on-home) .skinHeader,
+body.bfx-active:not(.streamflix-on-home) header.MuiAppBar-root {
     background: rgba(14, 14, 17, 0.72) !important;
     backdrop-filter: blur(22px) saturate(160%) !important;
     -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
@@ -28,17 +28,17 @@ body:not(.streamflix-on-home) header.MuiAppBar-root {
 }
 
 /* Wordmark: crisp gradient, no neon glow */
-[data-streamflix-corner-brand="true"],
-.streamflix-toolbar-brand-link,
-.streamflix-inline-brand,
-.skinHeader .pageTitleWithDefaultLogo,
-.skinHeader .pageTitleWithLogo,
-.MuiToolbar-root a[href="#/"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]),
-.MuiToolbar-root a[href="#/home"]:not([href*="tab="]),
-.MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/home"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) {
+body.bfx-active [data-streamflix-corner-brand="true"],
+body.bfx-active .streamflix-toolbar-brand-link,
+body.bfx-active .streamflix-inline-brand,
+body.bfx-active .skinHeader .pageTitleWithDefaultLogo,
+body.bfx-active .skinHeader .pageTitleWithLogo,
+body.bfx-active .MuiToolbar-root a[href="#/"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="#/home"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/home"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) {
     font-size: 24px !important;
     font-weight: 900 !important;
     letter-spacing: 0.02em !important;

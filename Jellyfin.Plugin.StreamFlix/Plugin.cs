@@ -793,58 +793,29 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         try
         {
             var brandingPath = Path.Combine(_appPaths.ConfigurationDirectoryPath, "branding.xml");
-            var css = GetEmbeddedStylesheetContent();
-            if (string.IsNullOrWhiteSpace(css))
-            {
-                return;
-            }
-
-            var escapedCss = System.Security.SecurityElement.Escape(css) ?? string.Empty;
-            var customCssTag = $"<CustomCss>{escapedCss}</CustomCss>";
-
             if (!File.Exists(brandingPath))
             {
-                var defaultXml = $"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<BrandingOptions xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n  <LoginDisclaimer />\n  {customCssTag}\n  <SplashscreenEnabled>false</SplashscreenEnabled>\n</BrandingOptions>";
-                File.WriteAllText(brandingPath, defaultXml);
-                _logger.LogInformation("StreamFlix: created branding.xml with StreamFlix CustomCss for Jellyfin App support.");
                 return;
             }
 
             var xml = File.ReadAllText(brandingPath);
-            string updated;
-            if (Regex.IsMatch(xml, "<CustomCss>[\\s\\S]*?</CustomCss>", RegexOptions.IgnoreCase))
+            if (xml.IndexOf("STREAMFLIX", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                updated = Regex.Replace(
+                var cleaned = Regex.Replace(
                     xml,
                     "<CustomCss>[\\s\\S]*?</CustomCss>",
-                    _ => customCssTag,
+                    "<CustomCss />",
                     RegexOptions.IgnoreCase);
-            }
-            else if (Regex.IsMatch(xml, "<CustomCss\\s*/>", RegexOptions.IgnoreCase))
-            {
-                updated = Regex.Replace(
-                    xml,
-                    "<CustomCss\\s*/>",
-                    _ => customCssTag,
-                    RegexOptions.IgnoreCase);
-            }
-            else
-            {
-                var closeIdx = xml.LastIndexOf("</BrandingOptions>", StringComparison.OrdinalIgnoreCase);
-                updated = closeIdx >= 0
-                    ? xml.Substring(0, closeIdx) + "  " + customCssTag + "\n" + xml.Substring(closeIdx)
-                    : xml;
-            }
-
-            if (!string.Equals(xml, updated, StringComparison.Ordinal))
-            {
-                File.WriteAllText(brandingPath, updated);
-                _logger.LogInformation("StreamFlix: synced StreamFlix CustomCss into branding.xml for Jellyfin App parity.");
+                if (!string.Equals(xml, cleaned, StringComparison.Ordinal))
+                {
+                    File.WriteAllText(brandingPath, cleaned);
+                    _logger.LogInformation("StreamFlix: removed legacy StreamFlix CustomCss from branding.xml so disabling the plugin restores native Jellyfin cleanly.");
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "StreamFlix: could not sync branding.xml.");
+            _logger.LogDebug(ex, "StreamFlix: could not inspect branding.xml.");
         }
     }
 
@@ -853,41 +824,31 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         lock (DiskIndexLock)
         {
             CleanConflictingBrandingCssIfPresent();
+
+            // Clean up any legacy on-disk index.html injection block; StreamFlixStartupFilter injects at request time
+            // ONLY while the plugin is active and EnableStreamFlixUi is true, so disabling StreamFlix in Jellyfin
+            // immediately restores 100% unmodified native Jellyfin UI without manual container/file edits.
             try
             {
                 var indexPath = IndexHtmlPath;
-                if (!File.Exists(indexPath))
+                if (File.Exists(indexPath))
                 {
-                    _logger.LogWarning("StreamFlix: index.html not found at {Path}", indexPath);
-                    return false;
-                }
-
-                var injectionBlock = BuildInjectionBlock();
-                var content = File.ReadAllText(indexPath);
-                if (content.Contains(injectionBlock, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                var cleanupRegex = new Regex($"{Regex.Escape(StartComment)}[\\s\\S]*?{Regex.Escape(EndComment)}\\s*", RegexOptions.Multiline);
-                content = cleanupRegex.Replace(content, string.Empty);
-
-                const string closingBody = "</body>";
-                var idx = content.LastIndexOf(closingBody, StringComparison.OrdinalIgnoreCase);
-                if (idx >= 0)
-                {
-                    content = content.Substring(0, idx) + injectionBlock + "\n" + content.Substring(idx);
-                    File.WriteAllText(indexPath, content);
-                    _logger.LogInformation("StreamFlix: injected client bundle ({AssetVersion}) into {Path}", AssetCacheVersion, indexPath);
-                    return true;
+                    var content = File.ReadAllText(indexPath);
+                    var cleanupRegex = new Regex($"{Regex.Escape(StartComment)}[\\s\\S]*?{Regex.Escape(EndComment)}\\s*", RegexOptions.Multiline);
+                    if (cleanupRegex.IsMatch(content))
+                    {
+                        var cleaned = cleanupRegex.Replace(content, string.Empty);
+                        File.WriteAllText(indexPath, cleaned);
+                        _logger.LogInformation("StreamFlix: removed legacy on-disk block from {Path} (using clean in-memory IStartupFilter injection).", indexPath);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "StreamFlix: index.html is read-only on disk; using request-time IStartupFilter middleware.");
+                _logger.LogDebug(ex, "StreamFlix: index.html on disk is read-only; relying on request-time IStartupFilter middleware.");
             }
 
-            return false;
+            return true;
         }
     }
 

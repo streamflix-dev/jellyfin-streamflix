@@ -426,6 +426,14 @@
         { key: 'random', label: 'Random Shuffle', sortBy: 'Random', sortOrder: 'Descending' }
     ];
 
+    function getCurrentServerNavSig() {
+        var cfg = state.config || {};
+        var showLibs = cfg.showLibrariesInNav !== false;
+        var hid = Array.isArray(cfg.navHiddenBuiltIns) ? cfg.navHiddenBuiltIns.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean).join(',') : '';
+        var libs = Array.isArray(cfg.navLibraryIds) ? cfg.navLibraryIds.map(function (x) { return normalizeGuid(x) || String(x || '').trim(); }).filter(Boolean).join(',') : '';
+        return String(showLibs) + '|' + hid + '|' + libs;
+    }
+
     function getProfileNavPrefs() {
         var pid = state.activeProfile && state.activeProfile.id;
         if (!pid) {
@@ -435,6 +443,9 @@
         if (!stored || typeof stored !== 'object' || !stored.customized) {
             return null;
         }
+        if (stored.serverNavSig !== getCurrentServerNavSig()) {
+            return null;
+        }
         return stored;
     }
 
@@ -442,6 +453,9 @@
         var pid = state.activeProfile && state.activeProfile.id;
         if (!pid) {
             return;
+        }
+        if (prefs && typeof prefs === 'object') {
+            prefs.serverNavSig = getCurrentServerNavSig();
         }
         saveJson(NAV_PROFILE_PREF_PREFIX + pid, prefs || null);
     }
@@ -476,6 +490,24 @@
             var ct = String(v.CollectionType || '').toLowerCase();
             return !excluded[ct];
         });
+    }
+
+    function matchBuiltInKindForView(view) {
+        if (!view) {
+            return '';
+        }
+        var low = String(view.Name || '').trim().toLowerCase();
+        var ct = String(view.CollectionType || '').trim().toLowerCase();
+        if (low === 'movies' || low === 'films') {
+            return 'movies';
+        }
+        if (low === 'shows' || low === 'tv shows' || low === 'tv' || low === 'series') {
+            return 'series';
+        }
+        if (low === 'collections' || low === 'boxsets' || low === 'box sets' || ct === 'boxsets') {
+            return 'collections';
+        }
+        return '';
     }
 
     function isDuplicateBuiltInLibraryName(viewName, hiddenBuiltInMap) {
@@ -530,10 +562,14 @@
 
     function getConfiguredNavPills(d) {
         d = d || state.hubData || {};
+        var cfg = state.config || {};
         var hiddenBuiltInMap = getEffectiveHiddenBuiltInNavMap();
         var eligibleViews = getEligibleUserLibraryViews(d);
         var profPrefs = getProfileNavPrefs();
         var visibleLibMap = {};
+        var showLibsInNav = cfg.showLibrariesInNav !== false;
+        var cfgLibIds = Array.isArray(cfg.navLibraryIds) ? cfg.navLibraryIds : [];
+        var hasExplicitServerLibs = showLibsInNav && cfgLibIds.length > 0;
 
         if (profPrefs && Array.isArray(profPrefs.libraryIds)) {
             profPrefs.libraryIds.forEach(function (id) {
@@ -546,11 +582,28 @@
             visibleLibMap = getDefaultVisibleLibraryIdsMap(eligibleViews, hiddenBuiltInMap);
         }
 
+        // Prevent duplicate tabs AND honor explicit unchecking of Movies / TV Shows / Collections under "Visible Jellyfin libraries"
+        var suppressBuiltIn = {};
+        if (showLibsInNav) {
+            eligibleViews.forEach(function (v) {
+                var kind = matchBuiltInKindForView(v);
+                if (!kind) {
+                    return;
+                }
+                var normId = normalizeGuid(v.Id);
+                if (visibleLibMap[normId]) {
+                    suppressBuiltIn[kind] = true;
+                } else if (hasExplicitServerLibs && !profPrefs) {
+                    suppressBuiltIn[kind] = true;
+                }
+            });
+        }
+
         var pills = [{ id: 'all', label: 'Home', hide: false }];
-        if (!hiddenBuiltInMap.series) {
+        if (!hiddenBuiltInMap.series && !suppressBuiltIn.series) {
             pills.push({ id: 'series', label: 'Shows', hide: !d.allSeries.length });
         }
-        if (!hiddenBuiltInMap.movies) {
+        if (!hiddenBuiltInMap.movies && !suppressBuiltIn.movies) {
             pills.push({ id: 'movies', label: 'Movies', hide: !d.allMovies.length });
         }
         if (!hiddenBuiltInMap.hot) {
@@ -569,7 +622,7 @@
             }
         });
 
-        if (!hiddenBuiltInMap.collections) {
+        if (!hiddenBuiltInMap.collections && !suppressBuiltIn.collections) {
             pills.push({
                 id: 'collections',
                 label: 'Collections',

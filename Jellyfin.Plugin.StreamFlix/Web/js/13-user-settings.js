@@ -446,7 +446,7 @@
             var active = state.activeProfile;
             var sp = findProfileById(active.id) || active;
             var isGuest = isGuestPassSession();
-            var isAdmin = !isGuest && (isHouseholdAdmin() || Boolean(active.isAdmin));
+            var isAdmin = !isGuest && isActiveProfileAdmin();
             var brandName = getBrandName();
             var uid = getActiveUserId() || active.jellyfinUserId || '';
             var uidSuffix = uid ? ('?userId=' + encodeURIComponent(uid)) : '';
@@ -739,7 +739,10 @@
                 if (!ev.isTrusted) {
                     return;
                 }
-                if (!state.config || state.config.enableStreamFlixUi === false) {
+                if (!isStreamFlixRuntimeEnabled() || !document.body || !document.body.classList.contains('bfx-active')) {
+                    return;
+                }
+                if (!getActiveToken()) {
                     return;
                 }
                 var target = ev.target;

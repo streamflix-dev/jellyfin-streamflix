@@ -219,7 +219,18 @@ public partial class StreamFlixController
         }
 
         StreamFlixSessionService.ResetLoginFailures(lockKey);
+        await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
         var isAdmin = StreamFlixStartupTask.IsUserAdminCompat(user);
+        if (!isAdmin && !IsJellyfinUserHouseholdMember(config, user))
+        {
+            return StatusCode(403, new
+            {
+                verified = false,
+                code = "not_household_member",
+                message = $"\"{user.Username}\" isn't linked to a StreamFlix household profile on this server. Ask an administrator to link a profile in Manage Profiles.",
+            });
+        }
+
         var kind = isAdmin
             ? StreamFlixSessionService.AuthKindJellyfinAdmin
             : StreamFlixSessionService.AuthKindJellyfin;
@@ -271,7 +282,7 @@ public partial class StreamFlixController
             });
         }
 
-        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext);
+        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext, config.TreatTailscaleAsLocalLan);
         if (config.AdminFallbackLanOnly && !isUnconfiguredGate && !isLocalLan)
         {
             return StatusCode(403, new
@@ -370,9 +381,9 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!HasHouseholdAccess(config, caller) || !caller.IsAdmin || IsGuestSession(caller))
+        if (!HasHouseholdAccess(config, caller) || !IsEffectiveActiveAdmin(caller) || IsGuestSession(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Sign in as a Jellyfin Administrator first." });
+            return StatusCode(403, new { code = "admin_required", message = "Switch to an Administrator profile first to open Server Settings." });
         }
 
         await SyncProfilesAsync(config, force: true).ConfigureAwait(false);
@@ -431,7 +442,7 @@ public partial class StreamFlixController
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can validate OAuth settings." });
         }
@@ -1013,7 +1024,7 @@ public partial class StreamFlixController
     {
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can validate OIDC settings." });
         }
@@ -1087,9 +1098,9 @@ public partial class StreamFlixController
         var host = Request.Host.Value;
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : string.Empty;
 
-        // When behind a local/Docker reverse proxy (e.g. Caddy, Nginx, Traefik), honor forwarded scheme/host/prefix safely
+        // When behind a local/Docker/Tailscale reverse proxy (e.g. Caddy, Nginx, Traefik), honor forwarded scheme/host/prefix safely
         var remoteIp = HttpContext.Connection.RemoteIpAddress;
-        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp))
+        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp, Config.TreatTailscaleAsLocalLan))
         {
             var fwdProto = Request.Headers["X-Forwarded-Proto"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
             if (fwdProto != null && (string.Equals(fwdProto, "https", StringComparison.OrdinalIgnoreCase)
@@ -1167,7 +1178,7 @@ public partial class StreamFlixController
         }
 
         var remoteIp = HttpContext.Connection.RemoteIpAddress;
-        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp))
+        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp, Config.TreatTailscaleAsLocalLan))
         {
             var fwdProto = Request.Headers["X-Forwarded-Proto"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
             if (string.Equals(fwdProto, "https", StringComparison.OrdinalIgnoreCase))

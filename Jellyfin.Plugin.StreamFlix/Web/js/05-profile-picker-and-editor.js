@@ -41,6 +41,16 @@
         return Boolean(active.isAdmin);
     }
 
+    function isProfileManagementAdmin() {
+        if (isGuestPassSession()) {
+            return false;
+        }
+        if (state.activeProfile) {
+            return isActiveProfileAdmin();
+        }
+        return isHouseholdAdmin();
+    }
+
     function canActiveProfileManageGuestPasses() {
         if (isGuestPassSession() || !areGuestPassesEnabled()) {
             return false;
@@ -180,7 +190,7 @@
     function renderProfilePickerGate() {
         var profiles = getProfiles();
         var isGuest = isGuestPassSession();
-        var isAdmin = !isGuest && isHouseholdAdmin();
+        var isAdmin = !isGuest && isProfileManagementAdmin();
         if (isGuest && state.manageMode) {
             state.manageMode = false;
         }
@@ -201,8 +211,9 @@
                 + (lockMeta ? '<span class="streamflix-tile-badge streamflix-tile-badge-lock ' + lockMeta.badgeClass + '" title="' + escapeHtml(lockBadgeTitle) + '">' + lockMeta.badgeSvg + '</span>' : '');
             var roleBadge = p.isAdmin ? 'Admin' : (p.isKids ? 'Kids' : 'Profile');
             var linkedUserLabel = p.jellyfinUsername || p.name;
-            var canDelete = isAdmin && profiles.length > 1;
-            var title = lockedOut ? (lockBadgeTitle || ('Locked to ' + lockLabel)) : (manage ? 'Edit ' + p.name : 'Open ' + p.name);
+            var canEditTile = isAdmin || (!p.isAdmin && !p.isOwner && !p.isKids && !lockedOut && (!state.activeProfile || state.activeProfile.id === p.id));
+            var canDelete = isAdmin && profiles.length > 1 && !p.isOwner;
+            var title = lockedOut ? (lockBadgeTitle || ('Locked to ' + lockLabel)) : (manage ? (canEditTile ? 'Edit ' + p.name : p.name) : 'Open ' + p.name);
 
             return ''
                 + '<div class="streamflix-profile-tile' + (lockedOut ? ' streamflix-tile-locked' : '') + '" tabindex="0" role="button" style="--i:' + idx + ';--pc:' + escapeHtml(p.color || '#E50914') + ';"'
@@ -213,7 +224,7 @@
                 + '    <span class="streamflix-profile-emoji">' + escapeHtml(p.icon || '🎬') + '</span>'
                 + (p.isKids ? '<span class="streamflix-profile-kids-ribbon">KIDS</span>' : '')
                 + (badges ? '<span class="streamflix-tile-badges">' + badges + '</span>' : '')
-                + (manage ? '<div class="streamflix-profile-edit-scrim">' + icon('edit') + '</div>' : '')
+                + (manage && canEditTile ? '<div class="streamflix-profile-edit-scrim">' + icon('edit') + '</div>' : '')
                 + '    <span class="streamflix-tile-spinner" aria-hidden="true"></span>'
                 + '  </div>'
                 + '  <div class="streamflix-profile-name">' + escapeHtml(p.name) + '</div>'
@@ -221,14 +232,16 @@
                     ? '<div class="streamflix-profile-meta" title="Linked Jellyfin user: ' + escapeHtml(linkedUserLabel) + '">'
                       + '<span class="streamflix-profile-role">' + escapeHtml(roleBadge) + '</span><span class="streamflix-profile-linked">' + icon('link') + escapeHtml(linkedUserLabel) + '</span>'
                       + '</div>'
-                      + '<div class="streamflix-profile-reorder-bar">'
-                      + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-left="' + escapeHtml(p.id) + '" title="Move left" aria-label="Move left"' + (idx === 0 ? ' disabled' : '') + '>' + icon('chevronLeft') + '</button>' : '')
-                      + '  <button type="button" class="streamflix-reorder-btn" data-edit-profile-id="' + escapeHtml(p.id) + '" title="Edit profile" aria-label="Edit profile">' + icon('edit') + '</button>'
-                      + (canDelete
-                          ? '<button type="button" class="streamflix-reorder-btn streamflix-reorder-btn-danger" data-delete-profile-id="' + escapeHtml(p.id) + '" title="Delete profile" aria-label="Delete profile">' + icon('trash') + '</button>'
+                      + ((isAdmin || canEditTile)
+                          ? '<div class="streamflix-profile-reorder-bar">'
+                            + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-left="' + escapeHtml(p.id) + '" title="Move left" aria-label="Move left"' + (idx === 0 ? ' disabled' : '') + '>' + icon('chevronLeft') + '</button>' : '')
+                            + (canEditTile ? '  <button type="button" class="streamflix-reorder-btn" data-edit-profile-id="' + escapeHtml(p.id) + '" title="Edit profile" aria-label="Edit profile">' + icon('edit') + '</button>' : '')
+                            + (canDelete
+                                ? '<button type="button" class="streamflix-reorder-btn streamflix-reorder-btn-danger" data-delete-profile-id="' + escapeHtml(p.id) + '" title="Delete profile" aria-label="Delete profile">' + icon('trash') + '</button>'
+                                : '')
+                            + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-right="' + escapeHtml(p.id) + '" title="Move right" aria-label="Move right"' + (idx === profiles.length - 1 ? ' disabled' : '') + '>' + icon('chevronRight') + '</button>' : '')
+                            + '</div>'
                           : '')
-                      + (isAdmin ? '  <button type="button" class="streamflix-reorder-btn" data-move-right="' + escapeHtml(p.id) + '" title="Move right" aria-label="Move right"' + (idx === profiles.length - 1 ? ' disabled' : '') + '>' + icon('chevronRight') + '</button>' : '')
-                      + '</div>'
                     : '')
                 + '</div>';
         }).join('');
@@ -582,9 +595,9 @@
             showToast('You can\'t delete the last remaining profile.', 'error');
             return;
         }
-        var isAdmin = isHouseholdAdmin();
-        if (!isAdmin && (profile.isAdmin || profile.isOwner)) {
-            showToast('Only an administrator can delete an administrator profile.', 'error');
+        var isAdmin = isProfileManagementAdmin();
+        if (!isAdmin) {
+            showToast('Only an active administrator profile can delete household profiles.', 'error');
             return;
         }
         if (!isAdmin && profile.googleLocked && !profile.googleLockSatisfied) {
@@ -864,10 +877,15 @@
             return;
         }
         var isNew = !existingProfile;
-        var isAdmin = isHouseholdAdmin();
+        var isAdmin = isProfileManagementAdmin();
 
         if (isNew && !isAdmin) {
-            showToast('Only an administrator can create new household profiles.', 'error');
+            showToast('Only an active administrator profile can create new household profiles.', 'error');
+            return;
+        }
+
+        if (!isNew && !isAdmin && state.activeProfile && state.activeProfile.id && existingProfile.id !== state.activeProfile.id) {
+            showToast('Switch to "' + existingProfile.name + '" or an administrator profile first to edit it.', 'error');
             return;
         }
 

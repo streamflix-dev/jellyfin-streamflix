@@ -66,9 +66,9 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can test Seerr settings." });
+            return StatusCode(403, new { code = "admin_required", message = "Only an active Jellyfin administrator profile can test Seerr settings." });
         }
 
         var url = !string.IsNullOrWhiteSpace(request?.SeerrUrl) ? request!.SeerrUrl : config.SeerrUrl;
@@ -224,7 +224,7 @@ public partial class StreamFlixController
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
-            cts.CancelAfter(TimeSpan.FromSeconds(12));
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             var list = await StreamFlixSeerrService.GetRecentRequestsAsync(
                 config,
                 isKids,
@@ -261,7 +261,7 @@ public partial class StreamFlixController
         }
         catch (OperationCanceledException)
         {
-            return StatusCode(504, new { code = "seerr_timeout", message = "Connecting to Seerr timed out — check Dashboard → Plugins → StreamFlix → Seerr URL (e.g. http://127.0.0.1:5055 or your Seerr container name)." });
+            return StatusCode(504, new { code = "seerr_timeout", message = "Seerr took too long to load recent requests (Radarr/Sonarr queue status sync may be slow). Please retry in a moment." });
         }
         catch (Exception ex)
         {
@@ -439,27 +439,109 @@ public partial class StreamFlixController
         };
     }
 
+    internal static void WarmServerCachesInBackground(
+        ILibraryManager libraryManager,
+        IUserManager userManager,
+        IUserDataManager userDataManager)
+    {
+        _ = RefreshShowcaseCacheAsync(libraryManager);
+        _ = RefreshPopularScoresCacheAsync(libraryManager, userManager, userDataManager);
+    }
+
+    private static Task RefreshPopularScoresCacheAsync(
+        ILibraryManager libraryManager,
+        IUserManager userManager,
+        IUserDataManager userDataManager)
+    {
+        if (Interlocked.CompareExchange(ref _popularRefreshInFlight, 1, 0) != 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                var fresh = ComputePopularScoresCompat(libraryManager, userManager, userDataManager);
+                lock (PopularCacheLock)
+                {
+                    _popularScoresCache = fresh;
+                    _popularCachedAtUtc = DateTime.UtcNow;
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _popularRefreshInFlight, 0);
+            }
+        });
+    }
+
+    private static Task RefreshShowcaseCacheAsync(ILibraryManager libraryManager)
+    {
+        if (Interlocked.CompareExchange(ref _showcaseRefreshInFlight, 1, 0) != 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return Task.Run(() =>
+        {
+            try
+            {
+                var fresh = JellyfinCompat.GetShowcaseItems(libraryManager);
+                lock (ShowcaseCacheLock)
+                {
+                    _showcaseCache = fresh;
+                    _showcaseCachedAtUtc = DateTime.UtcNow;
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _showcaseRefreshInFlight, 0);
+            }
+        });
+    }
+
     private static Dictionary<string, double> GetPopularScoresCached(
         ILibraryManager libraryManager,
         IUserManager userManager,
         IUserDataManager userDataManager)
     {
+        bool isCold;
+        Dictionary<string, double> snapshot;
         lock (PopularCacheLock)
         {
-            if (DateTime.UtcNow - _popularCachedAtUtc < TimeSpan.FromMinutes(3) && _popularScoresCache.Count > 0)
+            snapshot = _popularScoresCache;
+            isCold = _popularCachedAtUtc == DateTime.MinValue;
+            if (!isCold && DateTime.UtcNow - _popularCachedAtUtc < TimeSpan.FromMinutes(4))
+            {
+                return snapshot;
+            }
+        }
+
+        var refreshTask = RefreshPopularScoresCacheAsync(libraryManager, userManager, userDataManager);
+        if (isCold && !refreshTask.IsCompleted)
+        {
+            try
+            {
+                refreshTask.Wait(TimeSpan.FromMilliseconds(250));
+            }
+            catch
+            {
+            }
+
+            lock (PopularCacheLock)
             {
                 return _popularScoresCache;
             }
         }
 
-        var fresh = ComputePopularScoresCompat(libraryManager, userManager, userDataManager);
-        lock (PopularCacheLock)
-        {
-            _popularScoresCache = fresh;
-            _popularCachedAtUtc = DateTime.UtcNow;
-        }
-
-        return fresh;
+        return snapshot;
     }
 
     private static Dictionary<string, double> ComputePopularScoresCompat(
@@ -727,22 +809,36 @@ public partial class StreamFlixController
 
     private static List<object> GetShowcaseItemsCached(ILibraryManager libraryManager)
     {
+        bool isCold;
+        List<object> snapshot;
         lock (ShowcaseCacheLock)
         {
-            if (DateTime.UtcNow - _showcaseCachedAtUtc < TimeSpan.FromMinutes(10) && _showcaseCache.Count > 0)
+            snapshot = _showcaseCache;
+            isCold = _showcaseCachedAtUtc == DateTime.MinValue;
+            if (!isCold && DateTime.UtcNow - _showcaseCachedAtUtc < TimeSpan.FromMinutes(10))
+            {
+                return snapshot;
+            }
+        }
+
+        var refreshTask = RefreshShowcaseCacheAsync(libraryManager);
+        if (isCold && !refreshTask.IsCompleted)
+        {
+            try
+            {
+                refreshTask.Wait(TimeSpan.FromMilliseconds(200));
+            }
+            catch
+            {
+            }
+
+            lock (ShowcaseCacheLock)
             {
                 return _showcaseCache;
             }
         }
 
-        var fresh = JellyfinCompat.GetShowcaseItems(libraryManager);
-        lock (ShowcaseCacheLock)
-        {
-            _showcaseCache = fresh;
-            _showcaseCachedAtUtc = DateTime.UtcNow;
-        }
-
-        return fresh;
+        return snapshot;
     }
 
     private object SerializeSeerrDetail(StreamFlixSeerrService.SeerrMediaDetail d)

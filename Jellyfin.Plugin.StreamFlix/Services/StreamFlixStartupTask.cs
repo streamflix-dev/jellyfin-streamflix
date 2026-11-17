@@ -57,11 +57,19 @@ public class StreamFlixStartupTask : IScheduledTask
     private static bool _extSetPermSearched;
 
     private readonly IUserManager _userManager;
+    private readonly ILibraryManager _libraryManager;
+    private readonly IUserDataManager _userDataManager;
     private readonly ILogger<StreamFlixStartupTask> _logger;
 
-    public StreamFlixStartupTask(IUserManager userManager, ILogger<StreamFlixStartupTask> logger)
+    public StreamFlixStartupTask(
+        IUserManager userManager,
+        ILibraryManager libraryManager,
+        IUserDataManager userDataManager,
+        ILogger<StreamFlixStartupTask> logger)
     {
         _userManager = userManager;
+        _libraryManager = libraryManager;
+        _userDataManager = userDataManager;
         _logger = logger;
     }
 
@@ -70,7 +78,7 @@ public class StreamFlixStartupTask : IScheduledTask
     public string Key => "StreamFlixStartupProfileSync";
 
     public string Description =>
-        "Provisions real Jellyfin Server Users for every StreamFlix profile so each profile has separate watch history, and injects the StreamFlix UI.";
+        "Provisions real Jellyfin Server Users for every StreamFlix profile so each profile has separate watch history, and cleans up any legacy disk branding.";
 
     public string Category => "StreamFlix";
 
@@ -87,6 +95,7 @@ public class StreamFlixStartupTask : IScheduledTask
             Plugin.Instance?.SaveConfiguration();
         }
 
+        Controllers.StreamFlixController.WarmServerCachesInBackground(_libraryManager, _userManager, _userDataManager);
         progress.Report(100);
     }
 

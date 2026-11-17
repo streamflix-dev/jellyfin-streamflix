@@ -132,7 +132,7 @@ public partial class StreamFlixController
                 profile.IsPluginCreatedJellyfinUser = false;
             }
 
-            if (user == null && caller.IsAdmin && config.AutoProvisionJellyfinUsers)
+            if (user == null && IsEffectiveActiveAdmin(caller) && config.AutoProvisionJellyfinUsers)
             {
                 try
                 {
@@ -362,11 +362,12 @@ public partial class StreamFlixController
             return BadRequest(new { message = "PINs must be 4 to 8 digits." });
         }
 
+        var effectiveAdmin = IsEffectiveActiveAdmin(caller);
         var existing = !string.IsNullOrWhiteSpace(request.Id) ? FindProfile(config, request.Id) : null;
         var isNewProfile = existing == null;
-        if (isNewProfile && !caller.IsAdmin)
+        if (isNewProfile && !effectiveAdmin)
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only an administrator can create new household profiles." });
+            return StatusCode(403, new { code = "admin_required", message = "Switch to an administrator profile to create new household profiles." });
         }
 
         if (isNewProfile && config.Profiles.Count >= MaxProfilesCount)
@@ -375,7 +376,7 @@ public partial class StreamFlixController
         }
 
         // Non-administrators may only edit safe cosmetic preferences & PIN on their own non-Kids, non-Admin profile.
-        if (existing != null && !caller.IsAdmin)
+        if (existing != null && !effectiveAdmin)
         {
             if (IsProfileLinkedToAdmin(existing))
             {
@@ -448,7 +449,7 @@ public partial class StreamFlixController
 
                 var changed = !string.Equals(newLock, existing?.GoogleAccountEmail, StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(newLockKind ?? string.Empty, existing?.AccountLockKind ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-                if (changed && !caller.IsAdmin && !DoesCallerOwnExplicitLock(config, newLock, newLockKind, caller))
+                if (changed && !effectiveAdmin && !DoesCallerOwnExplicitLock(config, newLock, newLockKind, caller))
                 {
                     return StatusCode(403, new { code = "google_lock_forbidden", message = "You can only lock a profile to the account you're currently signed in with." });
                 }
@@ -456,7 +457,7 @@ public partial class StreamFlixController
         }
 
         // Resolve which Jellyfin user this profile should be linked to.
-        // Security: only administrators may choose, change, or create Jellyfin accounts.
+        // Security: only active administrators may choose, change, or create Jellyfin accounts.
         var currentLinkedId = existing?.JellyfinUserId;
         var requestedLink = request.JellyfinUserId?.Trim() ?? string.Empty;
         var wantsCreate = false;
@@ -464,7 +465,7 @@ public partial class StreamFlixController
         JUser? targetUser = null;
         var createName = cleanName;
 
-        if (caller.IsAdmin)
+        if (effectiveAdmin)
         {
             wantsCreate = string.Equals(requestedLink, "__CREATE__", StringComparison.OrdinalIgnoreCase)
                 || (isNewProfile && string.IsNullOrEmpty(requestedLink));
@@ -525,7 +526,7 @@ public partial class StreamFlixController
         }
 
         var createdByPlugin = false;
-        if (caller.IsAdmin && targetUser == null && wantsCreate)
+        if (effectiveAdmin && targetUser == null && wantsCreate)
         {
             try
             {
@@ -545,9 +546,9 @@ public partial class StreamFlixController
         {
             if (existing == null)
             {
-                if (!caller.IsAdmin)
+                if (!effectiveAdmin)
                 {
-                    return StatusCode(403, new { code = "admin_required", message = "Only an administrator can create new household profiles." });
+                    return StatusCode(403, new { code = "admin_required", message = "Switch to an administrator profile to create new household profiles." });
                 }
 
                 if (config.Profiles.Count >= MaxProfilesCount)
@@ -568,10 +569,10 @@ public partial class StreamFlixController
             var trimmedEmoji = request.AvatarEmoji?.Trim();
             existing.AvatarEmoji = !string.IsNullOrEmpty(trimmedEmoji)
                 ? (trimmedEmoji.Length > 16 ? trimmedEmoji.Substring(0, 16) : trimmedEmoji)
-                : (existing.IsKids || (caller.IsAdmin && request.IsKids) ? "🦊" : "🎬");
+                : (existing.IsKids || (effectiveAdmin && request.IsKids) ? "🦊" : "🎬");
             existing.AvatarColorHex = SanitizeHexColor(request.AvatarColorHex);
 
-            if (caller.IsAdmin)
+            if (effectiveAdmin)
             {
                 existing.IsKids = request.IsKids;
                 if (request.KidsExitPinRequired.HasValue)
@@ -596,7 +597,7 @@ public partial class StreamFlixController
             existing.AutoplayNextEpisode = request.AutoplayNextEpisode;
             existing.AutoplayPreviews = request.AutoplayPreviews;
 
-            if (caller.IsAdmin)
+            if (effectiveAdmin)
             {
                 if (request.AllowedLibraryIds != null)
                 {
@@ -620,7 +621,7 @@ public partial class StreamFlixController
                 var hadExistingKidsBedtime = existing.IsKids
                     && !string.IsNullOrEmpty(existing.BedtimeStart)
                     && !string.IsNullOrEmpty(existing.BedtimeEnd);
-                var canModifyKidsBedtime = caller.IsAdmin
+                var canModifyKidsBedtime = effectiveAdmin
                     || !hadExistingKidsBedtime
                     || CheckAdultPin(config, request.CurrentPin ?? string.Empty) == null;
                 if (canModifyKidsBedtime)
@@ -630,7 +631,7 @@ public partial class StreamFlixController
                 }
             }
 
-            if (caller.IsAdmin && targetUser != null)
+            if (effectiveAdmin && targetUser != null)
             {
                 var targetIdStr = targetUser.Id.ToString("N");
                 if (createdByPlugin)
@@ -701,9 +702,9 @@ public partial class StreamFlixController
             return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot reorder profiles." });
         }
 
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only an administrator can reorder household profiles." });
+            return StatusCode(403, new { code = "admin_required", message = "Switch to an administrator profile to reorder household profiles." });
         }
 
         if (request?.ProfileIds != null && request.ProfileIds.Count > 0 && config.Profiles.Count > 1)
@@ -764,9 +765,9 @@ public partial class StreamFlixController
             return StatusCode(403, new { code = "guest_pass_restricted", message = "Guest Pass sessions cannot delete profiles." });
         }
 
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only an administrator can delete household profiles." });
+            return StatusCode(403, new { code = "admin_required", message = "Switch to an administrator profile to delete household profiles." });
         }
 
         if (config.Profiles.Count <= 1)
@@ -812,7 +813,7 @@ public partial class StreamFlixController
             config.Profiles.Remove(target);
             deletedUserId = target.JellyfinUserId;
             shouldDeleteUser = request?.DeleteJellyfinUser == true
-                && caller.IsAdmin
+                && IsEffectiveActiveAdmin(caller)
                 && !string.IsNullOrWhiteSpace(deletedUserId)
                 && !config.Profiles.Any(p => string.Equals(p.JellyfinUserId, deletedUserId, StringComparison.OrdinalIgnoreCase));
 
@@ -1429,7 +1430,7 @@ public partial class StreamFlixController
             pinLength = isGuest || string.IsNullOrWhiteSpace(p.PinCode) ? 0 : p.PinCode.Trim().Length,
             googleLocked = !isGuest && lockEmail != null,
             accountLockKind = effectiveLockKind,
-            googleAccountEmail = lockEmail != null && (caller.IsAdmin || callerOwnsLock) ? lockEmail : null,
+            googleAccountEmail = lockEmail != null && (IsEffectiveActiveAdmin(caller) || callerOwnsLock) ? lockEmail : null,
             googleAccountHint = lockEmail != null ? StreamFlixSessionService.MaskEmail(lockEmail) : null,
             googleLockSatisfied = isGuest || lockEmail == null || callerOwnsLock || caller.IsAdmin,
             autoplayNextEpisode = p.AutoplayNextEpisode,

@@ -1,5 +1,8 @@
 /* StreamFlix Client (02/14) — Jellyfin 12 Fetch/XHR Interceptors & Session Sync */
     function rewriteJellyfinItemsQueryUrl(rawUrl) {
+        if (!isStreamFlixRuntimeEnabled()) {
+            return rawUrl;
+        }
         try {
             var u = new URL(rawUrl, window.location.origin);
             var pathLower = (u.pathname || '').toLowerCase();
@@ -90,7 +93,7 @@
 
         XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
             var lower = String(name || '').toLowerCase();
-            if (this.__streamflixSameOrigin && lower) {
+            if (this.__streamflixSameOrigin && lower && isStreamFlixRuntimeEnabled()) {
                 var activeToken = getActiveToken();
                 if (activeToken) {
                     if (lower === 'authorization' || lower === 'x-emby-authorization') {
@@ -109,7 +112,7 @@
         XMLHttpRequest.prototype.send = function (bodyArg) {
             try {
                 if (this.__streamflixSameOrigin) {
-                    var token = getActiveToken();
+                    var token = isStreamFlixRuntimeEnabled() ? getActiveToken() : null;
                     if (token) {
                         var authVal = getEmbyAuthHeader(token);
                         var hdrs = this.__streamflixHeaders || {};
@@ -176,8 +179,9 @@
             }
 
             var attachSessionHdr = isSameOrigin && lowCheckUrl.indexOf('/streamflix/') !== -1 && state.googleUser && state.googleUser.token;
-            if (isSameOrigin && (getActiveToken() || attachSessionHdr)) {
-                var token = sanitizeHeaderField(getActiveToken());
+            var runtimeOn = isStreamFlixRuntimeEnabled();
+            if (isSameOrigin && ((runtimeOn && getActiveToken()) || attachSessionHdr)) {
+                var token = runtimeOn ? sanitizeHeaderField(getActiveToken()) : '';
                 if (token || attachSessionHdr) {
                     var authVal = token ? getEmbyAuthHeader(token) : '';
                     init = Object.assign({}, init || {});
@@ -242,7 +246,7 @@
                     }
                 }
 
-                if (!isSameOrigin || method !== 'GET' || !res || !res.ok) {
+                if (!runtimeOn || !isSameOrigin || method !== 'GET' || !res || !res.ok || isAdminRouteHash()) {
                     return res;
                 }
 
@@ -266,12 +270,14 @@
                 if (isItemsEndpoint) {
                     var filters = urlObj.searchParams.get('Filters') || urlObj.searchParams.get('filters') || '';
                     var itemTypes = urlObj.searchParams.get('IncludeItemTypes') || urlObj.searchParams.get('includeItemTypes') || '';
+                    var alreadyRec = String(urlObj.searchParams.get('Recursive') || urlObj.searchParams.get('recursive') || '').toLowerCase() === 'true';
+                    var reqPid = urlObj.searchParams.get('ParentId') || urlObj.searchParams.get('parentId') || '';
                     if (filters || itemTypes === 'Episode' || itemTypes === 'Season') {
                         return res;
                     }
 
                     return res.clone().json().then(function (data) {
-                        if (data && Array.isArray(data.Items) && data.Items.length > 0) {
+                        if (data && Array.isArray(data.Items) && (data.Items.length > 0 || alreadyRec || !reqPid || !isKnownTopLevelViewId(reqPid))) {
                             stampServerIdOnItems(data);
                             return new Response(JSON.stringify(data), {
                                 status: 200,
@@ -290,39 +296,14 @@
                         return nativeFetch(apiBase() + '/Items?' + sp1.toString(), { headers: authHeaders })
                             .then(function (r1) { return r1.ok ? r1.json() : null; })
                             .then(function (d1) {
-                                if (d1 && Array.isArray(d1.Items) && d1.Items.length > 0) {
+                                if (d1 && Array.isArray(d1.Items)) {
                                     stampServerIdOnItems(d1);
                                     return new Response(JSON.stringify(d1), {
                                         status: 200,
                                         headers: { 'Content-Type': 'application/json' }
                                     });
                                 }
-
-                                var pid = sp1.get('ParentId') || sp1.get('parentId') || '';
-                                if (pid && !isKnownTopLevelViewId(pid)) {
-                                    return res;
-                                }
-                                var inferredType = inferItemTypesForParentOrRoute(pid, itemTypes);
-                                if (!inferredType) {
-                                    return res;
-                                }
-
-                                sp1.delete('ParentId');
-                                sp1.delete('parentId');
-                                sp1.set('IncludeItemTypes', inferredType);
-
-                                return nativeFetch(apiBase() + '/Items?' + sp1.toString(), { headers: authHeaders })
-                                    .then(function (r2) { return r2.ok ? r2.json() : null; })
-                                    .then(function (d2) {
-                                        if (d2 && Array.isArray(d2.Items) && d2.Items.length > 0) {
-                                            stampServerIdOnItems(d2);
-                                            return new Response(JSON.stringify(d2), {
-                                                status: 200,
-                                                headers: { 'Content-Type': 'application/json' }
-                                            });
-                                        }
-                                        return res;
-                                    });
+                                return res;
                             })
                             .catch(function () {
                                 return res;
@@ -333,8 +314,9 @@
                 }
 
                 if (isLatestEndpoint) {
+                    var latestPid = urlObj.searchParams.get('ParentId') || urlObj.searchParams.get('parentId') || '';
                     return res.clone().json().then(function (data) {
-                        if (Array.isArray(data) && data.length > 0) {
+                        if (Array.isArray(data) && (data.length > 0 || !latestPid || !isKnownTopLevelViewId(latestPid))) {
                             stampServerIdOnItems(data);
                             return new Response(JSON.stringify(data), {
                                 status: 200,
@@ -343,9 +325,8 @@
                         }
 
                         var spL = new URLSearchParams(urlObj.search);
-                        var pid = spL.get('ParentId') || spL.get('parentId') || '';
                         var existingType = spL.get('IncludeItemTypes') || spL.get('includeItemTypes') || '';
-                        var inferredType = inferItemTypesForParentOrRoute(pid, existingType) || 'Movie,Series';
+                        var inferredType = inferItemTypesForParentOrRoute(latestPid, existingType) || 'Movie,Series';
 
                         if (activeUid && !spL.has('userId') && !spL.has('UserId')) {
                             spL.set('userId', activeUid);
@@ -359,32 +340,14 @@
                         return nativeFetch(apiBase() + '/Items?' + spL.toString(), { headers: authHeaders })
                             .then(function (rL1) { return rL1.ok ? rL1.json() : null; })
                             .then(function (dL1) {
-                                if (dL1 && Array.isArray(dL1.Items) && dL1.Items.length > 0) {
+                                if (dL1 && Array.isArray(dL1.Items)) {
                                     stampServerIdOnItems(dL1.Items);
                                     return new Response(JSON.stringify(dL1.Items), {
                                         status: 200,
                                         headers: { 'Content-Type': 'application/json' }
                                     });
                                 }
-
-                                if (!pid || !isKnownTopLevelViewId(pid)) {
-                                    return res;
-                                }
-
-                                spL.delete('ParentId');
-                                spL.delete('parentId');
-                                return nativeFetch(apiBase() + '/Items?' + spL.toString(), { headers: authHeaders })
-                                    .then(function (rL2) { return rL2.ok ? rL2.json() : null; })
-                                    .then(function (dL2) {
-                                        if (dL2 && Array.isArray(dL2.Items) && dL2.Items.length > 0) {
-                                            stampServerIdOnItems(dL2.Items);
-                                            return new Response(JSON.stringify(dL2.Items), {
-                                                status: 200,
-                                                headers: { 'Content-Type': 'application/json' }
-                                            });
-                                        }
-                                        return res;
-                                    });
+                                return res;
                             })
                             .catch(function () {
                                 return res;
@@ -716,6 +679,9 @@
         if (typeof ac.getItems === 'function') {
             var origGetItems = ac.getItems.bind(ac);
             ac.getItems = function (userId, options) {
+                if (!isStreamFlixRuntimeEnabled()) {
+                    return origGetItems(userId, options);
+                }
                 var opts = Object.assign({}, options || {});
                 if (opts.ParentId === 'undefined' || opts.ParentId === 'null') {
                     delete opts.ParentId;
@@ -724,8 +690,10 @@
                     delete opts.parentId;
                 }
                 var uid = userId || getActiveUserId();
+                var pid = opts.ParentId || opts.parentId || '';
+                var wasRec = String(opts.Recursive || opts.recursive || '').toLowerCase() === 'true';
                 return origGetItems(uid, opts).then(function (res) {
-                    if (res && Array.isArray(res.Items) && res.Items.length > 0) {
+                    if (res && Array.isArray(res.Items) && (res.Items.length > 0 || wasRec || !pid || !isKnownTopLevelViewId(pid))) {
                         return stampServerIdOnItems(res);
                     }
                     if (opts.Filters || opts.IncludeItemTypes === 'Episode' || opts.IncludeItemTypes === 'Season') {
@@ -742,23 +710,7 @@
                     });
                     qs.set('Recursive', 'true');
                     return apiFetch('/Items?' + qs.toString()).then(function (d1) {
-                        if (d1 && Array.isArray(d1.Items) && d1.Items.length > 0) {
-                            return stampServerIdOnItems(d1);
-                        }
-                        var pid = qs.get('ParentId') || qs.get('parentId') || '';
-                        if (pid && !isKnownTopLevelViewId(pid)) {
-                            return res;
-                        }
-                        var inferredType = inferItemTypesForParentOrRoute(pid, qs.get('IncludeItemTypes'));
-                        if (!inferredType) {
-                            return res;
-                        }
-                        qs.delete('ParentId');
-                        qs.delete('parentId');
-                        qs.set('IncludeItemTypes', inferredType);
-                        return apiFetch('/Items?' + qs.toString()).then(function (d2) {
-                            return (d2 && Array.isArray(d2.Items) && d2.Items.length > 0) ? stampServerIdOnItems(d2) : res;
-                        });
+                        return (d1 && Array.isArray(d1.Items)) ? stampServerIdOnItems(d1) : res;
                     }).catch(function () {
                         return res;
                     });
@@ -769,17 +721,23 @@
         if (typeof ac.getLatestItems === 'function') {
             var origGetLatest = ac.getLatestItems.bind(ac);
             ac.getLatestItems = function (options) {
+                if (!isStreamFlixRuntimeEnabled()) {
+                    return origGetLatest(options);
+                }
+                var opts = options || {};
+                var pid = opts.ParentId || opts.parentId || '';
                 return origGetLatest(options).then(function (res) {
-                    if (Array.isArray(res) && res.length > 0) {
+                    if (Array.isArray(res) && (res.length > 0 || !pid || !isKnownTopLevelViewId(pid))) {
                         return stampServerIdOnItems(res);
                     }
-                    var opts = options || {};
-                    var pid = opts.ParentId || opts.parentId || '';
                     var inferredType = inferItemTypesForParentOrRoute(pid, opts.IncludeItemTypes) || 'Movie,Series';
                     var qs = new URLSearchParams();
                     var uid = getActiveUserId();
                     if (uid) {
                         qs.set('userId', String(uid));
+                    }
+                    if (pid) {
+                        qs.set('ParentId', String(pid));
                     }
                     qs.set('Recursive', 'true');
                     qs.set('IncludeItemTypes', inferredType);
@@ -790,7 +748,7 @@
                         qs.set('Fields', String(opts.Fields));
                     }
                     return apiFetch('/Items?' + qs.toString()).then(function (d) {
-                        return (d && Array.isArray(d.Items) && d.Items.length > 0) ? stampServerIdOnItems(d.Items) : res;
+                        return (d && Array.isArray(d.Items)) ? stampServerIdOnItems(d.Items) : res;
                     }).catch(function () {
                         return res;
                     });
@@ -1284,6 +1242,7 @@
             || prevHeroLibsSig !== nextHeroLibsSig
             || prevNavSig !== nextNavSig;
 
+        state.pluginDisabled = false;
         state.configFresh = true;
         state.configAttempted = true;
         state.config = {
@@ -1305,6 +1264,7 @@
             allowAdminFallbackLogin: Boolean(cfg.allowAdminFallbackLogin),
             adminFallbackLanOnly: Boolean(cfg.adminFallbackLanOnly),
             bypassLoginGateOnLan: bypassLan,
+            treatTailscaleAsLocalLan: cfg.treatTailscaleAsLocalLan !== false,
             isLocalLan: isLocalLan,
             canShowAdminFallback: cfg.canShowAdminFallback !== undefined
                 ? Boolean(cfg.canShowAdminFallback)

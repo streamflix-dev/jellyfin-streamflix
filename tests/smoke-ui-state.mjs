@@ -302,4 +302,16 @@ assert.match(combinedJs, /function\s+canManageMediaItems\s*\(/, 'Admin Manage Me
 assert.match(combinedJs, /streamflix-modal-manage-btn/, 'Admin Manage Media modal entry point must be wired');
 console.log('[PASS] Per-profile Guest Pass permissions & Manage Media tools invariants verified');
 
-console.log('ALL STREAMFLIX v0.9.8.2 SMOKE CHECKS PASSED!');
+// Verify v0.9.8.3 CSS scoping, clean UI teardown, JMP guard, active-profile admin gating & direct download buttons
+const css01 = fs.readFileSync(path.join(cssDir, '01-base-and-native-detail.css'), 'utf8');
+assert.match(css01, /body\.bfx-active\s+div#itemDetailPage:not\(\.hide\)/, '#itemDetailPage override must be scoped to body.bfx-active and :not(.hide)');
+assert.match(css01, /body\.bfx-active\s+\.headerUserButton/, 'Native header button hiding must be scoped to body.bfx-active');
+assert.match(combinedJs, /function\s+teardownStreamFlixUi\s*\(/, 'Clean UI teardown helper must be present');
+assert.match(combinedJs, /function\s+isNativeDesktopShellClient\s*\(/, 'Jellyfin Media Player desktop shell guard must be present');
+assert.match(combinedJs, /function\s+isProfileManagementAdmin\s*\(/, 'Active-profile admin gate must be present');
+assert.match(combinedJs, /function\s+triggerDirectMediaDownload\s*\(/, 'Synchronous direct media download helper must be present');
+assert.match(combinedJs, /streamflix-modal-download-btn/, 'Detail modal Download button must be wired');
+assert.match(combinedJs, /data-ep-download-id/, 'Per-episode Download button must be wired');
+console.log('[PASS] Clean UI teardown, JMP guard, active-admin scoping & direct downloads verified');
+
+console.log('ALL STREAMFLIX v0.9.8.3 SMOKE CHECKS PASSED!');

@@ -892,7 +892,7 @@ public partial class StreamFlixController
             TrackGuestAccessToken(pass.Id, authResult.AccessToken);
         }
 
-        var guestCaller = new CallerContext(guestSession, true, false, StreamFlixSessionService.IsLocalLanRequest(HttpContext), user);
+        var guestCaller = new CallerContext(guestSession, true, false, StreamFlixSessionService.IsLocalLanRequest(HttpContext, config.TreatTailscaleAsLocalLan), user);
         var mappedProfile = MapProfilePublic(config, profile, guestCaller);
 
         return Ok(new

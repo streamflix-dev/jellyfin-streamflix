@@ -87,6 +87,10 @@ public partial class StreamFlixController : ControllerBase
 
     private static Dictionary<string, double> _popularScoresCache = new(StringComparer.OrdinalIgnoreCase);
 
+    private static int _showcaseRefreshInFlight;
+
+    private static int _popularRefreshInFlight;
+
     private readonly IUserManager _userManager;
     private readonly IUserDataManager _userDataManager;
     private readonly ISessionManager _sessionManager;
@@ -155,7 +159,7 @@ public partial class StreamFlixController : ControllerBase
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can read StreamFlix admin configuration." });
         }
@@ -171,7 +175,7 @@ public partial class StreamFlixController : ControllerBase
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can open StreamFlix settings." });
         }
@@ -192,7 +196,7 @@ public partial class StreamFlixController : ControllerBase
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can update StreamFlix settings." });
         }
@@ -216,6 +220,11 @@ public partial class StreamFlixController : ControllerBase
             config.AllowAdminFallbackLogin = request.AllowAdminFallbackLogin;
             config.AdminFallbackLanOnly = request.AdminFallbackLanOnly;
             config.BypassLoginGateOnLan = request.BypassLoginGateOnLan;
+            if (request.TreatTailscaleAsLocalLan.HasValue)
+            {
+                config.TreatTailscaleAsLocalLan = request.TreatTailscaleAsLocalLan.Value;
+            }
+
             config.AutoProvisionJellyfinUsers = request.AutoProvisionJellyfinUsers;
 
             config.GoogleClientId = (request.GoogleClientId ?? string.Empty).Trim();
@@ -389,7 +398,7 @@ public partial class StreamFlixController : ControllerBase
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can change StreamFlix secrets." });
         }
@@ -433,6 +442,24 @@ public partial class StreamFlixController : ControllerBase
             && !config.AllowStandardJellyfinLogin;
     }
 
+    private static bool IsJellyfinUserHouseholdMember(PluginConfiguration config, JUser? user)
+    {
+        if (user == null || StreamFlixStartupTask.IsUserDisabledCompat(user))
+        {
+            return false;
+        }
+
+        if (StreamFlixStartupTask.IsUserAdminCompat(user))
+        {
+            return true;
+        }
+
+        return (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Any(p => !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+                && Guid.TryParse(p.JellyfinUserId, out var linkedUid)
+                && linkedUid == user.Id);
+    }
+
     private static bool HasHouseholdAccess(PluginConfiguration config, CallerContext caller)
     {
         if (caller.IsAdmin)
@@ -447,7 +474,9 @@ public partial class StreamFlixController : ControllerBase
 
         return (config.BypassLoginGateOnLan && caller.IsLocalLan)
             || caller.Session != null
-            || (config.AllowStandardJellyfinLogin && caller.IsJellyfinAuthenticated && caller.JellyfinUser != null);
+            || (config.AllowStandardJellyfinLogin
+                && caller.IsJellyfinAuthenticated
+                && IsJellyfinUserHouseholdMember(config, caller.JellyfinUser));
     }
 
     private ObjectResult GoogleRequired(PluginConfiguration? config = null)
@@ -465,7 +494,7 @@ public partial class StreamFlixController : ControllerBase
 
     private async Task<CallerContext> GetCallerAsync(PluginConfiguration config)
     {
-        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext);
+        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext, config.TreatTailscaleAsLocalLan);
         var token = Request.Headers[StreamFlixSessionService.HeaderName].FirstOrDefault();
         var session = StreamFlixSessionService.Validate(config, token);
         var sessionIsAdmin = false;
@@ -525,6 +554,10 @@ public partial class StreamFlixController : ControllerBase
                     else if (StreamFlixStartupTask.IsUserAdminCompat(u))
                     {
                         sessionIsAdmin = true;
+                    }
+                    else if (!config.AllowStandardJellyfinLogin || !IsJellyfinUserHouseholdMember(config, u))
+                    {
+                        session = null;
                     }
                 }
             }
@@ -596,9 +629,10 @@ public partial class StreamFlixController : ControllerBase
         var isUnconfiguredGate = IsGateUnconfigured(config);
         var canShowAdminFallback = isUnconfiguredGate
             || (config.AllowAdminFallbackLogin && (!config.AdminFallbackLanOnly || caller.IsLocalLan));
+        var effectiveAdmin = IsEffectiveActiveAdmin(caller);
 
-        // The full Jellyfin user list is only needed (and only shown) to administrators choosing a profile's account.
-        var serverUsers = hasAccess && caller.IsAdmin
+        // The full Jellyfin user list is only needed (and only shown) to active administrators choosing a profile's account.
+        var serverUsers = hasAccess && effectiveAdmin
             ? StreamFlixStartupTask.GetAllUsersCompat(_userManager)
                 .OrderByDescending(u => StreamFlixStartupTask.IsUserAdminCompat(u))
                 .ThenBy(u => StreamFlixStartupTask.GetInternalIdCompat(u))
@@ -617,6 +651,33 @@ public partial class StreamFlixController : ControllerBase
             profilesSnapshot = profilesSnapshot
                 .Where(p => string.Equals(p.Id, caller.Session?.LockedProfileId, StringComparison.Ordinal) && !IsProfileLinkedToAdmin(p))
                 .ToList();
+        }
+        else if (!caller.IsAdmin)
+        {
+            var isLanBypassOnly = caller.Session == null && config.BypassLoginGateOnLan && caller.IsLocalLan;
+            var isNonAdminJfSession = (caller.Session != null && string.Equals(caller.Session.AuthKind, StreamFlixSessionService.AuthKindJellyfin, StringComparison.Ordinal))
+                || (caller.Session == null && !isLanBypassOnly && caller.IsJellyfinAuthenticated && caller.JellyfinUser != null);
+            if (isNonAdminJfSession)
+            {
+                Guid? scopedUid = null;
+                if (caller.Session != null && Guid.TryParse(caller.Session.JellyfinUserId, out var parsedSessUid))
+                {
+                    scopedUid = parsedSessUid;
+                }
+                else if (caller.JellyfinUser != null)
+                {
+                    scopedUid = caller.JellyfinUser.Id;
+                }
+
+                profilesSnapshot = scopedUid.HasValue
+                    ? profilesSnapshot
+                        .Where(p => !IsProfileLinkedToAdmin(p)
+                            && !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+                            && Guid.TryParse(p.JellyfinUserId, out var pUid)
+                            && pUid == scopedUid.Value)
+                        .ToList()
+                    : new List<StreamFlixProfileConfig>();
+            }
         }
 
         var activeGuestPass = isGuestPass && !string.IsNullOrWhiteSpace(caller.Session?.GuestPassId)
@@ -665,27 +726,28 @@ public partial class StreamFlixController : ControllerBase
             oidcConfigured,
             oidcProviderName,
             oidcRequireAllowlist = config.OidcRequireAllowlist,
-            hasOidcClientSecret = caller.IsAdmin && !string.IsNullOrWhiteSpace(config.OidcClientSecret),
+            hasOidcClientSecret = effectiveAdmin && !string.IsNullOrWhiteSpace(config.OidcClientSecret),
             allowStandardJellyfinLogin = config.AllowStandardJellyfinLogin,
             allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
             adminFallbackLanOnly = config.AdminFallbackLanOnly,
             bypassLoginGateOnLan = config.BypassLoginGateOnLan,
+            treatTailscaleAsLocalLan = config.TreatTailscaleAsLocalLan,
             isLocalLan = caller.IsLocalLan,
             canShowAdminFallback,
-            googleClientId = caller.IsAdmin || config.EnableGoogleSignIn ? config.GoogleClientId : string.Empty,
+            googleClientId = effectiveAdmin || config.EnableGoogleSignIn ? config.GoogleClientId : string.Empty,
             googleConfigured = !string.IsNullOrWhiteSpace(config.GoogleClientId),
-            hasGoogleClientSecret = caller.IsAdmin && !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
+            hasGoogleClientSecret = effectiveAdmin && !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
             hasAccess,
-            isAdmin = caller.IsAdmin,
+            isAdmin = effectiveAdmin,
             enableGuestPasses = config.EnableGuestPasses,
-            guestPassManagerProfileIds = hasAccess && caller.IsAdmin ? (config.GuestPassManagerProfileIds ?? new List<string>()).ToList() : new List<string>(),
+            guestPassManagerProfileIds = hasAccess && effectiveAdmin ? (config.GuestPassManagerProfileIds ?? new List<string>()).ToList() : new List<string>(),
             enableWatchTogether = config.EnableWatchTogether,
             hasAnyAdultPin = hasAccess && !isGuestPass && (config.Profiles ?? new List<StreamFlixProfileConfig>()).Any(p => !p.IsKids && !string.IsNullOrWhiteSpace(p.PinCode)),
             isGuestPass,
             guestPassLabel = activeGuestPass?.Label,
             guestPassExpiresAt = activeGuestPass?.ExpiresAtUtc ?? caller.Session?.ExpiresAt.ToString("O"),
             lockedProfileId = isGuestPass ? caller.Session?.LockedProfileId : null,
-            seerrConfigured = caller.IsAdmin && seerrConfigured,
+            seerrConfigured = effectiveAdmin && seerrConfigured,
             seerrEnabled,
             seerrAllowKids = config.SeerrAllowKids,
             seerrAllowGuests = config.SeerrAllowGuests,
@@ -711,8 +773,8 @@ public partial class StreamFlixController : ControllerBase
             showLibrariesInNav = config.ShowLibrariesInNav,
             navHiddenBuiltIns = navHiddenBuiltInsSnapshot,
             navLibraryIds = navLibraryIdsSnapshot,
-            approvedGoogleAccounts = hasAccess && caller.IsAdmin ? approvedSnapshot : new List<string>(),
-            approvedOidcUsers = hasAccess && caller.IsAdmin ? approvedOidcSnapshot : new List<string>(),
+            approvedGoogleAccounts = hasAccess && effectiveAdmin ? approvedSnapshot : new List<string>(),
+            approvedOidcUsers = hasAccess && effectiveAdmin ? approvedOidcSnapshot : new List<string>(),
             serverUsers,
             serverLibraries = hasAccess ? JellyfinCompat.GetServerMediaLibraries(_libraryManager) : new List<object>(),
             profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(config, p, caller)).ToList() : new List<object>(),
@@ -740,6 +802,7 @@ public partial class StreamFlixController : ControllerBase
             allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
             adminFallbackLanOnly = config.AdminFallbackLanOnly,
             bypassLoginGateOnLan = config.BypassLoginGateOnLan,
+            treatTailscaleAsLocalLan = config.TreatTailscaleAsLocalLan,
             autoProvisionJellyfinUsers = config.AutoProvisionJellyfinUsers,
             googleClientId = config.GoogleClientId ?? string.Empty,
             hasGoogleClientSecret = !string.IsNullOrWhiteSpace(config.GoogleClientSecret),
@@ -775,11 +838,9 @@ public partial class StreamFlixController : ControllerBase
 
     private ActionResult ServeAsset((string Text, byte[] Bytes, string ETag) asset, string contentType)
     {
-        var requestedVer = Request.Query["v"].ToString();
-        Response.Headers["Cache-Control"] = !string.IsNullOrEmpty(requestedVer)
-            && string.Equals(requestedVer, Plugin.AssetCacheVersion, StringComparison.Ordinal)
-            ? "public, max-age=86400"
-            : "no-cache";
+        // Always use ETag revalidation ("no-cache") rather than long-lived immutable caching so disabling the plugin
+        // in Jellyfin immediately causes browsers to revalidate and stop executing cached StreamFlix assets.
+        Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["ETag"] = asset.ETag;
 

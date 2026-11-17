@@ -727,29 +727,48 @@ public static class StreamFlixSeerrService
             ? "admin"
             : $"u:{callerSeerrUserId!.Value.ToString(CultureInfo.InvariantCulture)}";
         var reqCacheKey = $"{baseUrl}|{(isKidsProfile ? "1" : "0")}|{scopeTag}";
-        if (RecentRequestsCache.TryGetValue(reqCacheKey, out var cachedReqs) && cachedReqs.ExpiresAtUtc > DateTime.UtcNow)
+        List<SeerrRequestEntry>? staleFallback = null;
+        if (RecentRequestsCache.TryGetValue(reqCacheKey, out var cachedReqs))
         {
-            return cachedReqs.Entries;
+            if (cachedReqs.ExpiresAtUtc > DateTime.UtcNow)
+            {
+                return cachedReqs.Entries;
+            }
+
+            if (DateTime.UtcNow - cachedReqs.ExpiresAtUtc < TimeSpan.FromMinutes(10))
+            {
+                staleFallback = cachedReqs.Entries;
+            }
         }
 
         var listUrl = callerIsAdmin
-            ? $"{baseUrl}/api/v1/request?take=20&skip=0&sort=added"
-            : $"{baseUrl}/api/v1/request?take=20&skip=0&sort=added&requestedBy={callerSeerrUserId!.Value.ToString(CultureInfo.InvariantCulture)}";
+            ? $"{baseUrl}/api/v1/request?take=15&skip=0&sort=added"
+            : $"{baseUrl}/api/v1/request?take=15&skip=0&sort=added&requestedBy={callerSeerrUserId!.Value.ToString(CultureInfo.InvariantCulture)}";
 
-        using var resp = await SendSeerrWithCircuitBreakerAsync(
-            HttpMethod.Get,
-            listUrl,
-            baseUrl,
-            apiKey,
-            authCtx?.ApiUserHeader,
-            null,
-            cancellationToken).ConfigureAwait(false);
-        if (!resp.IsSuccessStatusCode)
+        string raw;
+        try
         {
-            throw new InvalidOperationException($"Seerr requests endpoint returned HTTP {(int)resp.StatusCode}.");
-        }
+            using var listCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            listCts.CancelAfter(TimeSpan.FromSeconds(22));
+            using var resp = await SendSeerrWithCircuitBreakerAsync(
+                HttpMethod.Get,
+                listUrl,
+                baseUrl,
+                apiKey,
+                authCtx?.ApiUserHeader,
+                null,
+                listCts.Token).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Seerr requests endpoint returned HTTP {(int)resp.StatusCode}.");
+            }
 
-        var raw = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            raw = await resp.Content.ReadAsStringAsync(listCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && staleFallback != null)
+        {
+            return staleFallback;
+        }
         using var doc = JsonDocument.Parse(raw);
         if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
         {
@@ -866,13 +885,13 @@ public static class StreamFlixSeerrService
                 var ck = $"{pair.MediaType}:{pair.TmdbId.ToString(CultureInfo.InvariantCulture)}";
                 return !MediaMetaCache.TryGetValue(ck, out var c) || c.ExpiresAtUtc <= DateTime.UtcNow;
             })
-            .Take(8)
+            .Take(6)
             .ToList();
 
         if (uncachedPairs.Count > 0)
         {
             using var metaCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            metaCts.CancelAfter(TimeSpan.FromSeconds(3.5));
+            metaCts.CancelAfter(TimeSpan.FromSeconds(4));
             using var gate = new SemaphoreSlim(6, 6);
 
             var fetchTasks = uncachedPairs.Select(async pair =>
@@ -1016,7 +1035,7 @@ public static class StreamFlixSeerrService
                 CanCancel: canCancelRow));
         }
 
-        RecentRequestsCache[reqCacheKey] = new CachedRequestsResult(entries, DateTime.UtcNow.AddSeconds(6));
+        RecentRequestsCache[reqCacheKey] = new CachedRequestsResult(entries, DateTime.UtcNow.AddSeconds(15));
         return entries;
     }
 
@@ -1454,22 +1473,52 @@ public static class StreamFlixSeerrService
             }
         }
 
-        // 2. Recovery when initial Seerr setup user #1 was deleted (so admin is user #2..#25): probe X-Api-User!
-        for (var candidateId = 2; candidateId <= 25; candidateId++)
+        // 2. Recovery when initial Seerr setup user #1 was deleted: query /api/v1/user once to locate an admin ID, then fall back to a brief bounded probe.
+        try
+        {
+            using var usersCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            usersCts.CancelAfter(TimeSpan.FromSeconds(4));
+            using var usersResp = await SendSeerrAsync(HttpMethod.Get, baseUrl + "/api/v1/user?take=100&skip=0", apiKey, null, null, usersCts.Token).ConfigureAwait(false);
+            if (usersResp.IsSuccessStatusCode)
+            {
+                using var uDoc = JsonDocument.Parse(await usersResp.Content.ReadAsStringAsync(usersCts.Token).ConfigureAwait(false));
+                if (uDoc.RootElement.TryGetProperty("results", out var uResults) && uResults.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var uEl in uResults.EnumerateArray())
+                    {
+                        var uid = JsonInt(uEl, "id", 0);
+                        var uPerms = JsonInt(uEl, "permissions", 0);
+                        if (uid > 0 && (uPerms & 2) != 0)
+                        {
+                            var headerVal = uid.ToString(CultureInfo.InvariantCulture);
+                            var recoveredFromList = new CachedApiAuthContext(headerVal, uid, DateTime.UtcNow.AddMinutes(15));
+                            ApiAuthCache[cacheKey] = recoveredFromList;
+                            return recoveredFromList;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        for (var candidateId = 2; candidateId <= 6; candidateId++)
         {
             var headerVal = candidateId.ToString(CultureInfo.InvariantCulture);
-            using var probeResp = await SendSeerrAsync(HttpMethod.Get, baseUrl + "/api/v1/auth/me", apiKey, headerVal, null, cancellationToken).ConfigureAwait(false);
-            if (!probeResp.IsSuccessStatusCode)
-            {
-                continue;
-            }
-
             try
             {
-                using var doc = JsonDocument.Parse(await probeResp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                probeCts.CancelAfter(TimeSpan.FromSeconds(2));
+                using var probeResp = await SendSeerrAsync(HttpMethod.Get, baseUrl + "/api/v1/auth/me", apiKey, headerVal, null, probeCts.Token).ConfigureAwait(false);
+                if (!probeResp.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                using var doc = JsonDocument.Parse(await probeResp.Content.ReadAsStringAsync(probeCts.Token).ConfigureAwait(false));
                 var foundId = JsonInt(doc.RootElement, "id", candidateId);
                 var perms = JsonInt(doc.RootElement, "permissions", 0);
-                // In Seerr/Jellyseerr, Permission.ADMIN == 2 (bit 1)
                 if ((perms & 2) != 0 || candidateId == 2)
                 {
                     var recovered = new CachedApiAuthContext(headerVal, foundId, DateTime.UtcNow.AddMinutes(15));
@@ -1482,7 +1531,9 @@ public static class StreamFlixSeerrService
             }
         }
 
-        return null;
+        var defaultFallback = new CachedApiAuthContext(null, 1, DateTime.UtcNow.AddMinutes(3));
+        ApiAuthCache[cacheKey] = defaultFallback;
+        return defaultFallback;
     }
 
     private static async Task<List<SeerrServiceServer>> GetServiceServersAsync(

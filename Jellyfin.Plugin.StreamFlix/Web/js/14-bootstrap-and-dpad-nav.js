@@ -5,6 +5,66 @@
     var configFetchInFlight = null;
     var lastConfigFetchAt = 0;
 
+    function teardownStreamFlixUi() {
+        try {
+            clearUserPreferencesEnhancements();
+        } catch (ePref) {}
+        try {
+            if (state.heroTimer) {
+                clearInterval(state.heroTimer);
+                state.heroTimer = null;
+            }
+            if (document.body) {
+                [
+                    'bfx-active',
+                    'streamflix-gate-locked',
+                    'streamflix-hub-filtered',
+                    'streamflix-hub-active',
+                    'streamflix-modal-open',
+                    'streamflix-on-home',
+                    'streamflix-on-details-page',
+                    'streamflix-scrolled',
+                    'bfx-admin-route',
+                    'bfx-classic-home',
+                    'bfx-settings-route',
+                    'bfx-settings-subpage',
+                    'bfx-kids-mode',
+                    'bfx-tv-mode'
+                ].forEach(function (cls) {
+                    document.body.classList.remove(cls);
+                });
+            }
+            [
+                '#streamflix-overlay-root',
+                '#streamflix-overlay-root-closing',
+                '#streamflix-cinema-hub',
+                '#streamflix-header-profile-btn',
+                '#streamflix-account-dropdown',
+                '#bfx-fixed-corner-brand',
+                '#streamflix-mobile-dock',
+                '#streamflix-playback-loader'
+            ].forEach(function (sel) {
+                var el = document.querySelector(sel);
+                if (el && el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+            });
+            Array.prototype.forEach.call(document.querySelectorAll('.streamflix-modal-backdrop'), function (mEl) {
+                if (mEl && mEl.parentNode) {
+                    mEl.parentNode.removeChild(mEl);
+                }
+            });
+            Array.prototype.forEach.call(document.querySelectorAll('[data-streamflix-corner-brand="true"]'), function (bEl) {
+                bEl.removeAttribute('data-streamflix-corner-brand');
+            });
+            if (state.pluginDisabled) {
+                Array.prototype.forEach.call(document.querySelectorAll('link[href*="/StreamFlix/ClientStyles"]'), function (lnk) {
+                    lnk.disabled = true;
+                });
+            }
+        } catch (eTd) {}
+    }
+
     function fetchPublicConfig() {
         if (configFetchInFlight) {
             return configFetchInFlight;
@@ -13,8 +73,13 @@
         configFetchInFlight = apiFetch('/StreamFlix/PublicConfig').then(function (cfg) {
             applyConfigFromServerResponse(cfg);
             return state.config;
-        }).catch(function () {
+        }).catch(function (err) {
             state.configAttempted = true;
+            if (err && err.status === 404) {
+                state.pluginDisabled = true;
+                try { localStorage.removeItem(CACHED_CONFIG_KEY); } catch (eRm) {}
+                teardownStreamFlixUi();
+            }
             if (!state.config) {
                 state.config = DEFAULT_CONFIG;
             }
@@ -83,16 +148,20 @@
     }
 
     function evaluateAuthAndProfileGate() {
+        if (!isStreamFlixRuntimeEnabled()) {
+            teardownStreamFlixUi();
+            return;
+        }
+
+        if (document.body) {
+            document.body.classList.add('bfx-active');
+        }
+
         installJellyfin12FetchInterceptor();
         patchJellyfinApiClientMethods();
         fixBrokenJellyfinRoutes();
 
         if (state.verifyingGoogle || state.activatingProfileId) {
-            return;
-        }
-
-        if (!state.config || state.config.enableStreamFlixUi === false) {
-            clearUserPreferencesEnhancements();
             return;
         }
 
@@ -117,25 +186,47 @@
             if (document.body) {
                 document.body.classList.remove('streamflix-hub-filtered', 'streamflix-hub-active');
             }
-            if (!isGuestPassSession()) {
-                if (state.adminAuth && state.adminAuth.accessToken && state.adminAuth.userId) {
-                    var admUnderlying = typeof getUnderlyingApiClientAuth === 'function' ? getUnderlyingApiClientAuth() : null;
-                    if (!admUnderlying || !admUnderlying.loggedIn || normalizeGuid(admUnderlying.userId) !== normalizeGuid(state.adminAuth.userId) || admUnderlying.accessToken !== state.adminAuth.accessToken) {
-                        applyJellyfinServerCredentials({
-                            serverId: state.adminAuth.serverId || (state.config && state.config.serverId),
-                            userId: state.adminAuth.userId,
-                            accessToken: state.adminAuth.accessToken,
-                            user: state.adminAuth.user || null
-                        });
-                    }
-                } else if (isHouseholdAdmin()
-                    && typeof isCurrentJellyfinClientAdmin === 'function'
-                    && !isCurrentJellyfinClientAdmin()
-                    && (!state.lastAutoAdminElevateAt || Date.now() - state.lastAutoAdminElevateAt > 8000)) {
-                    state.lastAutoAdminElevateAt = Date.now();
-                    openStreamFlixAdminRoute(window.location.hash || '#/dashboard');
-                    return;
+            if (isGuestPassSession()) {
+                window.location.hash = '#/home';
+                return;
+            }
+            if (state.adminAuth && state.adminAuth.accessToken && state.adminAuth.userId) {
+                var admUnderlying = typeof getUnderlyingApiClientAuth === 'function' ? getUnderlyingApiClientAuth() : null;
+                if (!admUnderlying || !admUnderlying.loggedIn || normalizeGuid(admUnderlying.userId) !== normalizeGuid(state.adminAuth.userId) || admUnderlying.accessToken !== state.adminAuth.accessToken) {
+                    applyJellyfinServerCredentials({
+                        serverId: state.adminAuth.serverId || (state.config && state.config.serverId),
+                        userId: state.adminAuth.userId,
+                        accessToken: state.adminAuth.accessToken,
+                        user: state.adminAuth.user || null
+                    });
                 }
+            } else if (state.activeProfile && state.activeProfile.isAdmin && state.activeProfile.accessToken && state.activeProfile.jellyfinUserId) {
+                saveAdminAuth({
+                    userId: state.activeProfile.jellyfinUserId,
+                    userName: state.activeProfile.jellyfinUsername || state.activeProfile.name || 'Administrator',
+                    accessToken: state.activeProfile.accessToken,
+                    serverId: state.activeProfile.serverId || (state.config && state.config.serverId),
+                    user: state.activeProfile.user || null
+                });
+                applyJellyfinServerCredentials({
+                    serverId: state.adminAuth.serverId || (state.config && state.config.serverId),
+                    userId: state.adminAuth.userId,
+                    accessToken: state.adminAuth.accessToken,
+                    user: state.adminAuth.user || null
+                });
+            } else if (isProfileManagementAdmin()
+                && typeof isCurrentJellyfinClientAdmin === 'function'
+                && !isCurrentJellyfinClientAdmin()
+                && (!state.lastAutoAdminElevateAt || Date.now() - state.lastAutoAdminElevateAt > 8000)) {
+                state.lastAutoAdminElevateAt = Date.now();
+                openStreamFlixAdminRoute(window.location.hash || '#/dashboard');
+                return;
+            } else if (state.configFresh
+                && !(typeof isCurrentJellyfinClientAdmin === 'function' && isCurrentJellyfinClientAdmin())
+                && !isProfileManagementAdmin()) {
+                showToast('Switch to an Administrator profile first to open the Server Dashboard.', 'error');
+                window.location.hash = '#/home';
+                return;
             }
             if (isGateOpen() && !isUserProtectedOverlayPhase() && hasHouseholdAccess() && getActiveToken()) {
                 closeOverlayGate();
@@ -1221,6 +1312,14 @@
     };
 
     function bootstrap() {
+        if (isNativeDesktopShellClient()) {
+            state.pluginDisabled = true;
+            teardownStreamFlixUi();
+            return;
+        }
+        if (document.body && isStreamFlixRuntimeEnabled()) {
+            document.body.classList.add('bfx-active');
+        }
         installStrictCspImageHandlers();
         syncDeviceLayoutClasses();
         installJellyfin12FetchInterceptor();

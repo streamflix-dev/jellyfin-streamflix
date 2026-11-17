@@ -7,17 +7,17 @@
     }
 
     /* Header & Wordmark */
-    .skinHeader,
-    .appHeader,
-    header.MuiAppBar-root {
+    body.bfx-active .skinHeader,
+    body.bfx-active .appHeader,
+    body.bfx-active header.MuiAppBar-root {
         min-height: 54px !important;
         padding-top: env(safe-area-inset-top, 0px) !important;
     }
-    [data-streamflix-corner-brand="true"],
-    .streamflix-toolbar-brand-link,
-    .streamflix-inline-brand,
-    .skinHeader .pageTitleWithDefaultLogo,
-    .skinHeader .pageTitleWithLogo {
+    body.bfx-active [data-streamflix-corner-brand="true"],
+    body.bfx-active .streamflix-toolbar-brand-link,
+    body.bfx-active .streamflix-inline-brand,
+    body.bfx-active .skinHeader .pageTitleWithDefaultLogo,
+    body.bfx-active .skinHeader .pageTitleWithLogo {
         font-size: 20px !important;
     }
     #streamflix-header-profile-btn {

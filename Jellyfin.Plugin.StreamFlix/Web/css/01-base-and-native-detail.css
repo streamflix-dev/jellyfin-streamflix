@@ -46,6 +46,9 @@
     --streamflix-muted: #b3b3b3;
     --streamflix-green: #46d369;
     --rounding: 8px;
+}
+
+body.bfx-active {
     --accent: #E50914;
     --deftraback: rgba(229, 9, 20, 0.22) !important;
     --theme-primary-color: #E50914 !important;
@@ -53,41 +56,41 @@
     --theme-background-color: #141414 !important;
 }
 
-::-moz-selection {
+body.bfx-active ::-moz-selection {
     background: var(--streamflix-red);
     color: #fff;
     text-shadow: none;
 }
-::selection {
+body.bfx-active ::selection {
     background: var(--streamflix-red);
     color: #fff;
     text-shadow: none;
 }
 
 /* Custom Netflix Red Scrollbars */
-::-webkit-scrollbar {
+body.bfx-active ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-track-piece {
+body.bfx-active ::-webkit-scrollbar-track,
+body.bfx-active ::-webkit-scrollbar-track-piece {
     background: rgba(10, 10, 10, 0.6) !important;
 }
-::-webkit-scrollbar-thumb {
+body.bfx-active ::-webkit-scrollbar-thumb {
     background: var(--streamflix-red) !important;
     border-radius: 4px !important;
 }
 
 /* Global Cinema Dark Background & Netflix Sans Typography */
-html,
-body,
-.backgroundContainer {
+html:has(body.bfx-active),
+body.bfx-active,
+body.bfx-active .backgroundContainer {
     background-color: var(--streamflix-bg);
     color: var(--streamflix-text) !important;
     font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
 }
 
-.mainAnimatedPages {
+body.bfx-active .mainAnimatedPages {
     background: transparent !important;
     background-color: transparent !important;
     color: var(--streamflix-text) !important;
@@ -123,10 +126,10 @@ body.streamflix-hub-filtered .homeTab .sections {
     display: none !important;
 }
 
-h1,
-h2,
-h3,
-h4 {
+body.bfx-active h1,
+body.bfx-active h2,
+body.bfx-active h3,
+body.bfx-active h4 {
     background: transparent !important;
     background-color: transparent !important;
     color: var(--streamflix-text) !important;
@@ -134,18 +137,18 @@ h4 {
 }
 
 /* Blurred + Ambient Cinema Backdrop for Library Pages */
-.backdropImage {
+body.bfx-active .backdropImage {
     -webkit-filter: blur(22px) saturate(135%) contrast(108%) brightness(38%);
     filter: blur(22px) saturate(135%) contrast(108%) brightness(38%);
 }
 
 /* Keep backdrop crisp & unblurred on Movie/Series Title Detail Page! */
-body.streamflix-on-details-page .backdropImage {
+body.bfx-active.streamflix-on-details-page .backdropImage {
     -webkit-filter: brightness(78%) contrast(106%) saturate(112%) !important;
     filter: brightness(78%) contrast(106%) saturate(112%) !important;
 }
 
-.backgroundContainer.withBackdrop:not(.backgroundContainer-transparent) {
+body.bfx-active .backgroundContainer.withBackdrop:not(.backgroundContainer-transparent) {
     background: linear-gradient(180deg, rgba(20, 20, 20, 0.55) 0%, rgba(20, 20, 20, 0.35) 45%, #141414 95%) !important;
 }
 
@@ -171,10 +174,10 @@ body.streamflix-gate-locked .loginPage {
 /* ==========================================================================
    2. Transparent Cinema Top Bar & Merged Profile/Account Menu Pill
    ========================================================================== */
-.skinHeader,
-.appHeader,
-header.MuiAppBar-root,
-.skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred {
+body.bfx-active .skinHeader,
+body.bfx-active .appHeader,
+body.bfx-active header.MuiAppBar-root,
+body.bfx-active .skinHeader.focuscontainer-x.skinHeader-withBackground.skinHeader-blurred {
     background: linear-gradient(180deg, rgba(10, 10, 10, 0.92) 0%, rgba(16, 16, 16, 0.65) 75%, rgba(20, 20, 20, 0) 100%) !important;
     backdrop-filter: blur(12px) !important;
     -webkit-backdrop-filter: blur(12px) !important;
@@ -184,43 +187,43 @@ header.MuiAppBar-root,
 
 /* Hide default Jellyfin logo, redundant Jellyfin User Avatar button, and redundant native Search button
    so there is only ONE unified search bar and ONE top-right Profile & Account Pill */
-.pageTitleWithDefaultLogo,
-.pageTitleWithLogo,
-.headerLogo {
+body.bfx-active .pageTitleWithDefaultLogo,
+body.bfx-active .pageTitleWithLogo,
+body.bfx-active .headerLogo {
     background-image: none !important;
     width: auto !important;
 }
 
-.headerUserButton,
-.headerUserButtonRound,
-.headerSearchButton,
-.MuiToolbar-root a[href*="mypreferencesmenu"],
-.MuiToolbar-root a[href*="search"],
-.skinHeader a[href*="search"],
-.MuiToolbar-root button[title="User"],
-.MuiToolbar-root button[aria-label="User"],
-.MuiToolbar-root button[title="Search"],
-.MuiToolbar-root button[aria-label="Search"],
-.skinHeader button[title="Search"],
-.skinHeader button[aria-label="Search"],
-.MuiToolbar-root .MuiAvatar-root,
-.MuiToolbar-root .MuiStack-root > :not(:first-child):not([data-streamflix-corner-brand="true"]),
-.MuiToolbar-root a[href*="/home?tab="],
-.MuiToolbar-root a[href*="#/movies"],
-.MuiToolbar-root a[href*="#/tv"],
-.MuiToolbar-root a[href*="#/list"],
-.MuiToolbar-root a[href*="#/boxsets"],
-.MuiToolbar-root button[aria-controls="user-views-menu"],
-.skinHeader .headerTabs,
-.skinHeader .sectionTabs,
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .mainDrawerButton,
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .barsMenuButton,
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .headerMenuButton,
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[title="Menu"],
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="Menu"],
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="Open navigation"],
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="open drawer"],
-body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) [data-bfx-drawer-btn="1"] {
+body.bfx-active .headerUserButton,
+body.bfx-active .headerUserButtonRound,
+body.bfx-active .headerSearchButton,
+body.bfx-active .MuiToolbar-root a[href*="mypreferencesmenu"],
+body.bfx-active .MuiToolbar-root a[href*="search"],
+body.bfx-active .skinHeader a[href*="search"],
+body.bfx-active .MuiToolbar-root button[title="User"],
+body.bfx-active .MuiToolbar-root button[aria-label="User"],
+body.bfx-active .MuiToolbar-root button[title="Search"],
+body.bfx-active .MuiToolbar-root button[aria-label="Search"],
+body.bfx-active .skinHeader button[title="Search"],
+body.bfx-active .skinHeader button[aria-label="Search"],
+body.bfx-active .MuiToolbar-root .MuiAvatar-root,
+body.bfx-active .MuiToolbar-root .MuiStack-root > :not(:first-child):not([data-streamflix-corner-brand="true"]),
+body.bfx-active .MuiToolbar-root a[href*="/home?tab="],
+body.bfx-active .MuiToolbar-root a[href*="#/movies"],
+body.bfx-active .MuiToolbar-root a[href*="#/tv"],
+body.bfx-active .MuiToolbar-root a[href*="#/list"],
+body.bfx-active .MuiToolbar-root a[href*="#/boxsets"],
+body.bfx-active .MuiToolbar-root button[aria-controls="user-views-menu"],
+body.bfx-active .skinHeader .headerTabs,
+body.bfx-active .skinHeader .sectionTabs,
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .mainDrawerButton,
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .barsMenuButton,
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .skinHeader:not(.osdHeader) .headerMenuButton,
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[title="Menu"],
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="Menu"],
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="Open navigation"],
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) .MuiToolbar-root button[aria-label="open drawer"],
+body.bfx-active:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-player) [data-bfx-drawer-btn="1"] {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
@@ -233,30 +236,30 @@ body:not(.bfx-admin-route):not(.bfx-classic-home):not(.streamflix-in-video-playe
 }
 
 /* Never show Jellyfin's FallbackRoute ("Page not found") text on the Home route */
-body.streamflix-on-home #fallbackPage > .padded-left,
-#fallbackPage.streamflix-recovered > .padded-left {
+body.bfx-active.streamflix-on-home #fallbackPage > .padded-left,
+body.bfx-active #fallbackPage.streamflix-recovered > .padded-left {
     display: none !important;
 }
 
-.headerRight {
+body.bfx-active .headerRight {
     padding-right: 130px !important;
 }
-.MuiToolbar-root > .MuiBox-root:last-child {
+body.bfx-active .MuiToolbar-root > .MuiBox-root:last-child {
     margin-right: 122px !important;
 }
 
 /* Top-Left Corner STREAMFLIX Wordmark (replaces Jellyfin triangle + "Jellyfin" in place) */
-[data-streamflix-corner-brand="true"],
-.streamflix-toolbar-brand-link,
-.streamflix-inline-brand,
-.skinHeader .pageTitleWithDefaultLogo,
-.skinHeader .pageTitleWithLogo,
-.MuiToolbar-root a[href="#/"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]),
-.MuiToolbar-root a[href="#/home"]:not([href*="tab="]),
-.MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/home"]:not([href*="tab="]),
-.MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) {
+body.bfx-active [data-streamflix-corner-brand="true"],
+body.bfx-active .streamflix-toolbar-brand-link,
+body.bfx-active .streamflix-inline-brand,
+body.bfx-active .skinHeader .pageTitleWithDefaultLogo,
+body.bfx-active .skinHeader .pageTitleWithLogo,
+body.bfx-active .MuiToolbar-root a[href="#/"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="#/home"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/home"]:not([href*="tab="]),
+body.bfx-active .MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) {
     display: inline-flex !important;
     align-items: center !important;
     font-family: "Netflix Sans", "Inter", "Helvetica Neue", Arial, sans-serif !important;
@@ -274,22 +277,22 @@ body.streamflix-on-home #fallbackPage > .padded-left,
     user-select: none !important;
 }
 
-[data-streamflix-corner-brand="true"] img,
-[data-streamflix-corner-brand="true"] svg,
-[data-streamflix-corner-brand="true"] .MuiButton-startIcon,
-[data-streamflix-corner-brand="true"] .MuiButton-icon,
-.streamflix-toolbar-brand-link img,
-.streamflix-toolbar-brand-link svg,
-.streamflix-toolbar-brand-link .MuiButton-startIcon,
-.streamflix-toolbar-brand-link .MuiButton-icon,
-.MuiToolbar-root a[href="#/"]:not([href*="tab="]) img,
-.MuiToolbar-root a[href="#/"]:not([href*="tab="]) .MuiButton-startIcon,
-.MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]) img,
-.MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]) .MuiButton-startIcon,
-.MuiToolbar-root a[href="#/home"]:not([href*="tab="]) img,
-.MuiToolbar-root a[href="#/home"]:not([href*="tab="]) .MuiButton-startIcon,
-.MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]) img,
-.MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]) .MuiButton-startIcon {
+body.bfx-active [data-streamflix-corner-brand="true"] img,
+body.bfx-active [data-streamflix-corner-brand="true"] svg,
+body.bfx-active [data-streamflix-corner-brand="true"] .MuiButton-startIcon,
+body.bfx-active [data-streamflix-corner-brand="true"] .MuiButton-icon,
+body.bfx-active .streamflix-toolbar-brand-link img,
+body.bfx-active .streamflix-toolbar-brand-link svg,
+body.bfx-active .streamflix-toolbar-brand-link .MuiButton-startIcon,
+body.bfx-active .streamflix-toolbar-brand-link .MuiButton-icon,
+body.bfx-active .MuiToolbar-root a[href="#/"]:not([href*="tab="]) img,
+body.bfx-active .MuiToolbar-root a[href="#/"]:not([href*="tab="]) .MuiButton-startIcon,
+body.bfx-active .MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]) img,
+body.bfx-active .MuiToolbar-root a[href="/web/#/"]:not([href*="tab="]) .MuiButton-startIcon,
+body.bfx-active .MuiToolbar-root a[href="#/home"]:not([href*="tab="]) img,
+body.bfx-active .MuiToolbar-root a[href="#/home"]:not([href*="tab="]) .MuiButton-startIcon,
+body.bfx-active .MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]) img,
+body.bfx-active .MuiToolbar-root a[href="#/home.html"]:not([href*="tab="]) .MuiButton-startIcon {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
@@ -474,10 +477,11 @@ body.streamflix-on-home #fallbackPage > .padded-left,
 
 /* Style #itemDetailPage itself as the centered 880px #181818 'The Devil Wears Prada 2' card
    so Jellyfin's native Play / Resume buttons work 100% natively without duplicate modal overlays! */
-div#itemDetailPage {
+body.bfx-active div#itemDetailPage:not(.hide) {
     position: relative !important;
     max-width: 880px !important;
     width: calc(100% - 32px) !important;
+    min-height: 440px !important;
     margin: 74px auto 48px auto !important;
     padding: 0 0 32px 0 !important;
     background: #181818 !important;
@@ -491,8 +495,8 @@ div#itemDetailPage {
 
 /* Hide underlying #itemDetailPage whenever .streamflix-detail-modal is open or playback transition is active
    so two detail cards never stack and the card disappears immediately when Play/Resume is clicked */
-body.streamflix-modal-open div#itemDetailPage,
-body.streamflix-autoplaying div#itemDetailPage {
+body.bfx-active.streamflix-modal-open div#itemDetailPage,
+body.bfx-active.streamflix-autoplaying div#itemDetailPage {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
@@ -501,7 +505,7 @@ body.streamflix-autoplaying div#itemDetailPage {
 }
 
 /* 400px Top Hero Banner inside the 880px #181818 Netflix Card */
-div#itemBackdrop {
+body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide) {
     height: 400px !important;
     min-height: 400px !important;
     max-height: 400px !important;
@@ -522,7 +526,7 @@ div#itemBackdrop {
 }
 
 /* Subtle left vignette inside the 400px card hero */
-div#itemBackdrop::before {
+body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide)::before {
     content: "" !important;
     position: absolute !important;
     inset: 0 !important;
@@ -537,7 +541,7 @@ div#itemBackdrop::before {
 }
 
 /* Exact 'The Devil Wears Prada 2' bottom fade into #181818 */
-div#itemBackdrop::after {
+body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide)::after {
     content: "" !important;
     position: absolute !important;
     inset: 0 !important;
@@ -568,8 +572,8 @@ html body #itemDetailPage .detailVerticalSection.hide {
 
 /* Completely collapse the stock left-hand 2:3 vertical poster container (.detailImageContainer)
    so it never pushes .infoWrapper to the middle of the screen! */
-#itemDetailPage .detailImageContainer,
-#itemDetailPage .detailImageContainer .card {
+body.bfx-active #itemDetailPage .detailImageContainer,
+body.bfx-active #itemDetailPage .detailImageContainer .card {
     display: none !important;
     width: 0 !important;
     min-width: 0 !important;
@@ -580,35 +584,35 @@ html body #itemDetailPage .detailVerticalSection.hide {
 }
 
 /* Hide stock .detailLogo because #itemDetailPage .itemName renders a crisp full-width Netflix Sans title */
-html body .layout-desktop #itemDetailPage .detailLogo,
-html body .layout-mobile #itemDetailPage .detailLogo,
-html body .layout-tv #itemDetailPage .detailLogo,
-html body #itemDetailPage .detailLogo,
-html body .detailLogo {
+html body.bfx-active .layout-desktop #itemDetailPage .detailLogo,
+html body.bfx-active .layout-mobile #itemDetailPage .detailLogo,
+html body.bfx-active .layout-tv #itemDetailPage .detailLogo,
+html body.bfx-active #itemDetailPage .detailLogo,
+html body.bfx-active .detailLogo {
     display: none !important;
 }
 
 /* Remove the ugly stock grey horizontal ribbon bar across the middle */
-#itemDetailPage .detailRibbon,
-#itemDetailPage .detailPageWrapperContainer,
-#itemDetailPage .detailPagePrimaryContainer,
-#itemDetailPage .detailPageSecondaryContainer,
-#itemDetailPage .detailPageContent {
+body.bfx-active #itemDetailPage .detailRibbon,
+body.bfx-active #itemDetailPage .detailPageWrapperContainer,
+body.bfx-active #itemDetailPage .detailPagePrimaryContainer,
+body.bfx-active #itemDetailPage .detailPageSecondaryContainer,
+body.bfx-active #itemDetailPage .detailPageContent {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
 }
 
-#itemDetailPage .detailPageWrapperContainer,
-#itemDetailPage .detailLogo.hide + .detailPageWrapperContainer {
+body.bfx-active #itemDetailPage .detailPageWrapperContainer,
+body.bfx-active #itemDetailPage .detailLogo.hide + .detailPageWrapperContainer {
     position: relative !important;
     z-index: 3 !important;
     padding-top: 215px !important;
 }
 
 /* Stack .infoWrapper (Title + Metadata) and .mainDetailButtons vertically inside the 880px card */
-#itemDetailPage .detailPagePrimaryContainer,
-#itemDetailPage .detailRibbon {
+body.bfx-active #itemDetailPage .detailPagePrimaryContainer,
+body.bfx-active #itemDetailPage .detailRibbon {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
@@ -621,12 +625,12 @@ html body .detailLogo {
     min-height: 0 !important;
 }
 
-#itemDetailPage .detailRibbon {
+body.bfx-active #itemDetailPage .detailRibbon {
     padding: 0 !important;
 }
 
-#itemDetailPage .infoWrapper,
-#itemDetailPage .nameContainer {
+body.bfx-active #itemDetailPage .infoWrapper,
+body.bfx-active #itemDetailPage .nameContainer {
     width: 100% !important;
     max-width: 816px !important;
     padding: 0 !important;
@@ -637,8 +641,8 @@ html body .detailLogo {
 }
 
 /* 'B FILM' / 'B SERIES' / 'B EPISODE' badge above Title inside #itemDetailPage */
-#itemDetailPage .nameContainer::before {
-    content: "B   FEATURE" !important;
+body.bfx-active #itemDetailPage .nameContainer::before {
+    content: "STREAMFLIX   FEATURE" !important;
     display: inline-block !important;
     font-size: 11px !important;
     font-weight: 900 !important;
@@ -1109,20 +1113,20 @@ html body #itemDetailPage .itemName {
 /* ==========================================================================
    4. Stock Jellyfin Cards, Inputs, Dialogs & Video Player OSD Overhaul
    ========================================================================== */
-.emby-tab-button.emby-tab-button-active,
-.MuiTab-root.Mui-selected {
+body.bfx-active .emby-tab-button.emby-tab-button-active,
+body.bfx-active .MuiTab-root.Mui-selected {
     color: #ffffff !important;
     font-weight: 800 !important;
 }
 
-.emby-tab-button.emby-tab-button-active::after,
-.MuiTabs-indicator {
+body.bfx-active .emby-tab-button.emby-tab-button-active::after,
+body.bfx-active .MuiTabs-indicator {
     background-color: var(--streamflix-red) !important;
     height: 3px !important;
 }
 
-.playedIndicator,
-.countIndicator {
+body.bfx-active .playedIndicator,
+body.bfx-active .countIndicator {
     background: var(--streamflix-red) !important;
     color: #ffffff !important;
     border-radius: 6px !important;
@@ -1130,21 +1134,21 @@ html body #itemDetailPage .itemName {
     font-weight: 800 !important;
 }
 
-.itemProgressBar {
+body.bfx-active .itemProgressBar {
     height: 4px !important;
     background: rgba(255, 255, 255, 0.22) !important;
 }
 
-.itemProgressBarForeground,
-.mdl-slider-background-lower {
+body.bfx-active .itemProgressBarForeground,
+body.bfx-active .mdl-slider-background-lower {
     background-color: var(--streamflix-red) !important;
 }
 
-.mdl-slider::-webkit-slider-thumb {
+body.bfx-active .mdl-slider::-webkit-slider-thumb {
     background: var(--streamflix-red) !important;
 }
 
-.cardBox {
+body.bfx-active .cardBox {
     border-radius: 8px !important;
     overflow: hidden !important;
     background: var(--streamflix-card) !important;
@@ -1153,24 +1157,24 @@ html body #itemDetailPage .itemName {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65) !important;
 }
 
-.card:hover .cardBox {
+body.bfx-active .card:hover .cardBox {
     transform: scale(1.06) translateY(-4px) !important;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9), 0 0 0 1.5px rgba(229, 9, 20, 0.7) !important;
     z-index: 25 !important;
 }
 
-.cardOverlayContainer {
+body.bfx-active .cardOverlayContainer {
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.82) 100%) !important;
     border-radius: 8px !important;
 }
 
-.cardOverlayFab-primary {
+body.bfx-active .cardOverlayFab-primary {
     background-color: var(--streamflix-red) !important;
     color: #fff !important;
     box-shadow: 0 6px 20px rgba(229, 9, 20, 0.55) !important;
 }
 
-.dialog {
+body.bfx-active .dialog {
     background-color: rgba(20, 20, 20, 0.92) !important;
     backdrop-filter: blur(40px) !important;
     -webkit-backdrop-filter: blur(40px) !important;
@@ -1178,7 +1182,7 @@ html body #itemDetailPage .itemName {
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
-.navMenuOption-selected {
+body.bfx-active .navMenuOption-selected {
     background: var(--streamflix-red) !important;
     color: #fff !important;
 }

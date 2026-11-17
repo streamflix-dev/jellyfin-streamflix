@@ -133,6 +133,7 @@ public class PluginConfiguration : BasePluginConfiguration
         AllowAdminFallbackLogin = false;
         AdminFallbackLanOnly = false;
         BypassLoginGateOnLan = false;
+        TreatTailscaleAsLocalLan = true;
         FirstGoogleAccountClaimed = false;
         AutoProvisionJellyfinUsers = true;
         ProfilesSeeded = false;
@@ -223,6 +224,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// and jump straight to the "Who's watching?" profile picker.
     /// </summary>
     public bool BypassLoginGateOnLan { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether Tailscale / RFC 6598 CGNAT addresses (<c>100.64.0.0/10</c>)
+    /// are treated as trusted private LAN connections alongside RFC 1918 subnets.
+    /// </summary>
+    public bool TreatTailscaleAsLocalLan { get; set; } = true;
 
     public bool AutoProvisionJellyfinUsers { get; set; }
 

@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.3",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.3 Release Candidate (Dev Test Channel): Clean disable/uninstall recovery with zero persistent disk branding/index.html writes and scoped body.bfx-active CSS (#17, #16); Jellyfin Media Player for Windows compatibility (#16); household-member scoping on Standard Jellyfin Login and active-profile admin enforcement across profile deletion/reordering/editing, backups, and device management (#11, #8, #3); Tailscale CGNAT (100.64.0.0/10) local-network recognition and Dashboard non-admin token protection (#12); 2-stage progressive Cinema Hub fallback, SWR caching, and non-blocking server popularity/showcase caches (#13); Visible Jellyfin Libraries navigation bar filtering & deduplication (#14); Seerr Tracker timeout & auth probe fixes (#15); and Jellyfin 12 download fix + direct Movie & Episode Download buttons (#10).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.3_12.0.0.zip",
+        "checksum": "4a06e6d795c3dca1c6a394107f43a6ae",
+        "timestamp": "2026-11-17T18:54:52Z"
+      },
+      {
+        "version": "0.9.8.3",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.3 Release Candidate (Dev Test Channel): Clean disable/uninstall recovery with zero persistent disk branding/index.html writes and scoped body.bfx-active CSS (#17, #16); Jellyfin Media Player for Windows compatibility (#16); household-member scoping on Standard Jellyfin Login and active-profile admin enforcement across profile deletion/reordering/editing, backups, and device management (#11, #8, #3); Tailscale CGNAT (100.64.0.0/10) local-network recognition and Dashboard non-admin token protection (#12); 2-stage progressive Cinema Hub fallback, SWR caching, and non-blocking server popularity/showcase caches (#13); Visible Jellyfin Libraries navigation bar filtering & deduplication (#14); Seerr Tracker timeout & auth probe fixes (#15); and Jellyfin 12 download fix + direct Movie & Episode Download buttons (#10).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.3_10.11.0.zip",
+        "checksum": "71120238479d18760e376a2f45933ff6",
+        "timestamp": "2026-11-17T18:54:52Z"
+      },
+      {
+        "version": "0.9.8.3",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.3 Release Candidate (Dev Test Channel): Clean disable/uninstall recovery with zero persistent disk branding/index.html writes and scoped body.bfx-active CSS (#17, #16); Jellyfin Media Player for Windows compatibility (#16); household-member scoping on Standard Jellyfin Login and active-profile admin enforcement across profile deletion/reordering/editing, backups, and device management (#11, #8, #3); Tailscale CGNAT (100.64.0.0/10) local-network recognition and Dashboard non-admin token protection (#12); 2-stage progressive Cinema Hub fallback, SWR caching, and non-blocking server popularity/showcase caches (#13); Visible Jellyfin Libraries navigation bar filtering & deduplication (#14); Seerr Tracker timeout & auth probe fixes (#15); and Jellyfin 12 download fix + direct Movie & Episode Download buttons (#10).",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.3_10.9.0.zip",
+        "checksum": "33f89c9e4f0d44c4218c1436ecbe96c2",
+        "timestamp": "2026-11-17T18:54:52Z"
+      },
+      {
         "version": "0.9.8.2",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.2 Release Candidate (Dev Test Channel): Security hardening across profile activation, Jellyfin user provisioning, and Seerr per-user scoping (#8); per-profile Guest Pass Manager permissions in Plugin Settings & server endpoints (#3); admin-only Manage Media tools (Edit Metadata, Identify, Refresh Metadata, Media Info, Download, Advanced Editor & Delete Media) in the title detail modal (#2); SECURITY.md; and uniform 2:3 poster card heights + hover preview artwork hydration.",
         "targetAbi": "12.0.0.0",

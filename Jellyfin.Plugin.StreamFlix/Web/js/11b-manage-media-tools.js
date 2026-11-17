@@ -18,7 +18,92 @@
         return Boolean(serverProfile ? serverProfile.isAdmin : active.isAdmin);
     }
 
-    // apiFetch() signs with the active profile token (except on admin route hashes),
+    function currentUserHasDownloadPermission() {
+        if (isGuestPassSession() || (typeof isKidsProfileActive === 'function' && isKidsProfileActive())) {
+            return false;
+        }
+        if (canManageMediaItems()) {
+            return true;
+        }
+        var active = state.activeProfile;
+        if (active && active.user && active.user.Policy && typeof active.user.Policy.EnableContentDownloading === 'boolean') {
+            return active.user.Policy.EnableContentDownloading;
+        }
+        var ac = typeof resolveActiveApiClient === 'function' ? resolveActiveApiClient() : window.ApiClient;
+        if (ac && ac._currentUser && ac._currentUser.Policy && typeof ac._currentUser.Policy.EnableContentDownloading === 'boolean') {
+            return ac._currentUser.Policy.EnableContentDownloading;
+        }
+        var uid = getActiveUserId();
+        if (uid && state.userDownloadPermCache && typeof state.userDownloadPermCache[normalizeGuid(uid)] === 'boolean') {
+            return state.userDownloadPermCache[normalizeGuid(uid)];
+        }
+        if (uid && getActiveToken()) {
+            state.userDownloadPermCache = state.userDownloadPermCache || {};
+            var normUid = normalizeGuid(uid);
+            if (!state.userDownloadPermPending || !state.userDownloadPermPending[normUid]) {
+                state.userDownloadPermPending = state.userDownloadPermPending || {};
+                state.userDownloadPermPending[normUid] = true;
+                apiFetch('/Users/' + encodeURIComponent(uid)).then(function (u) {
+                    if (u && u.Policy && typeof u.Policy.EnableContentDownloading === 'boolean') {
+                        state.userDownloadPermCache[normUid] = u.Policy.EnableContentDownloading;
+                    }
+                }).catch(function () {}).then(function () {
+                    delete state.userDownloadPermPending[normUid];
+                });
+            }
+        }
+        return false;
+    }
+
+    function canUserDownloadItem(item) {
+        if (!item || !item.Id) {
+            return false;
+        }
+        if (isGuestPassSession() || (typeof isKidsProfileActive === 'function' && isKidsProfileActive())) {
+            return false;
+        }
+        if (item.LocationType === 'Virtual') {
+            return false;
+        }
+        var t = String(item.Type || '');
+        if (t !== 'Movie' && t !== 'Episode' && t !== 'Video') {
+            return false;
+        }
+        if (item.CanDownload === true) {
+            return true;
+        }
+        if (item.CanDownload === false) {
+            return Boolean(canManageMediaItems());
+        }
+        return Boolean(currentUserHasDownloadPermission());
+    }
+
+    function triggerDirectMediaDownload(itemOrId, overrideToken) {
+        var itemId = typeof itemOrId === 'string' ? itemOrId : (itemOrId && itemOrId.Id);
+        if (!itemId) {
+            showToast('Could not determine item to download.', 'error');
+            return;
+        }
+        var tok = sanitizeHeaderField(overrideToken || getActiveToken() || (state.adminAuth && state.adminAuth.accessToken) || '');
+        if (!tok) {
+            showToast('Sign in to download media.', 'error');
+            return;
+        }
+        var url = apiBase() + '/Items/' + encodeURIComponent(itemId) + '/Download?api_key=' + encodeURIComponent(tok);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        a.rel = 'noopener';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+            if (a.parentNode) {
+                a.parentNode.removeChild(a);
+            }
+        }, 1200);
+        showToast('Download started.', 'success');
+    }
     // so media management calls use an explicit admin-token request helper.
     function adminApiFetch(adminAuth, path, options) {
         options = options || {};
@@ -174,8 +259,8 @@
     function fetchItemAsAdmin(adminAuth, itemId) {
         var iid = encodeURIComponent(itemId);
         var uid = encodeURIComponent(adminAuth.userId);
-        return adminApiFetch(adminAuth, '/Users/' + uid + '/Items/' + iid).catch(function () {
-            return adminApiFetch(adminAuth, '/Items/' + iid + '?userId=' + uid);
+        return adminApiFetch(adminAuth, '/Items/' + iid + '?userId=' + uid).catch(function () {
+            return adminApiFetch(adminAuth, '/Users/' + uid + '/Items/' + iid);
         });
     }
 
@@ -631,24 +716,18 @@
     }
 
     function manageDownloadMedia(item) {
+        if (!item || !item.Id) {
+            return;
+        }
+        var immediateTok = (state.adminAuth && state.adminAuth.accessToken)
+            || (canManageMediaItems() ? getActiveToken() : '');
+        if (immediateTok) {
+            triggerDirectMediaDownload(item.Id, immediateTok);
+            return;
+        }
         runWithManageAuth(function (auth) {
-            return adminApiFetch(auth, '/Users/' + encodeURIComponent(auth.userId)
-                + '/Items/' + encodeURIComponent(item.Id)).then(function () {
-                var url = apiBase() + '/Items/' + encodeURIComponent(item.Id)
-                    + '/Download?api_key=' + encodeURIComponent(auth.accessToken);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = '';
-                a.rel = 'noopener';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(function () {
-                    if (a.parentNode) {
-                        a.parentNode.removeChild(a);
-                    }
-                }, 1000);
-                showToast('Download started.', 'success');
-            });
+            triggerDirectMediaDownload(item.Id, auth.accessToken);
+            return Promise.resolve();
         }).catch(function (err) {
             manageMediaErrorToast(err, 'Could not start the download.');
         });

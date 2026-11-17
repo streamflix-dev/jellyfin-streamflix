@@ -477,6 +477,14 @@
                                             Profile PINs and email locks remain enforced on LAN. Forwarded external client IPs from reverse proxies are automatically treated as remote WAN traffic.
                                         </div>
                                     </div>
+
+                                    <div class="checkboxContainer checkboxContainer-withDescription" style="margin:10px 0 0; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06);">
+                                        <label class="emby-checkbox-label">
+                                            <input id="TreatTailscaleAsLocalLan" name="TreatTailscaleAsLocalLan" type="checkbox" is="emby-checkbox" checked />
+                                            <span>Treat Tailscale / Mesh VPN (100.64.0.0/10) as Local Network</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">Recognizes Tailscale CGNAT addresses as trusted private LAN traffic for Server Admin LAN-only rules, LAN sign-in bypass, and Jellyfin Dashboard access.</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1642,7 +1650,7 @@
                     host.innerHTML = availableLibraries.map(function (lib) {
                         var checked = hasExplicit
                             ? (!explicitNone && Boolean(selectedMap[normalizeIdKey(lib.id)]))
-                            : !isSmartDuplicateLibraryName(lib.name);
+                            : true;
                         return ''
                             + '<label class="bfx-lib-chip">'
                             + '  <input type="checkbox" data-nav-lib-id="' + esc(lib.id) + '"' + (checked ? ' checked' : '') + ' />'
@@ -1674,9 +1682,6 @@
                     if (!heroLibrariesLoaded) {
                         return selectedNavLibIds.slice();
                     }
-                    if (!navLibsTouched && selectedNavLibIds.length === 0) {
-                        return [];
-                    }
                     var out = [];
                     Array.prototype.forEach.call(page.querySelectorAll('input[data-nav-lib-id]:checked'), function (cb) {
                         var id = cb.getAttribute('data-nav-lib-id');
@@ -1684,6 +1689,9 @@
                             out.push(id);
                         }
                     });
+                    if (!navLibsTouched && selectedNavLibIds.length === 0 && availableLibraries.length > 0 && out.length === availableLibraries.length) {
+                        return [];
+                    }
                     return out.length > 0 ? out : ['__NONE__'];
                 }
 
@@ -2624,6 +2632,7 @@
                     '#AllowAdminFallbackLogin',
                     '#AdminFallbackLanOnly',
                     '#BypassLoginGateOnLan',
+                    '#TreatTailscaleAsLocalLan',
                     '#EnableGuestPasses',
                     '#ShowLibrariesInNav',
                     '#ShowHeroAdvanced',
@@ -2676,6 +2685,7 @@
                     $('#AllowAdminFallbackLogin').checked = Boolean(cfg.allowAdminFallbackLogin);
                     $('#AdminFallbackLanOnly').checked = Boolean(cfg.adminFallbackLanOnly);
                     $('#BypassLoginGateOnLan').checked = Boolean(cfg.bypassLoginGateOnLan);
+                    $('#TreatTailscaleAsLocalLan').checked = cfg.treatTailscaleAsLocalLan !== false;
                     $('#AutoProvisionJellyfinUsers').checked = cfg.autoProvisionJellyfinUsers !== false;
                     $('#EnableGuestPasses').checked = cfg.enableGuestPasses !== false;
                     selectedGuestPassManagerIds = Array.isArray(cfg.guestPassManagerProfileIds) ? cfg.guestPassManagerProfileIds.slice() : [];
@@ -2800,6 +2810,7 @@
                         allowAdminFallbackLogin: $('#AllowAdminFallbackLogin').checked,
                         adminFallbackLanOnly: $('#AdminFallbackLanOnly').checked,
                         bypassLoginGateOnLan: $('#BypassLoginGateOnLan').checked,
+                        treatTailscaleAsLocalLan: $('#TreatTailscaleAsLocalLan').checked,
                         autoProvisionJellyfinUsers: $('#AutoProvisionJellyfinUsers').checked,
                         enableGuestPasses: $('#EnableGuestPasses').checked,
                         guestPassManagerProfileIds: getCheckedGuestPassManagerIds(),

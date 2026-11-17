@@ -217,6 +217,8 @@ public class SaveAdminConfigRequest
 
     public bool BypassLoginGateOnLan { get; set; }
 
+    public bool? TreatTailscaleAsLocalLan { get; set; }
+
     public bool AutoProvisionJellyfinUsers { get; set; } = true;
 
     public string? GoogleClientId { get; set; }

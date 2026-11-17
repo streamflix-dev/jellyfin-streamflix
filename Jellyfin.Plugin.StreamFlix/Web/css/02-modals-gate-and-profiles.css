@@ -752,6 +752,28 @@
     flex-shrink: 0;
 }
 .streamflix-ep-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.streamflix-ep-download-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e5e5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.streamflix-ep-download-btn .bfx-icon { width: 17px; height: 17px; }
+.streamflix-ep-download-btn:hover {
+    background: rgba(229, 9, 20, 0.22);
+    border-color: var(--streamflix-red);
+    color: #ffffff;
+    transform: scale(1.08);
+}
 
 /* Track Selector Pills & Credits inside .streamflix-detail-modal ('The Devil Wears Prada 2' style) */
 .streamflix-modal-tracks-row {
@@ -831,13 +853,13 @@
     .streamflix-detail-hero { height: 270px; padding: 20px; }
     .streamflix-detail-body { padding: 0 20px 24px 20px; }
     .streamflix-ep-thumb { width: 110px; }
-    div#itemDetailPage { width: calc(100% - 16px) !important; margin: 62px auto 32px auto !important; }
-    div#itemBackdrop { height: 270px !important; min-height: 270px !important; max-height: 270px !important; }
-    #itemDetailPage .detailPageWrapperContainer,
-    #itemDetailPage .detailLogo.hide + .detailPageWrapperContainer { padding-top: 135px !important; }
-    #itemDetailPage .detailPagePrimaryContainer,
-    #itemDetailPage .detailPagePrimaryContent,
-    #itemDetailPage .detailVerticalSection:not(.hide) { padding-left: 20px !important; padding-right: 20px !important; }
+    body.bfx-active div#itemDetailPage:not(.hide) { width: calc(100% - 16px) !important; margin: 62px auto 32px auto !important; }
+    body.bfx-active #itemDetailPage:not(.hide) div#itemBackdrop:not(.hide) { height: 270px !important; min-height: 270px !important; max-height: 270px !important; }
+    body.bfx-active #itemDetailPage .detailPageWrapperContainer,
+    body.bfx-active #itemDetailPage .detailLogo.hide + .detailPageWrapperContainer { padding-top: 135px !important; }
+    body.bfx-active #itemDetailPage .detailPagePrimaryContainer,
+    body.bfx-active #itemDetailPage .detailPagePrimaryContent,
+    body.bfx-active #itemDetailPage .detailVerticalSection:not(.hide) { padding-left: 20px !important; padding-right: 20px !important; }
 }
 
 

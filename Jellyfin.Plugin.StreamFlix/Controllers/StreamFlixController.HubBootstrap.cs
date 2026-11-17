@@ -84,9 +84,9 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can export StreamFlix backups." });
+            return StatusCode(403, new { code = "admin_required", message = "Only an active Jellyfin administrator profile can export StreamFlix backups." });
         }
 
         var exportedProfiles = (config.Profiles ?? new List<StreamFlixProfileConfig>()).Select(p => new
@@ -167,9 +167,9 @@ public partial class StreamFlixController
 
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
-            return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can import StreamFlix backups." });
+            return StatusCode(403, new { code = "admin_required", message = "Only an active Jellyfin administrator profile can import StreamFlix backups." });
         }
 
         var importedProfilesCount = 0;
@@ -478,13 +478,13 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new
             {
                 code = "admin_required",
                 errorCode = StreamFlixErrorCodes.AdminRequired,
-                message = "Only a Jellyfin administrator can run the StreamFlix Health Check.",
+                message = "Only an active Jellyfin administrator profile can run the StreamFlix Health Check.",
             });
         }
 

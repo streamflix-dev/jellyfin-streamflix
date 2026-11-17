@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.2)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.3)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.2';
+    var VERSION = '0.9.8.3';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -93,6 +93,7 @@
         allowAdminFallbackLogin: false,
         adminFallbackLanOnly: false,
         bypassLoginGateOnLan: false,
+        treatTailscaleAsLocalLan: true,
         isLocalLan: false,
         canShowAdminFallback: false,
         googleClientId: '',
@@ -143,6 +144,7 @@
         googleUser: loadHouseholdSession(),
         configFresh: false,
         configAttempted: false,
+        pluginDisabled: false,
         adminLoginExpanded: false,
         guestPassExpanded: false,
         heroPaused: false,
@@ -869,9 +871,52 @@
         return String(id || '').replace(/-/g, '').toLowerCase();
     }
 
+    function isNativeDesktopShellClient() {
+        try {
+            var ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+            if (/JellyfinMediaPlayer|\bJMP\//i.test(ua)) {
+                return true;
+            }
+            if (window.location && /^(file|qrc):/i.test(window.location.protocol || '')) {
+                return true;
+            }
+            if (window.NativeShell && window.jmpInfo) {
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
+    function isStreamFlixRuntimeEnabled() {
+        if (state.pluginDisabled || isNativeDesktopShellClient()) {
+            return false;
+        }
+        if (state.config && state.config.enableStreamFlixUi === false) {
+            return false;
+        }
+        return true;
+    }
+
+    function resolveActiveApiClient() {
+        try {
+            if (window.ApiClient) {
+                return window.ApiClient;
+            }
+            var cm = window.ConnectionManager || (window.Emby && window.Emby.ConnectionManager) || null;
+            if (cm && typeof cm.currentApiClient === 'function') {
+                var cur = cm.currentApiClient();
+                if (cur) {
+                    return cur;
+                }
+            }
+        } catch (e) {}
+        return null;
+    }
+
     function apiBase() {
-        if (window.ApiClient && typeof window.ApiClient.serverAddress === 'function') {
-            var addr = window.ApiClient.serverAddress();
+        var ac = resolveActiveApiClient();
+        if (ac && typeof ac.serverAddress === 'function') {
+            var addr = ac.serverAddress();
             if (addr) {
                 return addr.replace(/\/+$/, '');
             }
@@ -916,26 +961,27 @@
             if (storedDeviceId) {
                 deviceId = storedDeviceId;
             }
-            if (window.ApiClient) {
-                if (typeof window.ApiClient.deviceId === 'function' && window.ApiClient.deviceId()) {
-                    deviceId = window.ApiClient.deviceId();
-                } else if (window.ApiClient._deviceId) {
-                    deviceId = window.ApiClient._deviceId;
+            var ac = resolveActiveApiClient();
+            if (ac) {
+                if (typeof ac.deviceId === 'function' && ac.deviceId()) {
+                    deviceId = ac.deviceId();
+                } else if (ac._deviceId) {
+                    deviceId = ac._deviceId;
                 }
-                if (typeof window.ApiClient.deviceName === 'function' && window.ApiClient.deviceName()) {
-                    deviceName = window.ApiClient.deviceName();
-                } else if (window.ApiClient._deviceName) {
-                    deviceName = window.ApiClient._deviceName;
+                if (typeof ac.deviceName === 'function' && ac.deviceName()) {
+                    deviceName = ac.deviceName();
+                } else if (ac._deviceName) {
+                    deviceName = ac._deviceName;
                 }
-                if (typeof window.ApiClient.appName === 'function' && window.ApiClient.appName()) {
-                    appName = window.ApiClient.appName();
-                } else if (window.ApiClient._appName) {
-                    appName = window.ApiClient._appName;
+                if (typeof ac.appName === 'function' && ac.appName()) {
+                    appName = ac.appName();
+                } else if (ac._appName) {
+                    appName = ac._appName;
                 }
-                if (typeof window.ApiClient.appVersion === 'function' && window.ApiClient.appVersion()) {
-                    appVersion = window.ApiClient.appVersion();
-                } else if (window.ApiClient._appVersion) {
-                    appVersion = window.ApiClient._appVersion;
+                if (typeof ac.appVersion === 'function' && ac.appVersion()) {
+                    appVersion = ac.appVersion();
+                } else if (ac._appVersion) {
+                    appVersion = ac._appVersion;
                 }
             }
         } catch (e) {}
@@ -1018,21 +1064,53 @@
     }
 
     function getActiveToken() {
+        var ac = resolveActiveApiClient();
+        if (!isStreamFlixRuntimeEnabled()) {
+            return ac && typeof ac.accessToken === 'function' ? ac.accessToken() : null;
+        }
         var adm = getActiveAdminAuthForRoute();
         if (adm) {
             return adm.accessToken;
         }
+        if (isAdminRouteHash()) {
+            if (state.activeProfile && state.activeProfile.isAdmin && state.activeProfile.accessToken) {
+                return state.activeProfile.accessToken;
+            }
+            if (!state.activeProfile && ac && typeof ac.accessToken === 'function') {
+                return ac.accessToken();
+            }
+            if (ac && ac._currentUser && ac._currentUser.Policy && ac._currentUser.Policy.IsAdministrator && typeof ac.accessToken === 'function') {
+                return ac.accessToken();
+            }
+            return null;
+        }
         return (state.activeProfile && state.activeProfile.accessToken)
-            || (window.ApiClient && typeof window.ApiClient.accessToken === 'function' ? window.ApiClient.accessToken() : null);
+            || (ac && typeof ac.accessToken === 'function' ? ac.accessToken() : null);
     }
 
     function getActiveUserId() {
+        var ac = resolveActiveApiClient();
+        if (!isStreamFlixRuntimeEnabled()) {
+            return ac && typeof ac.getCurrentUserId === 'function' ? ac.getCurrentUserId() : null;
+        }
         var adm = getActiveAdminAuthForRoute();
         if (adm) {
             return adm.userId;
         }
+        if (isAdminRouteHash()) {
+            if (state.activeProfile && state.activeProfile.isAdmin && state.activeProfile.jellyfinUserId) {
+                return state.activeProfile.jellyfinUserId;
+            }
+            if (!state.activeProfile && ac && typeof ac.getCurrentUserId === 'function') {
+                return ac.getCurrentUserId();
+            }
+            if (ac && ac._currentUser && ac._currentUser.Policy && ac._currentUser.Policy.IsAdministrator && typeof ac.getCurrentUserId === 'function') {
+                return ac.getCurrentUserId();
+            }
+            return null;
+        }
         return (state.activeProfile && state.activeProfile.jellyfinUserId)
-            || (window.ApiClient && typeof window.ApiClient.getCurrentUserId === 'function' ? window.ApiClient.getCurrentUserId() : null);
+            || (ac && typeof ac.getCurrentUserId === 'function' ? ac.getCurrentUserId() : null);
     }
 
     function buildJellyfinAuthHeaders(extraHeaders) {

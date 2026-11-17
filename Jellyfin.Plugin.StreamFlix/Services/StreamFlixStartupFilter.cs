@@ -53,31 +53,16 @@ public class StreamFlixStartupFilter : IStartupFilter
             return;
         }
 
-        // Serve StreamFlix stylesheet directly on /Branding/Css with ETag caching so Jellyfin Mobile / Desktop / TV apps
-        // that load server branding CSS always receive the live StreamFlix stylesheet without re-allocating on repeat loads.
-        if (IsBrandingCssRequest(reqPath))
+        // Never hijack /Branding/Css: native desktop/TV/mobile clients (such as Jellyfin Media Player for Windows)
+        // fetch /Branding/Css without loading /StreamFlix/ClientScript, whereas web clients load ClientStyles via index.html.
+        // Also skip StreamFlix HTML injection for Jellyfin Media Player desktop native shell so its mpv/tile shell runs natively.
+        var ua = context.Request.Headers.UserAgent.ToString();
+        if (!string.IsNullOrEmpty(ua)
+            && (ua.Contains("JellyfinMediaPlayer", StringComparison.OrdinalIgnoreCase)
+                || ua.Contains("JMP/", StringComparison.OrdinalIgnoreCase)))
         {
-            var (cssBytes, etag) = Plugin.GetEmbeddedStylesheetAsset();
-            if (cssBytes.Length > 0)
-            {
-                context.Response.Headers["Cache-Control"] = "no-cache";
-                if (!string.IsNullOrEmpty(etag))
-                {
-                    context.Response.Headers["ETag"] = etag;
-                    var inm = context.Request.Headers["If-None-Match"].ToString();
-                    if (!string.IsNullOrEmpty(inm) && inm.Contains(etag, StringComparison.Ordinal))
-                    {
-                        context.Response.StatusCode = StatusCodes.Status304NotModified;
-                        return;
-                    }
-                }
-
-                context.Response.StatusCode = StatusCodes.Status200OK;
-                context.Response.ContentType = "text/css;charset=utf-8";
-                context.Response.ContentLength = cssBytes.Length;
-                await context.Response.Body.WriteAsync(cssBytes, 0, cssBytes.Length).ConfigureAwait(false);
-                return;
-            }
+            await nextMw().ConfigureAwait(false);
+            return;
         }
 
         if (!IsIndexRequest(reqPath))

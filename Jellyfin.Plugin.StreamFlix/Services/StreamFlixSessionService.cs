@@ -611,10 +611,10 @@ public static class StreamFlixSessionService
     /// when a local proxy forwards an external <c>Forwarded</c> (RFC 7239), <c>X-Forwarded-For</c>, <c>X-Real-IP</c>,
     /// <c>CF-Connecting-IP</c>, <c>True-Client-IP</c>, or <c>X-Client-IP</c> header.
     /// </summary>
-    public static bool IsLocalLanRequest(HttpContext? httpContext)
+    public static bool IsLocalLanRequest(HttpContext? httpContext, bool allowTailscaleCgnat = true)
     {
         var remoteIp = httpContext?.Connection?.RemoteIpAddress;
-        if (remoteIp == null || !IsPrivateOrLoopbackIp(remoteIp))
+        if (remoteIp == null || !IsPrivateOrLoopbackIp(remoteIp, allowTailscaleCgnat))
         {
             return false;
         }
@@ -631,7 +631,7 @@ public static class StreamFlixSessionService
             foreach (var part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 var candidate = StripOptionalPort(part);
-                if (!IPAddress.TryParse(candidate, out var forwardedIp) || !IsPrivateOrLoopbackIp(forwardedIp))
+                if (!IPAddress.TryParse(candidate, out var forwardedIp) || !IsPrivateOrLoopbackIp(forwardedIp, allowTailscaleCgnat))
                 {
                     return false;
                 }
@@ -654,7 +654,7 @@ public static class StreamFlixSessionService
                     sawForToken = true;
                     var rawVal = param.Substring(4).Trim().Trim('"');
                     var candidate = StripOptionalPort(rawVal);
-                    if (!IPAddress.TryParse(candidate, out var forwardedIp) || !IsPrivateOrLoopbackIp(forwardedIp))
+                    if (!IPAddress.TryParse(candidate, out var forwardedIp) || !IsPrivateOrLoopbackIp(forwardedIp, allowTailscaleCgnat))
                     {
                         return false;
                     }
@@ -736,7 +736,7 @@ public static class StreamFlixSessionService
         return normalizedRemote.ToString();
     }
 
-    public static bool IsPrivateOrLoopbackIp(IPAddress ip)
+    public static bool IsPrivateOrLoopbackIp(IPAddress ip, bool allowTailscaleCgnat = true)
     {
         if (IPAddress.IsLoopback(ip))
         {
@@ -755,7 +755,8 @@ public static class StreamFlixSessionService
                 || b[0] == 127
                 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
                 || (b[0] == 192 && b[1] == 168)
-                || (b[0] == 169 && b[1] == 254);
+                || (b[0] == 169 && b[1] == 254)
+                || (allowTailscaleCgnat && b[0] == 100 && b[1] >= 64 && b[1] <= 127);
         }
 
         if (ip.AddressFamily == AddressFamily.InterNetworkV6)

@@ -46,7 +46,7 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can sign out all devices." });
         }
@@ -82,7 +82,7 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can view active devices." });
         }
@@ -99,7 +99,7 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!caller.IsAdmin)
+        if (!IsEffectiveActiveAdmin(caller))
         {
             return StatusCode(403, new { code = "admin_required", message = "Only a Jellyfin administrator can sign out devices." });
         }
