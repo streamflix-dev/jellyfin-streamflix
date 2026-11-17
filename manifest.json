@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.7",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.7 Release Candidate (Dev Test Channel): Restrict media Download buttons strictly to Jellyfin mobile apps on phones (hidden on web browsers, Windows / Jellyfin Media Player, desktop, and TVs) and route downloads exclusively through Jellyfin's built-in NativeShell download bridge (NativeShell.downloadFiles / NativeShell.downloadFile with ?ApiKey= and full item metadata) instead of starting raw browser file downloads.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.7_12.0.0.zip",
+        "checksum": "ddf261a203fa0b628491f698499a80f0",
+        "timestamp": "2026-11-17T23:06:36Z"
+      },
+      {
+        "version": "0.9.8.7",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.7 Release Candidate (Dev Test Channel): Restrict media Download buttons strictly to Jellyfin mobile apps on phones (hidden on web browsers, Windows / Jellyfin Media Player, desktop, and TVs) and route downloads exclusively through Jellyfin's built-in NativeShell download bridge (NativeShell.downloadFiles / NativeShell.downloadFile with ?ApiKey= and full item metadata) instead of starting raw browser file downloads.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.7_10.11.0.zip",
+        "checksum": "02c73ef320c7e8c6a06ab2bbdbf648a2",
+        "timestamp": "2026-11-17T23:06:36Z"
+      },
+      {
+        "version": "0.9.8.7",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.7 Release Candidate (Dev Test Channel): Restrict media Download buttons strictly to Jellyfin mobile apps on phones (hidden on web browsers, Windows / Jellyfin Media Player, desktop, and TVs) and route downloads exclusively through Jellyfin's built-in NativeShell download bridge (NativeShell.downloadFiles / NativeShell.downloadFile with ?ApiKey= and full item metadata) instead of starting raw browser file downloads.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.7_10.9.0.zip",
+        "checksum": "38a7bcee78791ec307b6d1fa296dedb9",
+        "timestamp": "2026-11-17T23:06:36Z"
+      },
+      {
         "version": "0.9.8.6",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.6 Release Candidate (Dev Test Channel): Fix false 'Account Sign-In Required' lockouts on unlocked non-admin household profiles after Google/OIDC/LAN sign-in and restore full Profile Picker management for verified SSO owners; automatically close the external system-browser SSO tab after Jellyfin Media Player sign-in handoff; and fix QtWebEngine 5.15 (Chromium 83) hero/subnav overlap, ghost card blur circles, and missing Flexbox gap spacing.",
         "targetAbi": "12.0.0.0",

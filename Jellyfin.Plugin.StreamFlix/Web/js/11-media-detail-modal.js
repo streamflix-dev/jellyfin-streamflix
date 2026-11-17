@@ -654,7 +654,7 @@
             var epContainer = qModal('#streamflix-detail-episodes-section');
             if (epContainer) {
                 epContainer.innerHTML = '<div style="color:#888;font-size:13px;">Loading episodes…</div>';
-                apiFetch('/Shows/' + encodeURIComponent(seriesIdForEpisodes) + '/Episodes?userId=' + encodeURIComponent(auth.userId) + '&Fields=Overview,PrimaryImageAspectRatio')
+                apiFetch('/Shows/' + encodeURIComponent(seriesIdForEpisodes) + '/Episodes?userId=' + encodeURIComponent(auth.userId) + '&Fields=Overview,PrimaryImageAspectRatio,Path')
                     .then(function (res) {
                         var eps = (res && res.Items) || [];
                         if (!eps.length || !modalBackdrop.parentNode || modalClosed) {

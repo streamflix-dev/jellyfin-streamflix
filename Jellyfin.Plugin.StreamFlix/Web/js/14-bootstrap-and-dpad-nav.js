@@ -792,6 +792,7 @@
         var isPhone = !isTv && detectPhoneEnvironment();
         document.body.classList.toggle('bfx-tv-mode', isTv);
         document.body.classList.toggle('bfx-phone-mode', isPhone);
+        document.body.classList.toggle('bfx-native-phone-download', typeof supportsNativePhoneDownload === 'function' && supportsNativePhoneDownload());
         if (document.documentElement) {
             document.documentElement.classList.toggle('bfx-no-flex-gap', !checkFlexGapSupport());
         }

@@ -309,14 +309,19 @@ assert.match(css01, /body\.bfx-active\s+\.headerUserButton/, 'Native header butt
 assert.match(combinedJs, /function\s+teardownStreamFlixUi\s*\(/, 'Clean UI teardown helper must be present');
 assert.match(combinedJs, /function\s+isJellyfinMediaPlayerApp\s*\(/, 'Jellyfin Media Player mpv player preservation helper must be present');
 assert.match(combinedJs, /function\s+isProfileManagementAdmin\s*\(/, 'Active-profile admin gate must be present');
-assert.match(combinedJs, /function\s+triggerDirectMediaDownload\s*\(/, 'Synchronous direct media download helper must be present');
-assert.match(combinedJs, /\/Download\?Apikey=/, 'Download URLs must use native ?Apikey= query parameter');
+assert.match(combinedJs, /function\s+supportsNativePhoneDownload\s*\(/, 'Phone-only NativeShell download gate must be present');
+assert.match(combinedJs, /function\s+triggerDirectMediaDownload\s*\(/, 'NativeShell download dispatcher must be present');
+assert.match(combinedJs, /\/Download\?ApiKey=/, 'Download URLs must use native ?ApiKey= query parameter');
+assert.match(combinedJs, /ns\.downloadFiles\(\[payload\]\)/, 'Must invoke NativeShell.downloadFiles when supported');
+assert.match(combinedJs, /ns\.downloadFile\(payload\)/, 'Must invoke NativeShell.downloadFile when supported');
+assert.doesNotMatch(combinedJs, /\.download\s*=\s*['"]/, 'Must never start a raw <a download> browser file download');
 assert.match(combinedJs, /streamflix-modal-download-btn/, 'Detail modal Download button must be wired');
 assert.match(combinedJs, /data-ep-download-id/, 'Per-episode Download button must be wired');
-console.log('[PASS] Clean UI teardown, JMP mpv support, active-admin scoping & native ?Apikey= downloads verified');
+console.log('[PASS] Clean UI teardown, JMP mpv support, active-admin scoping & native phone-only NativeShell downloads verified');
 
-// Verify v0.9.8.5 QtWebEngine / Chromium 83+ CSS fallbacks & JMP system-browser SSO relay
+// Verify v0.9.8.7 QtWebEngine / Chromium 83+ CSS fallbacks & JMP system-browser SSO relay
 const css02 = fs.readFileSync(path.join(cssDir, '02-modals-gate-and-profiles.css'), 'utf8');
+assert.match(css02, /body\.bfx-active:not\(\.bfx-native-phone-download\)\s+#streamflix-modal-download-btn/, 'CSS must hide download buttons outside native phone apps');
 assert.match(css02, /#streamflix-overlay-root\s*\{[\s\S]*?top:\s*0;[\s\S]*?left:\s*0;/, '#streamflix-overlay-root must include explicit top/right/bottom/left fallbacks for QtWebEngine');
 assert.match(css02, /@supports\s+not\s*\(aspect-ratio:\s*1\s*\/\s*1\)/, 'Card aspect-ratio fallback block must be present for Chromium < 88 / QtWebEngine');
 assert.match(combinedJs, /function\s+canOpenExternalSystemBrowser\s*\(/, 'JMP external system-browser SSO detection helper must be present');
@@ -328,4 +333,4 @@ const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'
 assert.match(css09, /html\.bfx-no-flex-gap\s+\.streamflix-hero-meta-row\s*>\s*\*\s*\+\s*\*/, 'Chromium 83 Flexbox gap fallback rules must be present');
 console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill & auto-closing JMP SSO tab verified');
 
-console.log('ALL STREAMFLIX v0.9.8.6 SMOKE CHECKS PASSED!');
+console.log('ALL STREAMFLIX v0.9.8.7 SMOKE CHECKS PASSED!');

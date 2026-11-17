@@ -55,7 +55,37 @@
         return false;
     }
 
+    function supportsNativePhoneDownload() {
+        try {
+            if (typeof isJellyfinMediaPlayerApp === 'function' && isJellyfinMediaPlayerApp()) {
+                return false;
+            }
+            if (typeof detectTvEnvironment === 'function' && detectTvEnvironment()) {
+                return false;
+            }
+            var ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+            if (/Windows NT|Win64|WOW64|CrOS|X11;\s*Linux\s+x86_64/i.test(ua)) {
+                return false;
+            }
+            var ns = typeof window !== 'undefined' ? window.NativeShell : null;
+            if (!ns || (typeof ns.downloadFiles !== 'function' && typeof ns.downloadFile !== 'function')) {
+                return false;
+            }
+            if (ns.AppHost && typeof ns.AppHost.supports === 'function' && !ns.AppHost.supports('filedownload')) {
+                return false;
+            }
+            var isPhone = (typeof detectPhoneEnvironment === 'function' && detectPhoneEnvironment())
+                || /iPhone|iPod|Android.*Mobile/i.test(ua);
+            return Boolean(isPhone);
+        } catch (e) {
+            return false;
+        }
+    }
+
     function canUserDownloadItem(item) {
+        if (!supportsNativePhoneDownload()) {
+            return false;
+        }
         if (!item || !item.Id) {
             return false;
         }
@@ -78,8 +108,49 @@
         return Boolean(currentUserHasDownloadPermission());
     }
 
+    function buildNativeDownloadFilename(itemObj, itemId) {
+        if (itemObj && typeof itemObj.Path === 'string' && itemObj.Path.trim()) {
+            var fromPath = itemObj.Path.trim().replace(/^.*[\\/]/, '');
+            if (fromPath) {
+                return fromPath;
+            }
+        }
+        var ext = (itemObj && itemObj.Container)
+            || (itemObj && Array.isArray(itemObj.MediaSources) && itemObj.MediaSources[0] && itemObj.MediaSources[0].Container)
+            || 'mp4';
+        ext = String(ext).split(',')[0].replace(/^\.+/, '').trim() || 'mp4';
+        var rawBaseName = (itemObj && itemObj.Name) ? String(itemObj.Name) : String(itemId);
+        var cleanBase = rawBaseName.replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim() || String(itemId);
+        if (cleanBase.toLowerCase().slice(-(ext.length + 1)) === '.' + ext.toLowerCase()) {
+            return cleanBase;
+        }
+        return cleanBase + '.' + ext;
+    }
+
+    function resolveActiveServerId(itemObj) {
+        if (itemObj && itemObj.ServerId) {
+            return String(itemObj.ServerId);
+        }
+        var ac = typeof resolveActiveApiClient === 'function' ? resolveActiveApiClient() : window.ApiClient;
+        if (ac) {
+            try {
+                if (typeof ac.serverId === 'function' && ac.serverId()) {
+                    return String(ac.serverId());
+                }
+                if (ac._serverInfo && ac._serverInfo.Id) {
+                    return String(ac._serverInfo.Id);
+                }
+            } catch (e) {}
+        }
+        return 'jellyfin';
+    }
+
     function triggerDirectMediaDownload(itemOrId, overrideToken) {
-        var itemId = typeof itemOrId === 'string' ? itemOrId : (itemOrId && itemOrId.Id);
+        if (!supportsNativePhoneDownload()) {
+            return;
+        }
+        var itemObj = (itemOrId && typeof itemOrId === 'object') ? itemOrId : null;
+        var itemId = typeof itemOrId === 'string' ? itemOrId : (itemObj && itemObj.Id);
         if (!itemId) {
             showToast('Could not determine item to download.', 'error');
             return;
@@ -89,20 +160,62 @@
             showToast('Sign in to download media.', 'error');
             return;
         }
-        var url = apiBase() + '/Items/' + encodeURIComponent(itemId) + '/Download?Apikey=' + encodeURIComponent(tok);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = '';
-        a.rel = 'noopener';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () {
-            if (a.parentNode) {
-                a.parentNode.removeChild(a);
+        var absBase = apiBase() || window.location.origin;
+        try {
+            absBase = new URL(absBase, window.location.href).toString().replace(/\/+$/, '');
+        } catch (eUrl) {
+            absBase = String(absBase).replace(/\/+$/, '');
+        }
+        var url = absBase + '/Items/' + encodeURIComponent(itemId) + '/Download?ApiKey=' + encodeURIComponent(tok);
+
+        function invokeNativeShellDownload(resolvedItemObj) {
+            var ns = window.NativeShell;
+            if (!ns) {
+                return;
             }
-        }, 1200);
-        showToast('Download started.', 'success');
+            var srvId = resolveActiveServerId(resolvedItemObj);
+            var safeItem = {};
+            if (resolvedItemObj && typeof resolvedItemObj === 'object') {
+                Object.keys(resolvedItemObj).forEach(function (k) {
+                    safeItem[k] = resolvedItemObj[k];
+                });
+            }
+            safeItem.Id = String(safeItem.Id || itemId);
+            safeItem.ServerId = String(safeItem.ServerId || srvId);
+            if (!safeItem.MediaType) {
+                safeItem.MediaType = 'Video';
+            }
+            var fname = buildNativeDownloadFilename(safeItem, itemId);
+            var payload = {
+                url: url,
+                item: safeItem,
+                itemId: String(itemId),
+                serverId: safeItem.ServerId,
+                title: String(safeItem.Name || fname),
+                filename: fname
+            };
+            if (typeof ns.downloadFiles === 'function') {
+                ns.downloadFiles([payload]);
+            } else if (typeof ns.downloadFile === 'function') {
+                ns.downloadFile(payload);
+            }
+        }
+
+        var nsNow = window.NativeShell;
+        if (itemObj && (itemObj.Path || (nsNow && typeof nsNow.downloadFiles === 'function'))) {
+            invokeNativeShellDownload(itemObj);
+            return;
+        }
+
+        var uid = getActiveUserId();
+        var detailPath = uid
+            ? ('/Users/' + encodeURIComponent(uid) + '/Items/' + encodeURIComponent(itemId))
+            : ('/Items/' + encodeURIComponent(itemId) + '?Fields=Path,MediaSources');
+        apiFetch(detailPath).then(function (fetched) {
+            invokeNativeShellDownload(fetched || itemObj || { Id: itemId });
+        }).catch(function () {
+            invokeNativeShellDownload(itemObj || { Id: itemId });
+        });
     }
     // so media management calls use an explicit admin-token request helper.
     function adminApiFetch(adminAuth, path, options) {
@@ -346,7 +459,7 @@
             canIdentify ? { act: 'identify', icon: 'search', label: 'Identify', hint: 'Match against metadata providers' } : null,
             { act: 'refresh', icon: 'refresh', label: 'Refresh metadata', hint: 'Search providers for updated metadata & missing images' },
             hasMediaInfo ? { act: 'info', icon: 'info', label: 'Media info', hint: 'Container, video, audio & subtitle streams' } : null,
-            hasMediaInfo ? { act: 'download', icon: 'download', label: 'Download', hint: 'Save the media file to this device' } : null,
+            (hasMediaInfo && supportsNativePhoneDownload()) ? { act: 'download', icon: 'download', label: 'Download', hint: 'Save to the Jellyfin mobile app Downloads tab' } : null,
             { act: 'advanced', icon: 'sliders', label: 'Advanced editor', hint: 'Open Jellyfin\u2019s full Metadata Manager (images & more)' },
             { act: 'delete', icon: 'trash', label: 'Delete media', hint: 'Permanently remove the files from disk', danger: true }
         ].filter(Boolean);
@@ -716,17 +829,17 @@
     }
 
     function manageDownloadMedia(item) {
-        if (!item || !item.Id) {
+        if (!item || !item.Id || !supportsNativePhoneDownload()) {
             return;
         }
         var immediateTok = (state.adminAuth && state.adminAuth.accessToken)
             || (canManageMediaItems() ? getActiveToken() : '');
         if (immediateTok) {
-            triggerDirectMediaDownload(item.Id, immediateTok);
+            triggerDirectMediaDownload(item, immediateTok);
             return;
         }
         runWithManageAuth(function (auth) {
-            triggerDirectMediaDownload(item.Id, auth.accessToken);
+            triggerDirectMediaDownload(item, auth.accessToken);
             return Promise.resolve();
         }).catch(function (err) {
             manageMediaErrorToast(err, 'Could not start the download.');

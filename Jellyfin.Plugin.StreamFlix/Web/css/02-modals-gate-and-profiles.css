@@ -822,6 +822,11 @@
     color: #ffffff;
     transform: scale(1.08);
 }
+body.bfx-active:not(.bfx-native-phone-download) #streamflix-modal-download-btn,
+body.bfx-active:not(.bfx-native-phone-download) .streamflix-ep-download-btn,
+body.bfx-active:not(.bfx-native-phone-download) .btnDownload {
+    display: none !important;
+}
 
 /* Track Selector Pills & Credits inside .streamflix-detail-modal ('The Devil Wears Prada 2' style) */
 .streamflix-modal-tracks-row {
