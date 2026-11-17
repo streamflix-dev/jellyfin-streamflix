@@ -1474,3 +1474,17 @@ html.bfx-no-flex-gap .streamflix-profiles-grid {
 html.bfx-no-flex-gap .streamflix-profiles-grid > * {
     margin: 12px;
 }
+html.bfx-no-flex-gap .bfx-sp-top-row > * + *,
+html.bfx-no-flex-gap .bfx-sp-mobile-row > * + * {
+    margin-left: 12px;
+}
+html.bfx-no-flex-gap .bfx-sp-tabs > * + *,
+html.bfx-no-flex-gap .bfx-sp-chip-wrap > * + *,
+html.bfx-no-flex-gap .bfx-sp-quick-strip > * + *,
+html.bfx-no-flex-gap .bfx-sp-quick-pill > * + *,
+html.bfx-no-flex-gap .bfx-sp-tab > * + * {
+    margin-left: 8px;
+}
+html.bfx-no-flex-gap .bfx-sp-mobile-list > * + * {
+    margin-top: 10px;
+}

@@ -645,14 +645,18 @@
                     return;
                 }
                 if (isOnHomeRoute()) {
-                    if (state.searchQuery || state.mobileSearchOpen) {
+                    if ((typeof isSearchPageActive === 'function' && isSearchPageActive()) || state.searchQuery || state.mobileSearchOpen) {
                         ev.preventDefault();
-                        cancelPendingSearch();
-                        state.mobileSearchOpen = false;
-                        state.searchQuery = '';
-                        state.searchResults = null;
-                        state.seerrSearchResults = null;
-                        renderCinemaHubContents();
+                        if (typeof closeSearchPage === 'function') {
+                            closeSearchPage();
+                        } else {
+                            cancelPendingSearch();
+                            state.mobileSearchOpen = false;
+                            state.searchQuery = '';
+                            state.searchResults = null;
+                            state.seerrSearchResults = null;
+                            renderCinemaHubContents();
+                        }
                         return;
                     }
                     if (state.libraryBrowser && state.libraryBrowser.active) {
@@ -682,6 +686,17 @@
                 }
                 var tag = (document.activeElement && document.activeElement.tagName) || '';
                 if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) {
+                    return;
+                }
+                var spInput = document.getElementById('streamflix-search-page-input');
+                if (spInput && spInput.offsetParent !== null) {
+                    ev.preventDefault();
+                    spInput.focus();
+                    return;
+                }
+                if (document.body && document.body.classList.contains('bfx-phone-mode') && typeof openSearchPage === 'function') {
+                    ev.preventDefault();
+                    openSearchPage('', true);
                     return;
                 }
                 var search = document.getElementById('streamflix-live-search-input');

@@ -6,9 +6,9 @@ StreamFlix publishes security updates on the latest stable release (`main` branc
 
 | Version | Channel | Supported |
 | :--- | :--- | :--- |
-| **`>= 0.9.2.11`** | Stable (`Latest`) | ✅ Supported |
-| **`>= 0.9.8.7`** | Dev Pre-Release (`dev`) | ✅ Supported |
-| **`<= 0.9.2.6`** | Legacy | ❌ Upgrade immediately to `>= 0.9.2.11` |
+| **`>= 0.9.2.12`** | Stable (`Latest`) | ✅ Supported |
+| **`>= 0.9.8.8`** | Dev Pre-Release (`dev`) | ✅ Supported |
+| **`<= 0.9.2.6`** | Legacy | ❌ Upgrade immediately to `>= 0.9.2.12` |
 
 ## Reporting a Vulnerability Privately
 

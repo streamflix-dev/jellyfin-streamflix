@@ -331,6 +331,10 @@ assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto
 assert.match(combinedJs, /function\s+checkFlexGapSupport\s*\(/, 'Chromium 83 Flexbox gap runtime feature detection must be wired');
 const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'), 'utf8');
 assert.match(css09, /html\.bfx-no-flex-gap\s+\.streamflix-hero-meta-row\s*>\s*\*\s*\+\s*\*/, 'Chromium 83 Flexbox gap fallback rules must be present');
-console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill & auto-closing JMP SSO tab verified');
+assert.match(combinedJs, /function\s+openSearchPage\s*\(/, 'Dedicated Search Page opener must be wired');
+assert.match(combinedJs, /function\s+closeSearchPage\s*\(/, 'Dedicated Search Page closer must be wired');
+assert.match(combinedJs, /function\s+scoreSearchCandidate\s*\(/, 'Smart search relevance scorer must be wired');
+assert.match(combinedJs, /streamflix-search-page-input/, 'Dedicated Search Page input must be wired');
+console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closing JMP SSO tab & full-page Search UX verified');
 
-console.log('ALL STREAMFLIX v0.9.8.7 SMOKE CHECKS PASSED!');
+console.log('ALL STREAMFLIX v0.9.8.8 SMOKE CHECKS PASSED!');

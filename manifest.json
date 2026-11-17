@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.8",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.8 Release Candidate (Dev Test Channel): Dedicated full-page Search experience that opens immediately on mobile Search tap and on the first keystroke on desktop/Windows/TV, featuring sticky live search with instant filter tabs (All, Movies, Shows, Collections, Request), punctuation/hyphen-tolerant relevance ranking, live People/Cast & Genre quick-match chips, per-profile Recent Searches, Explore by Genre cards, and Netflix-mobile recommended rows.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.8_12.0.0.zip",
+        "checksum": "0f5b0dcf94d5dc60bb3ede41f4e2f8a3",
+        "timestamp": "2026-11-17T23:48:05Z"
+      },
+      {
+        "version": "0.9.8.8",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.8 Release Candidate (Dev Test Channel): Dedicated full-page Search experience that opens immediately on mobile Search tap and on the first keystroke on desktop/Windows/TV, featuring sticky live search with instant filter tabs (All, Movies, Shows, Collections, Request), punctuation/hyphen-tolerant relevance ranking, live People/Cast & Genre quick-match chips, per-profile Recent Searches, Explore by Genre cards, and Netflix-mobile recommended rows.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.8_10.11.0.zip",
+        "checksum": "a8c9dba718dcdabb5fbca072bc7ab9bc",
+        "timestamp": "2026-11-17T23:48:05Z"
+      },
+      {
+        "version": "0.9.8.8",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.8 Release Candidate (Dev Test Channel): Dedicated full-page Search experience that opens immediately on mobile Search tap and on the first keystroke on desktop/Windows/TV, featuring sticky live search with instant filter tabs (All, Movies, Shows, Collections, Request), punctuation/hyphen-tolerant relevance ranking, live People/Cast & Genre quick-match chips, per-profile Recent Searches, Explore by Genre cards, and Netflix-mobile recommended rows.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.8_10.9.0.zip",
+        "checksum": "80e32a3afe5fddc5815fc875823103b4",
+        "timestamp": "2026-11-17T23:48:05Z"
+      },
+      {
         "version": "0.9.8.7",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.7 Release Candidate (Dev Test Channel): Restrict media Download buttons strictly to Jellyfin mobile apps on phones (hidden on web browsers, Windows / Jellyfin Media Player, desktop, and TVs) and route downloads exclusively through Jellyfin's built-in NativeShell download bridge (NativeShell.downloadFiles / NativeShell.downloadFile with ?ApiKey= and full item metadata) instead of starting raw browser file downloads.",
         "targetAbi": "12.0.0.0",

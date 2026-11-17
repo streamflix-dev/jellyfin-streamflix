@@ -1378,6 +1378,7 @@ body.bfx-settings-route button:focus-visible {
 
     /* Bottom clearance so the floating dock never overlaps content rows, settings cards, or toasts */
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-rows,
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .bfx-search-page,
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) #streamflix-library-page-fallback {
         padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
     }

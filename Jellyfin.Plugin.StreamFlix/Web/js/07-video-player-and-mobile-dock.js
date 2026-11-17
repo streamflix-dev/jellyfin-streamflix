@@ -1434,7 +1434,9 @@
             return;
         }
         var onHome = isOnHomeRoute();
-        var searchOpen = Boolean(state.mobileSearchOpen || state.searchQuery);
+        var searchOpen = typeof isSearchPageActive === 'function'
+            ? isSearchPageActive()
+            : Boolean(state.mobileSearchOpen || state.searchQuery);
         var hashLower = (window.location.hash || '').toLowerCase();
         var cat = state.activeCategory || 'all';
         var activeTab = 'home';
@@ -1529,11 +1531,15 @@
                     closeAccountDropdown();
 
                     if (tab === 'home') {
-                        cancelPendingSearch();
-                        state.mobileSearchOpen = false;
-                        state.searchQuery = '';
-                        state.searchResults = null;
-                        state.seerrSearchResults = null;
+                        if (typeof closeSearchPage === 'function') {
+                            closeSearchPage(true);
+                        } else {
+                            cancelPendingSearch();
+                            state.mobileSearchOpen = false;
+                            state.searchQuery = '';
+                            state.searchResults = null;
+                            state.seerrSearchResults = null;
+                        }
                         state.browseFilter = null;
                         state.libraryBrowser = null;
                         state.activeCategory = 'all';
@@ -1564,11 +1570,15 @@
                     }
 
                     if (tab === 'hot') {
-                        cancelPendingSearch();
-                        state.mobileSearchOpen = false;
-                        state.searchQuery = '';
-                        state.searchResults = null;
-                        state.seerrSearchResults = null;
+                        if (typeof closeSearchPage === 'function') {
+                            closeSearchPage(true);
+                        } else {
+                            cancelPendingSearch();
+                            state.mobileSearchOpen = false;
+                            state.searchQuery = '';
+                            state.searchResults = null;
+                            state.seerrSearchResults = null;
+                        }
                         state.browseFilter = null;
                         state.libraryBrowser = null;
                         if (state.cinemaHubEnabled === false) {
@@ -1605,48 +1615,8 @@
                             syncMobileDockState();
                             return;
                         }
-                        if (isOnHomeRoute()) {
-                            var hubEl = document.getElementById('streamflix-cinema-hub');
-                            var liveInput = document.getElementById('streamflix-live-search-input');
-                            if (state.mobileSearchOpen && !state.searchQuery && liveInput && document.activeElement === liveInput) {
-                                state.mobileSearchOpen = false;
-                                try { liveInput.blur(); } catch (eBlur) {}
-                                renderCinemaHubContents();
-                                syncMobileDockState();
-                                return;
-                            }
-                            state.mobileSearchOpen = true;
-                            if (hubEl) {
-                                var subEl = hubEl.querySelector('.streamflix-subnav');
-                                if (subEl) {
-                                    subEl.classList.add('is-search-open');
-                                }
-                            }
-                            syncMobileDockState();
-                            try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (eScr) { window.scrollTo(0, 0); }
-                            if (liveInput) {
-                                try { liveInput.focus(); } catch (eFoc) {}
-                            } else {
-                                ensureCinemaHubMounted();
-                                renderCinemaHubContents();
-                                var liveInput2 = document.getElementById('streamflix-live-search-input');
-                                if (liveInput2) {
-                                    try { liveInput2.focus(); } catch (eFoc2) {}
-                                }
-                            }
-                        } else {
-                            state.mobileSearchOpen = true;
-                            window.location.hash = '#/home';
-                            setTimeout(function () {
-                                ensureCinemaHubMounted();
-                                renderCinemaHubContents();
-                                syncMobileDockState();
-                                try { window.scrollTo(0, 0); } catch (eScr2) {}
-                                var liveInput3 = document.getElementById('streamflix-live-search-input');
-                                if (liveInput3) {
-                                    try { liveInput3.focus(); } catch (eFoc3) {}
-                                }
-                            }, 45);
+                        if (typeof openSearchPage === 'function') {
+                            openSearchPage(undefined, true);
                         }
                     }
                 });

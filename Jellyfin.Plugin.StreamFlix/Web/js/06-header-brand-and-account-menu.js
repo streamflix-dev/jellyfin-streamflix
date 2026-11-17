@@ -1176,6 +1176,22 @@
         }
         el.setAttribute('data-streamflix-corner-brand', 'true');
         el.classList.add('streamflix-toolbar-brand-link');
+        if (!el.__bfxCornerResetBound) {
+            el.__bfxCornerResetBound = true;
+            el.addEventListener('click', function () {
+                if (typeof isSearchPageActive === 'function' && isSearchPageActive() && typeof closeSearchPage === 'function') {
+                    state.activeCategory = 'all';
+                    closeSearchPage();
+                } else if (state.browseFilter || state.libraryBrowser || state.activeCategory !== 'all') {
+                    state.browseFilter = null;
+                    state.libraryBrowser = null;
+                    state.activeCategory = 'all';
+                    if (isOnHomeRoute()) {
+                        renderCinemaHubContents();
+                    }
+                }
+            });
+        }
 
         // Hide any Jellyfin triangle icon img / svg / startIcon inside the brand button
         var icons = el.querySelectorAll('img, svg, .MuiButton-startIcon, .MuiButton-icon');
@@ -1239,6 +1255,12 @@
             fb.href = '#/home';
             fb.className = 'bfx-fixed-corner-brand';
             fb.setAttribute('aria-label', getBrandName() + ' Home');
+            fb.addEventListener('click', function () {
+                if (typeof isSearchPageActive === 'function' && isSearchPageActive() && typeof closeSearchPage === 'function') {
+                    state.activeCategory = 'all';
+                    closeSearchPage();
+                }
+            });
             document.body.appendChild(fb);
         }
         if (fb && fb.textContent !== brandLogo) {

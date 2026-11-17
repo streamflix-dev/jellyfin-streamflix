@@ -1504,10 +1504,132 @@
         var d = state.hubData;
         var profileName = (state.activeProfile && state.activeProfile.name) || 'You';
         var cat = state.activeCategory || 'all';
-        var bf = (!state.searchQuery && state.browseFilter) ? state.browseFilter : null;
-        var lb = (!state.searchQuery && !bf && state.libraryBrowser && state.libraryBrowser.active) ? state.libraryBrowser : null;
+        var searchPageOn = typeof isSearchPageActive === 'function'
+            ? isSearchPageActive()
+            : Boolean(state.mobileSearchOpen || state.searchQuery);
+        var bf = (!searchPageOn && state.browseFilter) ? state.browseFilter : null;
+        var lb = (!searchPageOn && !bf && state.libraryBrowser && state.libraryBrowser.active) ? state.libraryBrowser : null;
         if (!lb) {
             disconnectLibraryBrowserObserver();
+        }
+
+        document.body.classList.toggle('bfx-search-page-open', searchPageOn);
+        if (searchPageOn) {
+            document.body.classList.add('streamflix-hub-filtered', 'streamflix-hub-active');
+            hub.classList.remove('streamflix-has-hero');
+            hub.style.removeProperty('--bfx-ambient');
+            syncHeroBleed(hub);
+            state.heroCatKey = null;
+
+            var existingPage = document.getElementById('streamflix-search-page');
+            if (existingPage && hub.contains(existingPage)) {
+                var spIn = document.getElementById('streamflix-search-page-input');
+                if (spIn && document.activeElement !== spIn && spIn.value !== (state.searchQuery || '')) {
+                    spIn.value = state.searchQuery || '';
+                }
+                var hasValNow = Boolean(state.searchQuery && String(state.searchQuery).length > 0);
+                var isBusyNow = Boolean(state.searchLocalLoading || state.seerrSearchLoading);
+                var spBar = existingPage.querySelector('.bfx-sp-bar');
+                if (spBar) { spBar.classList.toggle('has-value', hasValNow); }
+                var spSpin = document.getElementById('bfx-sp-spinner');
+                if (spSpin) { spSpin.classList.toggle('is-visible', isBusyNow); }
+                var spClr = document.getElementById('bfx-sp-clear-btn');
+                if (spClr) { spClr.classList.toggle('is-visible', hasValNow); }
+                var spTabs = document.getElementById('streamflix-search-page-tabs');
+                if (spTabs) { spTabs.innerHTML = buildSearchPageTabsHtml(); }
+                var spBody = document.getElementById('streamflix-search-page-body');
+                if (spBody) { spBody.innerHTML = buildSearchPageBodyHtml(); }
+                bindSearchPageInteractive(existingPage);
+                syncMobileDockState();
+                return;
+            }
+
+            hub.innerHTML = buildSearchPageShellHtml();
+            if (!hub.classList.contains('streamflix-hub-ready')) {
+                hub.classList.add('streamflix-hub-ready');
+            }
+            var mountedPage = document.getElementById('streamflix-search-page');
+            var mountedInput = document.getElementById('streamflix-search-page-input');
+            var backBtn = document.getElementById('bfx-sp-back-btn');
+            var clrBtn = document.getElementById('bfx-sp-clear-btn');
+
+            if (backBtn) {
+                backBtn.addEventListener('click', function () {
+                    closeSearchPage();
+                });
+            }
+            if (clrBtn) {
+                clrBtn.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    cancelPendingSearch();
+                    state.searchQuery = '';
+                    state.searchTypeFilter = 'all';
+                    state.searchResults = null;
+                    state.searchPeopleResults = null;
+                    state.seerrSearchResults = null;
+                    if (mountedInput) {
+                        mountedInput.value = '';
+                        try { mountedInput.focus(); } catch (eF) {}
+                    }
+                    renderCinemaHubContents();
+                });
+            }
+            if (mountedInput) {
+                mountedInput.addEventListener('focus', function () {
+                    if (document.body) {
+                        document.body.classList.add('bfx-mobile-search-focused');
+                    }
+                    syncMobileDockState();
+                });
+                mountedInput.addEventListener('blur', function () {
+                    if (document.body) {
+                        document.body.classList.remove('bfx-mobile-search-focused');
+                    }
+                    syncMobileDockState();
+                });
+                mountedInput.addEventListener('input', function () {
+                    state.searchQuery = mountedInput.value;
+                    state.searchGenreFilter = '';
+                    if (state.searchDebounce) {
+                        clearTimeout(state.searchDebounce);
+                        state.searchDebounce = null;
+                    }
+                    previewInstantLocalSearch(state.searchQuery);
+                    if ((state.searchQuery || '').trim()) {
+                        state.searchDebounce = setTimeout(function () {
+                            runLiveSearch(state.searchQuery);
+                        }, 150);
+                    }
+                });
+                mountedInput.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Escape') {
+                        ev.preventDefault();
+                        closeSearchPage();
+                    } else if (ev.key === 'Enter') {
+                        var qTrim = String(mountedInput.value || '').trim();
+                        if (qTrim.length >= 2) {
+                            saveRecentSearch(qTrim);
+                            if (state.searchDebounce) {
+                                clearTimeout(state.searchDebounce);
+                                state.searchDebounce = null;
+                            }
+                            runLiveSearch(qTrim);
+                        }
+                    }
+                });
+                if (!document.querySelector('.streamflix-modal-backdrop') && !isGateOpen()) {
+                    try {
+                        mountedInput.focus();
+                        var endPos = mountedInput.value ? mountedInput.value.length : 0;
+                        if (mountedInput.setSelectionRange) {
+                            mountedInput.setSelectionRange(endPos, endPos);
+                        }
+                    } catch (eInitFoc) {}
+                }
+            }
+            bindSearchPageInteractive(mountedPage);
+            syncMobileDockState();
+            return;
         }
 
         document.body.classList.toggle('streamflix-hub-filtered', Boolean(state.searchQuery) || Boolean(bf) || Boolean(lb) || cat !== 'all');
@@ -1948,6 +2070,11 @@
                 if (ev.target && ev.target.closest && ev.target.closest('#streamflix-search-clear-btn')) {
                     return;
                 }
+                if (document.body && document.body.classList.contains('bfx-phone-mode')) {
+                    ev.preventDefault();
+                    openSearchPage('', true);
+                    return;
+                }
                 if (subnavEl) {
                     subnavEl.classList.add('is-search-open');
                 }
@@ -1956,18 +2083,16 @@
                 }
             });
             searchInput.addEventListener('focus', function () {
+                if (document.body && document.body.classList.contains('bfx-phone-mode')) {
+                    openSearchPage('', true);
+                    return;
+                }
                 if (subnavEl) {
                     subnavEl.classList.add('is-search-open');
-                }
-                if (document.body) {
-                    document.body.classList.add('bfx-mobile-search-focused');
                 }
                 syncMobileDockState();
             });
             searchInput.addEventListener('blur', function () {
-                if (document.body) {
-                    document.body.classList.remove('bfx-mobile-search-focused');
-                }
                 if (subnavEl && !searchInput.value && !state.mobileSearchOpen) {
                     subnavEl.classList.remove('is-search-open');
                 }
@@ -1976,39 +2101,28 @@
         }
         if (searchInput) {
             searchInput.addEventListener('input', function () {
-                state.searchQuery = searchInput.value;
+                var val = searchInput.value;
+                state.searchQuery = val;
                 if (state.searchDebounce) {
                     clearTimeout(state.searchDebounce);
                     state.searchDebounce = null;
                 }
-                if (typeof previewInstantLocalSearch === 'function') {
-                    previewInstantLocalSearch(state.searchQuery);
-                }
-                if ((state.searchQuery || '').trim()) {
+                if ((val || '').trim()) {
+                    state.mobileSearchOpen = true;
+                    previewInstantLocalSearch(val);
                     state.searchDebounce = setTimeout(function () {
                         runLiveSearch(state.searchQuery);
-                    }, 220);
+                    }, 150);
+                } else {
+                    previewInstantLocalSearch('');
                 }
             });
             searchInput.addEventListener('keydown', function (ev) {
                 if (ev.key === 'Escape' && (state.searchQuery || state.mobileSearchOpen)) {
                     ev.preventDefault();
-                    cancelPendingSearch();
-                    state.mobileSearchOpen = false;
-                    state.searchQuery = '';
-                    state.searchResults = null;
-                    state.seerrSearchResults = null;
-                    searchInput.value = '';
-                    try { searchInput.blur(); } catch (eEsc) {}
-                    renderCinemaHubContents();
+                    closeSearchPage();
                 }
             });
-            if (state.searchQuery && !document.querySelector('.streamflix-modal-backdrop') && !isGateOpen()) {
-                searchInput.focus();
-                try {
-                    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-                } catch (e) {}
-            }
         }
 
         bindClearSearchBtn();
