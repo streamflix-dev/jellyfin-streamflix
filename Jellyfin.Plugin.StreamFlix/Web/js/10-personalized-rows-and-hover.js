@@ -117,11 +117,23 @@
     var PREVIEW_CARD_SEL = '.streamflix-poster-card, .streamflix-top10-card, .streamflix-wide-card';
 
     // Closes only the currently open preview popup without cancelling a pending showTimer for the next movie card
+    function clearPreviewSourceCardClass() {
+        if (hoverPreview.card && hoverPreview.card.classList) {
+            hoverPreview.card.classList.remove('is-pv-source');
+        }
+        try {
+            Array.prototype.forEach.call(document.querySelectorAll('.is-pv-source'), function (node) {
+                node.classList.remove('is-pv-source');
+            });
+        } catch (e) {}
+    }
+
     function closeOpenPreviewVisuals() {
         clearTimeout(hoverPreview.hideTimer);
         hoverPreview.hideTimer = null;
         var el = hoverPreview.el;
         var wasOpen = Boolean(el && el.classList.contains('is-open'));
+        clearPreviewSourceCardClass();
         hoverPreview.card = null;
         hoverPreview.item = null;
         if (wasOpen) {
@@ -321,7 +333,8 @@
             || document.querySelector('.streamflix-modal-backdrop')) {
             return;
         }
-        var rect = card.getBoundingClientRect();
+        var artEl = card.querySelector('.streamflix-poster-img-wrap, .streamflix-wide-img-wrap, .streamflix-top10-poster') || card;
+        var rect = artEl.getBoundingClientRect();
         if (rect.width < 40 || rect.bottom < 0 || rect.top > window.innerHeight) {
             return;
         }
@@ -329,10 +342,11 @@
         var isWide = card.classList.contains('streamflix-wide-card');
         var cardImg = card.querySelector('img');
         var placeholder = cardImg && cardImg.classList.contains('is-loaded') ? (cardImg.currentSrc || cardImg.src || '') : '';
-        var W = Math.round(Math.min(isWide ? 420 : 372, Math.max(isWide ? 332 : 288, rect.width * (isWide ? 1.28 : 1.5))));
+        var W = Math.round(Math.min(isWide ? 420 : 356, Math.max(isWide ? 332 : 280, rect.width * (isWide ? 1.28 : 1.46))));
         W = Math.min(W, window.innerWidth - 24);
         clearTimeout(hoverPreview.hideTimer);
         hoverPreview.hideTimer = null;
+        clearPreviewSourceCardClass();
         hoverPreview.card = card;
         hoverPreview.item = item;
         hoverPreview.dismissedCard = null;
@@ -346,7 +360,7 @@
         var H = el.offsetHeight || Math.round(W * 0.9);
         var cx = rect.left + rect.width / 2;
         var left = Math.max(12, Math.min(window.innerWidth - W - 12, cx - W / 2));
-        var top = rect.top + rect.height / 2 - H * 0.42;
+        var top = rect.top + rect.height / 2 - H * 0.48;
         var hdr = document.querySelector('.skinHeader:not(.osdHeader)');
         var minTop = Math.max(12, hdr ? Math.min(96, Math.round(hdr.getBoundingClientRect().bottom) + 8) : 72);
         top = Math.max(minTop, Math.min(window.innerHeight - H - 12, top));
@@ -358,6 +372,7 @@
         el.style.setProperty('--bfx-pv-from', (rect.width / W).toFixed(3));
         void el.offsetWidth;
         el.style.transition = '';
+        card.classList.add('is-pv-source');
         el.classList.add('is-open');
         el.setAttribute('aria-hidden', 'false');
     }

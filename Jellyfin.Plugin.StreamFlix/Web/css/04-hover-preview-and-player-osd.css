@@ -653,10 +653,17 @@ body.streamflix-nf-player .videoOsdBottom .sliderMarkerContainer,
 body.streamflix-nf-player .videoOsdBottom .sliderMarker { display: none !important; }
 
 /* ---------- Hover preview, refined ---------- */
+.streamflix-poster-card.is-pv-source,
+.streamflix-wide-card.is-pv-source,
+.streamflix-top10-card.is-pv-source {
+    opacity: 0 !important;
+    transform: none !important;
+    transition: opacity 0.14s ease !important;
+}
 #bfx-hover-preview {
     border-radius: 12px;
-    background: #141414;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.07);
+    background: #1b1b20;
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.9), 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 .bfx-pv-media { background: #1c1c1c; }
 .bfx-pv-ph {
@@ -672,8 +679,8 @@ body.streamflix-nf-player .videoOsdBottom .sliderMarker { display: none !importa
 }
 .bfx-pv-img { opacity: 0; transition: opacity 0.25s ease; }
 .bfx-pv-img.is-loaded { opacity: 1; }
-.bfx-pv-scrim { background: linear-gradient(180deg, rgba(20, 20, 20, 0) 42%, rgba(20, 20, 20, 0.55) 74%, #141414 100%); }
-.bfx-pv-logo { left: 16px; bottom: 14px; max-width: 62%; max-height: 50%; }
+.bfx-pv-scrim { background: linear-gradient(180deg, rgba(27, 27, 32, 0) 42%, rgba(27, 27, 32, 0.58) 74%, #1b1b20 100%); }
+.bfx-pv-logo { left: 16px; bottom: 12px; max-width: 58%; max-height: 44%; }
 .bfx-pv-title { left: 16px; right: 16px; bottom: 14px; font-size: 20px; }
 .bfx-pv-bar {
     position: absolute;

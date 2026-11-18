@@ -2327,56 +2327,55 @@
             { id: 'movie', label: 'Movies', count: st.movies.length, show: st.movies.length > 0 || tf === 'movie' },
             { id: 'series', label: 'Shows', count: st.series.length, show: st.series.length > 0 || tf === 'series' },
             { id: 'collection', label: 'Collections', count: st.collections.length, show: st.collections.length > 0 || tf === 'collection' },
-            { id: 'request', label: 'Available to Request', count: st.seerrFiltered.length, show: st.seerrOk && st.hasQuery && (st.seerrFiltered.length > 0 || st.seerrSearchLoading || tf === 'request') }
+            { id: 'request', label: 'Request', count: st.seerrFiltered.length, show: st.seerrOk && st.hasQuery && (st.seerrFiltered.length > 0 || state.seerrSearchLoading || tf === 'request') }
         ];
         if (!tabs.some(function (t) { return t.id === tf && t.show; })) {
             tf = 'all';
             state.searchTypeFilter = 'all';
         }
-        var chipsHtml = '';
-        if (state.searchGenreFilter && !st.hasQuery) {
-            chipsHtml += '<button type="button" class="bfx-sp-active-genre" data-sp-clear-genre="1" title="Clear genre filter">'
-                + '<span>Genre: ' + escapeHtml(state.searchGenreFilter) + '</span>'
-                + icon('close')
-                + '</button>';
-        }
-        chipsHtml += tabs.filter(function (t) { return t.show; }).map(function (t) {
+        var pillsHtml = tabs.filter(function (t) { return t.show; }).map(function (t) {
             var active = tf === t.id;
-            return '<button type="button" class="bfx-sp-tab' + (active ? ' is-active' : '') + '" data-sp-tab="' + t.id + '">'
-                + '<span>' + escapeHtml(t.label) + '</span>'
-                + '<b class="bfx-sp-tab-cnt">' + t.count + '</b>'
+            return '<button type="button" class="streamflix-pill' + (active ? ' active' : '') + '" data-sp-tab="' + t.id + '">'
+                + escapeHtml(t.label)
+                + (t.count > 0 ? ' <span class="bfx-sp-pill-cnt">' + t.count + '</span>' : '')
                 + '</button>';
         }).join('');
-        return chipsHtml;
+        var genreChip = (state.searchGenreFilter && !st.hasQuery)
+            ? ('<button type="button" class="bfx-sp-active-genre" data-sp-clear-genre="1" title="Clear genre filter">'
+                + '<span>' + escapeHtml(state.searchGenreFilter) + '</span>'
+                + icon('close')
+                + '</button>')
+            : '';
+        return genreChip + '<nav class="streamflix-FilterPills bfx-sp-filter-pills" aria-label="Filter results">' + pillsHtml + '</nav>';
     }
 
     function buildSearchPageShellHtml() {
         var seerrOk = isCurrentProfileSeerrAllowed();
-        var placeholder = seerrOk
-            ? 'Search movies, shows, actors, genres, or request new titles…'
-            : 'Search movies, shows, actors, genres…';
+        var placeholder = seerrOk ? 'Titles, actors, genres, or request…' : 'Titles, actors, genres…';
         var isBusy = Boolean(state.searchLocalLoading || state.seerrSearchLoading);
         var hasVal = Boolean(state.searchQuery && String(state.searchQuery).length > 0);
         return ''
             + '<div id="streamflix-search-page" class="bfx-search-page">'
-            + '  <div class="bfx-sp-sticky">'
-            + '    <div class="bfx-sp-top-row">'
-            + '      <button type="button" id="bfx-sp-back-btn" class="bfx-sp-back-btn" title="Exit search" aria-label="Back to Browse">'
-            +          icon('chevronLeft') + '<span>Back</span>'
+            + '  <div class="streamflix-subnav bfx-sp-subnav">'
+            + '    <div class="bfx-sp-left">'
+            + '      <button type="button" id="bfx-sp-back-btn" class="streamflix-ghost-btn bfx-sp-back-btn" title="Back to Browse" aria-label="Back to Browse">'
+            +          icon('chevronLeft') + '<span>Browse</span>'
             + '      </button>'
-            + '      <div class="bfx-sp-bar' + (hasVal ? ' has-value' : '') + '">'
-            + '        <span class="bfx-sp-bar-ico" aria-hidden="true">' + icon('search') + '</span>'
-            + '        <input type="search" id="streamflix-search-page-input" class="bfx-sp-input" placeholder="' + escapeHtml(placeholder) + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search" value="' + escapeHtml(state.searchQuery || '') + '" />'
-            + '        <span id="bfx-sp-spinner" class="bfx-sp-spinner' + (isBusy ? ' is-visible' : '') + '" aria-hidden="true"></span>'
-            + '        <button type="button" id="bfx-sp-clear-btn" class="bfx-sp-clear-btn' + (hasVal ? ' is-visible' : '') + '" title="Clear search text" aria-label="Clear search text">' + icon('close') + '</button>'
-            + '      </div>'
+            + '      <div id="streamflix-search-page-tabs" class="bfx-sp-tabs-slot">' + buildSearchPageTabsHtml() + '</div>'
+            + '    </div>'
+            + '    <div class="streamflix-subnav-right bfx-sp-right">'
             + (seerrOk
                 ? '      <button type="button" class="streamflix-ghost-btn bfx-sp-reqs-btn" data-open-seerr-requests="1" title="View Media Requests">' + icon('seerrIcon') + '<span>Requests</span></button>'
                 : '')
+            + '      <div class="streamflix-search-box bfx-sp-bar' + (hasVal ? ' has-value' : '') + '">'
+            + '        <span class="streamflix-search-icon" aria-hidden="true">' + icon('search') + '</span>'
+            + '        <input type="search" id="streamflix-search-page-input" class="streamflix-search-input bfx-sp-input" placeholder="' + escapeHtml(placeholder) + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search" value="' + escapeHtml(state.searchQuery || '') + '" />'
+            + '        <span id="bfx-sp-spinner" class="bfx-sp-spinner' + (isBusy ? ' is-visible' : '') + '" aria-hidden="true"></span>'
+            + '        <button type="button" id="bfx-sp-clear-btn" class="streamflix-search-clear bfx-sp-clear-btn' + (hasVal ? ' is-visible' : '') + '" title="Clear search" aria-label="Clear search">' + icon('close') + '</button>'
+            + '      </div>'
             + '    </div>'
-            + '    <div id="streamflix-search-page-tabs" class="bfx-sp-tabs">' + buildSearchPageTabsHtml() + '</div>'
             + '  </div>'
-            + '  <div id="streamflix-search-page-body" class="bfx-sp-body">' + buildSearchPageBodyHtml() + '</div>'
+            + '  <div id="streamflix-search-page-body" class="streamflix-rows bfx-sp-body">' + buildSearchPageBodyHtml() + '</div>'
             + '</div>';
     }
 
@@ -2420,10 +2419,10 @@
         var html = '';
         if (recents.length > 0) {
             html += ''
-                + '<section class="bfx-sp-section">'
-                + '  <div class="bfx-sp-sec-head">'
-                + '    <h3 class="bfx-sp-sec-title">Recent Searches</h3>'
-                + '    <button type="button" class="bfx-sp-link-btn" data-sp-clear-recents="1">Clear all</button>'
+                + '<section class="streamflix-row bfx-sp-section">'
+                + '  <div class="streamflix-row-header bfx-sp-sec-head">'
+                + '    <h2 class="streamflix-row-title">Recent Searches</h2>'
+                + '    <button type="button" class="bfx-sp-link-btn" data-sp-clear-recents="1">Clear</button>'
                 + '  </div>'
                 + '  <div class="bfx-sp-chip-wrap">'
                 + recents.map(function (rq) {
@@ -2438,18 +2437,18 @@
 
         if (genres.length > 0) {
             html += ''
-                + '<section class="bfx-sp-section">'
-                + '  <div class="bfx-sp-sec-head">'
-                + '    <h3 class="bfx-sp-sec-title">Explore by Genre</h3>'
+                + '<section class="streamflix-row bfx-sp-section">'
+                + '  <div class="streamflix-row-header bfx-sp-sec-head">'
+                + '    <h2 class="streamflix-row-title">Genres</h2>'
                 + ((d.allMovies && d.allMovies.length) + (d.allSeries && d.allSeries.length) >= 2
-                    ? '    <button type="button" class="bfx-sp-link-btn" data-sp-surprise="1">' + icon('shuffle') + '<span>Surprise Me</span></button>'
+                    ? '    <button type="button" class="streamflix-ghost-btn bfx-btn-xs" data-sp-surprise="1">' + icon('shuffle') + '<span>Surprise Me</span></button>'
                     : '')
                 + '  </div>'
-                + '  <div class="bfx-sp-genre-grid">'
-                + genres.map(function (gObj, idx) {
-                    return '<button type="button" class="bfx-sp-genre-card bfx-sp-g' + (idx % 6) + '" data-sp-genre="' + escapeHtml(gObj.name) + '">'
-                        + '<span class="bfx-sp-genre-name">' + escapeHtml(gObj.name) + '</span>'
-                        + '<span class="bfx-sp-genre-cnt">' + gObj.count + '</span>'
+                + '  <div class="bfx-sp-chip-wrap">'
+                + genres.map(function (gObj) {
+                    return '<button type="button" class="bfx-sp-genre-pill" data-sp-genre="' + escapeHtml(gObj.name) + '">'
+                        + '<span>' + escapeHtml(gObj.name) + '</span>'
+                        + '<b class="bfx-sp-pill-cnt">' + gObj.count + '</b>'
                         + '</button>';
                 }).join('')
                 + '  </div>'
@@ -2458,9 +2457,9 @@
 
         if (popularPool.length > 0) {
             html += ''
-                + '<section class="bfx-sp-section">'
-                + '  <div class="bfx-sp-sec-head">'
-                + '    <h3 class="bfx-sp-sec-title">' + (isPhone ? 'Recommended TV Shows &amp; Movies' : 'Popular Searches') + '</h3>'
+                + '<section class="streamflix-row streamflix-row-grid bfx-sp-section">'
+                + '  <div class="streamflix-row-header">'
+                + '    <h2 class="streamflix-row-title">' + (isPhone ? 'Recommended Searches' : 'Popular Searches') + '</h2>'
                 + '  </div>'
                 + (isPhone
                     ? '  <div class="bfx-sp-mobile-list">' + popularPool.map(buildMobileTopSearchRowHtml).join('') + '</div>'

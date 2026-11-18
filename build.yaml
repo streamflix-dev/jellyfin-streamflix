@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.9.8.8"
+version: "0.9.8.9"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,4 +18,4 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - v0.9.8.8 Release Candidate (Dev Test Channel): Dedicated full-page Search experience that opens immediately on mobile Search tap and on the first keystroke on desktop/Windows/TV, featuring sticky live search with instant filter tabs (All, Movies, Shows, Collections, Request), punctuation/hyphen-tolerant relevance ranking, live People/Cast & Genre quick-match chips, per-profile Recent Searches, Explore by Genre cards, and Netflix-mobile recommended rows.
+  - v0.9.8.9 Release Candidate (Dev Test Channel): Unify the dedicated Search Page header, filter pills, genre pills, and search bar with StreamFlix's native frosted-glass .streamflix-subnav / .streamflix-FilterPills / .streamflix-search-box design language; eliminate sticky-header clipping; and hide the underlying 2:3 poster card while its 16:9 hover preview card is expanded so posters never poke above or clip into hover cards.

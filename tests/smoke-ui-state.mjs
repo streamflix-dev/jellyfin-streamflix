@@ -335,6 +335,7 @@ assert.match(combinedJs, /function\s+openSearchPage\s*\(/, 'Dedicated Search Pag
 assert.match(combinedJs, /function\s+closeSearchPage\s*\(/, 'Dedicated Search Page closer must be wired');
 assert.match(combinedJs, /function\s+scoreSearchCandidate\s*\(/, 'Smart search relevance scorer must be wired');
 assert.match(combinedJs, /streamflix-search-page-input/, 'Dedicated Search Page input must be wired');
-console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closing JMP SSO tab & full-page Search UX verified');
+assert.match(combinedJs, /is-pv-source/, 'Underlying poster card must be hidden via .is-pv-source while hover preview is expanded');
+console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closing JMP SSO tab & unified Search UX verified');
 
-console.log('ALL STREAMFLIX v0.9.8.8 SMOKE CHECKS PASSED!');
+console.log('ALL STREAMFLIX v0.9.8.9 SMOKE CHECKS PASSED!');

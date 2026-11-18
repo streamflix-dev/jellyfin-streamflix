@@ -1474,17 +1474,30 @@ html.bfx-no-flex-gap .streamflix-profiles-grid {
 html.bfx-no-flex-gap .streamflix-profiles-grid > * {
     margin: 12px;
 }
-html.bfx-no-flex-gap .bfx-sp-top-row > * + *,
+html.bfx-no-flex-gap .bfx-sp-left > * + *,
+html.bfx-no-flex-gap .bfx-sp-right > * + *,
+html.bfx-no-flex-gap .streamflix-poster-sub > * + * {
+    margin-left: 10px;
+}
 html.bfx-no-flex-gap .bfx-sp-mobile-row > * + * {
     margin-left: 12px;
 }
-html.bfx-no-flex-gap .bfx-sp-tabs > * + *,
+html.bfx-no-flex-gap .bfx-sp-tabs-slot > * + *,
 html.bfx-no-flex-gap .bfx-sp-chip-wrap > * + *,
 html.bfx-no-flex-gap .bfx-sp-quick-strip > * + *,
 html.bfx-no-flex-gap .bfx-sp-quick-pill > * + *,
-html.bfx-no-flex-gap .bfx-sp-tab > * + * {
+html.bfx-no-flex-gap .bfx-sp-genre-pill > * + *,
+html.bfx-no-flex-gap .bfx-pv-actions > * + *,
+html.bfx-no-flex-gap .bfx-pv-play > * + *,
+html.bfx-no-flex-gap .bfx-pv-meta > * + *,
+html.bfx-no-flex-gap .bfx-pv-genres > * + * {
     margin-left: 8px;
 }
+html.bfx-no-flex-gap .bfx-pv-rating > * + *,
+html.bfx-no-flex-gap .streamflix-card-rating > * + * {
+    margin-left: 4px;
+}
+html.bfx-no-flex-gap .bfx-pv-body > * + *,
 html.bfx-no-flex-gap .bfx-sp-mobile-list > * + * {
-    margin-top: 10px;
+    margin-top: 9px;
 }
