@@ -2384,11 +2384,12 @@ body.bfx-search-page-open .skinHeader:not(.osdHeader) {
 @media (max-width: 640px) {
     .bfx-sp-subnav {
         display: grid !important;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 8px;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 8px 10px !important;
+        align-items: center !important;
     }
     .bfx-sp-left {
-        display: contents;
+        display: contents !important;
     }
     .bfx-sp-back-btn {
         grid-column: 1;
@@ -2402,25 +2403,47 @@ body.bfx-search-page-open .skinHeader:not(.osdHeader) {
         display: none;
     }
     .bfx-sp-right {
+        display: flex !important;
         grid-column: 2;
         grid-row: 1;
-        width: 100%;
-        min-width: 0;
+        width: 100% !important;
+        min-width: 0 !important;
+        align-items: center;
+        gap: 8px;
     }
     .bfx-sp-tabs-slot {
         grid-column: 1 / -1;
         grid-row: 2;
+        width: 100%;
     }
     .bfx-search-page .bfx-sp-bar,
-    .bfx-search-page .bfx-sp-bar:focus-within {
+    .bfx-search-page .bfx-sp-bar:focus-within,
+    .bfx-search-page .bfx-sp-bar.has-value {
+        display: flex !important;
+        order: 1 !important;
+        flex: 1 1 auto !important;
         width: 100% !important;
-        height: 42px;
+        min-width: 0 !important;
+        height: 42px !important;
+        padding: 0 !important;
+        border-radius: 999px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
     }
-    .bfx-sp-input {
+    .bfx-search-page .bfx-sp-input {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 0 60px 0 40px !important;
         font-size: 16px !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
     }
     .bfx-sp-reqs-btn span { display: none; }
     .bfx-sp-reqs-btn {
+        order: 2 !important;
+        flex: 0 0 42px !important;
         width: 42px !important;
         height: 42px !important;
         padding: 0 !important;

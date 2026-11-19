@@ -2043,9 +2043,20 @@
             }
             var mountedPage = document.getElementById('streamflix-search-page');
             var mountedInput = document.getElementById('streamflix-search-page-input');
+            var mountedBar = mountedPage ? mountedPage.querySelector('.bfx-sp-bar') : null;
             var backBtn = document.getElementById('bfx-sp-back-btn');
             var clrBtn = document.getElementById('bfx-sp-clear-btn');
 
+            if (mountedBar && mountedInput) {
+                mountedBar.addEventListener('click', function (ev) {
+                    if (ev.target && ev.target.closest && ev.target.closest('#bfx-sp-clear-btn')) {
+                        return;
+                    }
+                    if (document.activeElement !== mountedInput) {
+                        try { mountedInput.focus(); } catch (eBarF) {}
+                    }
+                });
+            }
             if (backBtn) {
                 backBtn.addEventListener('click', function () {
                     closeSearchPage();
@@ -2107,6 +2118,9 @@
                                 state.searchDebounce = null;
                             }
                             runLiveSearch(qTrim);
+                        }
+                        if (document.body && document.body.classList.contains('bfx-phone-mode')) {
+                            try { mountedInput.blur(); } catch (eBlur) {}
                         }
                     }
                 });

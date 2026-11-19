@@ -514,4 +514,13 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     console.log('[PASS] Opt-In Live TV compatibility (#19) defaults & UI/EPG hooks verified');
 }
 
-console.log('ALL STREAMFLIX v0.9.8.10 SMOKE CHECKS PASSED!');
+// Verify Mobile App Search Page bar & filter pills are never hidden by phone subnav declutter CSS
+{
+    const css08 = fs.readFileSync(path.join(cssDir, '08-user-settings-and-mobile-dock.css'), 'utf8');
+    assert.match(css08, /\.streamflix-subnav:not\(\.bfx-sp-subnav\):not\(\.is-search-open\)\s+\.streamflix-search-box:not\(:focus-within\):not\(\.has-value\)/, 'Mobile dock subnav search hiding MUST exclude .bfx-sp-subnav');
+    assert.match(css08, /\.bfx-search-page\s+\.bfx-sp-bar\s*\{[\s\S]*?display:\s*flex\s*!important;/, 'Mobile Search Page .bfx-sp-bar must enforce display: flex !important');
+    assert.match(css05, /\.streamflix-subnav:not\(\.bfx-sp-subnav\):not\(\.is-search-open\)\s+\.streamflix-search-box/, '720px collapsed circle rule MUST exclude .bfx-sp-subnav');
+    console.log('[PASS] Mobile App Search Page input bar & filter pills visibility invariants verified');
+}
+
+console.log('ALL STREAMFLIX v0.9.8.11 SMOKE CHECKS PASSED!');

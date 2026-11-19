@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.11",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.11 Release Candidate (Dev Test Channel): Fix the mobile app Search Page header where phone subnav declutter CSS hid the Search input bar (.bfx-sp-bar) and result filter pills (.bfx-sp-filter-pills), keeping the full-width search bar always visible and focusable beside the Back button on Android and iOS phones.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.11_12.0.0.zip",
+        "checksum": "29779087911eb703ec39288b2d282145",
+        "timestamp": "2026-11-19T20:26:52Z"
+      },
+      {
+        "version": "0.9.8.11",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.11 Release Candidate (Dev Test Channel): Fix the mobile app Search Page header where phone subnav declutter CSS hid the Search input bar (.bfx-sp-bar) and result filter pills (.bfx-sp-filter-pills), keeping the full-width search bar always visible and focusable beside the Back button on Android and iOS phones.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.11_10.11.0.zip",
+        "checksum": "62e98d10d24baf5fe8dc50b905d521de",
+        "timestamp": "2026-11-19T20:26:52Z"
+      },
+      {
+        "version": "0.9.8.11",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.11 Release Candidate (Dev Test Channel): Fix the mobile app Search Page header where phone subnav declutter CSS hid the Search input bar (.bfx-sp-bar) and result filter pills (.bfx-sp-filter-pills), keeping the full-width search bar always visible and focusable beside the Back button on Android and iOS phones.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.11_10.9.0.zip",
+        "checksum": "26535f87c8bda487bd4c04a577dc7b2e",
+        "timestamp": "2026-11-19T20:26:52Z"
+      },
+      {
         "version": "0.9.8.10",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.10 Release Candidate (Dev Test Channel): Add opt-in Live TV compatibility (#19, disabled by default) in Dashboard -> Plugins -> StreamFlix -> Home & Hero; when enabled, adds a Live TV tab to the top navigation bar with live channels, On Now broadcasts with live progress bars, favorites, DVR recordings, instant Live TV channel search, upcoming channel schedules, and 1-click access to Jellyfin's full EPG TV Guide while respecting per-user Live TV permissions and Kids Mode safety; plus includes the Local LAN / Tailscale profile sign-in fix (#21).",
         "targetAbi": "12.0.0.0",

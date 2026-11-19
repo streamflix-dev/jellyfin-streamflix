@@ -64,7 +64,7 @@
         padding: 6px 13px;
         font-size: 13px;
     }
-    .streamflix-subnav:not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) {
+    .streamflix-subnav:not(.bfx-sp-subnav):not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) {
         flex: 0 0 38px !important;
         width: 38px !important;
         height: 38px !important;
@@ -74,26 +74,26 @@
         border-radius: 50%;
         cursor: pointer;
     }
-    .streamflix-subnav:not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) .streamflix-search-input {
+    .streamflix-subnav:not(.bfx-sp-subnav):not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) .streamflix-search-input {
         width: 0 !important;
         min-width: 0 !important;
         padding: 0 !important;
         opacity: 0;
         pointer-events: none;
     }
-    .streamflix-subnav:not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) .streamflix-search-icon {
+    .streamflix-subnav:not(.bfx-sp-subnav):not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) .streamflix-search-icon {
         margin: 0 !important;
     }
-    .streamflix-subnav.is-search-open {
+    .streamflix-subnav:not(.bfx-sp-subnav).is-search-open {
         flex-wrap: wrap !important;
     }
-    .streamflix-subnav:has(.streamflix-search-box:focus-within),
-    .streamflix-subnav:has(.streamflix-search-box.has-value) {
+    .streamflix-subnav:not(.bfx-sp-subnav):has(.streamflix-search-box:focus-within),
+    .streamflix-subnav:not(.bfx-sp-subnav):has(.streamflix-search-box.has-value) {
         flex-wrap: wrap !important;
     }
-    .streamflix-subnav.is-search-open .streamflix-search-box,
-    .streamflix-search-box:focus-within,
-    .streamflix-search-box.has-value {
+    .streamflix-subnav:not(.bfx-sp-subnav).is-search-open .streamflix-search-box,
+    .streamflix-subnav:not(.bfx-sp-subnav) .streamflix-search-box:focus-within,
+    .streamflix-subnav:not(.bfx-sp-subnav) .streamflix-search-box.has-value {
         flex: 1 1 100% !important;
         width: 100% !important;
         order: 2 !important;

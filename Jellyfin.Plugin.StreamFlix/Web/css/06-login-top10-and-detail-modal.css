@@ -750,7 +750,7 @@ body.bfx-dpad-nav .streamflix-credit-chip:focus {
 }
 
 @media (max-width: 640px) {
-    .streamflix-subnav-right {
+    .streamflix-subnav:not(.bfx-sp-subnav) > .streamflix-subnav-right {
         display: contents;
     }
     .streamflix-search-kbd {

@@ -1323,7 +1323,7 @@ body.bfx-settings-route button:focus-visible {
         padding: 6px var(--bfx-gutter) 8px var(--bfx-gutter) !important;
         gap: 8px !important;
     }
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-FilterPills {
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav) > .streamflix-FilterPills {
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
@@ -1360,19 +1360,47 @@ body.bfx-settings-route button:focus-visible {
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) #streamflix-surprise-btn {
         display: none !important;
     }
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) {
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav):not(.is-search-open) .streamflix-search-box:not(:focus-within):not(.has-value) {
         display: none !important;
     }
 
-    /* When Search is opened from the mobile dock, show a clean full-width search bar */
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav.is-search-open .streamflix-FilterPills {
+    /* Dedicated Mobile Search Page (#streamflix-search-page): always keep the search input bar & result filter pills visible */
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .bfx-search-page .bfx-sp-right {
+        display: flex !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .bfx-search-page .bfx-sp-bar {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 42px !important;
+        padding: 0 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .bfx-search-page .bfx-sp-filter-pills {
+        display: inline-flex !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 2px 0 !important;
+        max-width: none !important;
+        gap: 8px !important;
+    }
+
+    /* When inline Search is opened on Home without the Search Page, hide Home category pills */
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav).is-search-open .streamflix-FilterPills {
         display: none !important;
     }
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:has(.streamflix-search-box:focus-within) .streamflix-FilterPills,
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:has(.streamflix-search-box.has-value) .streamflix-FilterPills {
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav):has(.streamflix-search-box:focus-within) .streamflix-FilterPills,
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav):has(.streamflix-search-box.has-value) .streamflix-FilterPills {
         display: none !important;
     }
-    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav.is-search-open + #streamflix-hero-billboard {
+    html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) .streamflix-subnav:not(.bfx-sp-subnav).is-search-open + #streamflix-hero-billboard {
         padding-top: var(--bfx-hero-pad-top, 130px) !important;
     }
 
