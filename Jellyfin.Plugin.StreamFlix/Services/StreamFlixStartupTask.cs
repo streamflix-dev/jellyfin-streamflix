@@ -921,6 +921,12 @@ public class StreamFlixStartupTask : IScheduledTask
                 requiredPermissions.Add("EnableRemoteAccess");
             }
 
+            var allowLiveTv = sourceAdminUser == null || HasUserPermissionCompat(sourceAdminUser, adminPermsProp, "EnableLiveTvAccess");
+            if (allowLiveTv)
+            {
+                requiredPermissions.Add("EnableLiveTvAccess");
+            }
+
             var foundPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var permsProp = targetUser.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
 
@@ -1171,6 +1177,51 @@ public class StreamFlixStartupTask : IScheduledTask
         }
 
         return false;
+    }
+
+    public static bool HasLiveTvAccessCompat(object? user)
+    {
+        if (user == null || IsUserAdminCompat(user))
+        {
+            return true;
+        }
+
+        try
+        {
+            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (permsProp?.GetValue(user) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindObj = perm.GetType().GetProperty("Kind")?.GetValue(perm);
+                    var valObj = perm.GetType().GetProperty("Value")?.GetValue(perm);
+                    if (kindObj != null && string.Equals(kindObj.ToString(), "EnableLiveTvAccess", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return valObj is bool b && b;
+                    }
+                }
+            }
+
+            var policyObj = user.GetType().GetProperty("Policy", BindingFlags.Public | BindingFlags.Instance)?.GetValue(user);
+            if (policyObj != null)
+            {
+                var polVal = policyObj.GetType().GetProperty("EnableLiveTvAccess", BindingFlags.Public | BindingFlags.Instance)?.GetValue(policyObj);
+                if (polVal is bool pb)
+                {
+                    return pb;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return true;
     }
 
     public static bool TrySyncDisplayCollectionsView(object targetUser, object sourceAdminUser)

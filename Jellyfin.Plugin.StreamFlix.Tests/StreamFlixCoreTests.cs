@@ -174,4 +174,22 @@ public class StreamFlixCoreTests
         cfg.OidcRequireAllowlist = false;
         Assert.False(StreamFlixController.IsPrimaryClaimedSsoOwner(cfg, ownerOidc));
     }
+
+    [Fact]
+    public void LiveTvCompatibility_DefaultsToFalseAndRespectsExplicitUserPermissions()
+    {
+        var defaultCfg = new PluginConfiguration();
+        Assert.False(defaultCfg.EnableLiveTv);
+
+        var defaultReq = new SaveAdminConfigRequest();
+        Assert.False(defaultReq.EnableLiveTv);
+
+        var allowedUser = new FakeUserEntity();
+        allowedUser.Permissions.Add(new FakePerm { Kind = "EnableLiveTvAccess", Value = true });
+        Assert.True(StreamFlixStartupTask.HasLiveTvAccessCompat(allowedUser));
+
+        var deniedUser = new FakeUserEntity();
+        deniedUser.Permissions.Add(new FakePerm { Kind = "EnableLiveTvAccess", Value = false });
+        Assert.False(StreamFlixStartupTask.HasLiveTvAccessCompat(deniedUser));
+    }
 }

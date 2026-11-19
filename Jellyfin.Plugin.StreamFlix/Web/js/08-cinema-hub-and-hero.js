@@ -26,10 +26,22 @@
         if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
             return apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Backdrop/0?maxWidth=' + w + '&quality=85';
         }
+        if (item.Type === 'TvChannel' && item.CurrentProgram && item.CurrentProgram.Id) {
+            var cp = item.CurrentProgram;
+            if (cp.BackdropImageTags && cp.BackdropImageTags.length > 0) {
+                return apiBase() + '/Items/' + encodeURIComponent(cp.Id) + '/Images/Backdrop/0?maxWidth=' + w + '&quality=85';
+            }
+            if (cp.ImageTags && cp.ImageTags.Thumb) {
+                return apiBase() + '/Items/' + encodeURIComponent(cp.Id) + '/Images/Thumb?maxWidth=' + w + '&quality=85';
+            }
+            if (cp.ImageTags && cp.ImageTags.Primary) {
+                return apiBase() + '/Items/' + encodeURIComponent(cp.Id) + '/Images/Primary?maxWidth=' + w + '&quality=85';
+            }
+        }
         if (item.ParentBackdropItemId && (!item.ParentBackdropImageTags || item.ParentBackdropImageTags.length > 0)) {
             return apiBase() + '/Items/' + encodeURIComponent(item.ParentBackdropItemId) + '/Images/Backdrop/0?maxWidth=' + w + '&quality=85';
         }
-        if (item.Type === 'Episode' && item.ImageTags && item.ImageTags.Primary) {
+        if ((item.Type === 'Episode' || item.Type === 'Program') && item.ImageTags && item.ImageTags.Primary) {
             return apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Primary?maxWidth=' + w + '&quality=85';
         }
         if (item.ImageTags && item.ImageTags.Thumb) {
@@ -37,6 +49,9 @@
         }
         if (item.SeriesId) {
             return apiBase() + '/Items/' + encodeURIComponent(item.SeriesId) + '/Images/Backdrop/0?maxWidth=' + w + '&quality=85';
+        }
+        if (item.Type === 'Program' && item.ChannelId) {
+            return apiBase() + '/Items/' + encodeURIComponent(item.ChannelId) + '/Images/Primary?maxWidth=' + w + '&quality=85';
         }
         return apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Primary?maxWidth=' + w + '&quality=85';
     }
@@ -103,6 +118,18 @@
             }
             if (state.personalRowsByUser && auth.userId) {
                 delete state.personalRowsByUser[auth.userId];
+            }
+            if (state.liveTvData && Array.isArray(state.liveTvData.channels)) {
+                var favNorm = normalizeGuid(item.Id);
+                state.liveTvData.channels.forEach(function (ch) {
+                    if (ch && normalizeGuid(ch.Id) === favNorm) {
+                        ch.UserData = ch.UserData || {};
+                        ch.UserData.IsFavorite = item.UserData.IsFavorite;
+                    }
+                });
+                if (state.activeCategory === 'livetv') {
+                    renderCinemaHubContents();
+                }
             }
             loadCinemaHubData(true);
         }).catch(function () {});
@@ -306,6 +333,9 @@
             d.heroItems, d.resumeItems, d.nextUpItems, d.top10Items,
             d.favoriteItems, d.recentMovies, d.recentSeries,
             d.allMovies, d.allSeries, d.collectionsItems,
+            state.liveTvData && state.liveTvData.channels,
+            state.liveTvData && state.liveTvData.onNow,
+            state.liveTvData && state.liveTvData.recordings,
             state.searchResults, state.browseFilter && state.browseFilter.items
         ];
         for (var i = 0; i < lists.length; i++) {
@@ -345,6 +375,37 @@
             var auth = getJellyfinAuthContext();
             var uid = auth && auth.userId ? encodeURIComponent(auth.userId) : '';
             var t = (item.Type || '').toLowerCase();
+
+            // If item is an airing Live TV Program, tune directly into its Live TV Channel
+            if (t === 'program' && item.ChannelId) {
+                var chCached = findCachedItemById(item.ChannelId);
+                if (chCached && chCached.Id) {
+                    return chCached;
+                }
+                return fetchFullItemDetails(item.ChannelId).then(function (chFull) {
+                    if (chFull && chFull.Id) {
+                        return chFull;
+                    }
+                    return {
+                        Id: item.ChannelId,
+                        Name: item.ChannelName || item.Name || 'Live TV',
+                        Type: 'TvChannel',
+                        MediaType: 'Video',
+                        ServerId: item.ServerId || resolveKnownServerId()
+                    };
+                }).catch(function () {
+                    return {
+                        Id: item.ChannelId,
+                        Name: item.ChannelName || item.Name || 'Live TV',
+                        Type: 'TvChannel',
+                        MediaType: 'Video',
+                        ServerId: item.ServerId || resolveKnownServerId()
+                    };
+                });
+            }
+            if (t === 'tvchannel') {
+                return item;
+            }
 
             // If item is a TV Series or Season, resolve the concrete Episode to play (Resumable -> NextUp -> First Episode)
             if ((t === 'series' || t === 'season') && uid) {
@@ -466,14 +527,18 @@
                 return false;
             }
             var itemType = (itemObj && itemObj.Type) || 'Movie';
-            var isFolder = itemType === 'Series' || itemType === 'Season' || itemType === 'BoxSet' || itemType === 'Folder';
-            var hasForcedPos = typeof forcedStartPositionTicks === 'number' && isFinite(forcedStartPositionTicks) && forcedStartPositionTicks >= 0;
-            var posTicks = hasForcedPos
-                ? Math.floor(forcedStartPositionTicks)
-                : ((itemObj && itemObj.UserData && itemObj.UserData.PlaybackPositionTicks)
-                    ? Number(itemObj.UserData.PlaybackPositionTicks)
-                    : 0);
+            var isLiveChannel = itemType === 'TvChannel';
+            var isFolder = !isLiveChannel && (itemType === 'Series' || itemType === 'Season' || itemType === 'BoxSet' || itemType === 'Folder');
+            var hasForcedPos = !isLiveChannel && typeof forcedStartPositionTicks === 'number' && isFinite(forcedStartPositionTicks) && forcedStartPositionTicks >= 0;
+            var posTicks = isLiveChannel
+                ? 0
+                : (hasForcedPos
+                    ? Math.floor(forcedStartPositionTicks)
+                    : ((itemObj && itemObj.UserData && itemObj.UserData.PlaybackPositionTicks)
+                        ? Number(itemObj.UserData.PlaybackPositionTicks)
+                        : 0));
             var actionName = posTicks > 0 ? 'resume' : 'play';
+            var mediaTypeAttr = (isLiveChannel && itemObj && itemObj.ChannelType === 'Radio') ? 'Audio' : 'Video';
 
             // IMPORTANT: In Jellyfin Web's shortcuts.js, dom.parentWithAttribute(e.target, 'data-id') stops at the first element with data-id
             // and reads data-serverid, data-type, data-mediatype, data-isfolder, and data-positionticks from THAT element.
@@ -483,7 +548,7 @@
             tempCard.setAttribute('data-id', targetId);
             tempCard.setAttribute('data-serverid', serverId);
             tempCard.setAttribute('data-type', itemType);
-            tempCard.setAttribute('data-mediatype', 'Video');
+            tempCard.setAttribute('data-mediatype', mediaTypeAttr);
             tempCard.setAttribute('data-isfolder', isFolder ? 'true' : 'false');
             if (posTicks > 0) {
                 tempCard.setAttribute('data-positionticks', String(posTicks));
@@ -1503,6 +1568,9 @@
             setTimeout(function () {
                 if (normalizeGuid(getJellyfinAuthContext().userId) === normalizeGuid(auth.userId)) {
                     loadPersonalRows(false);
+                    if (typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile() && typeof ensureLiveTvHubDataLoaded === 'function') {
+                        ensureLiveTvHubDataLoaded(false);
+                    }
                 }
             }, 1200);
         }).catch(function () {
@@ -1697,14 +1765,20 @@
         var origCompact = origNorm.replace(/\s+/g, '');
         var sortNorm = normalizeSearchText(it.SortName);
         var yearStr = it.ProductionYear ? String(it.ProductionYear) : '';
+        var chNumRaw = (it.Type === 'TvChannel' && (it.Number || it.ChannelNumber)) ? String(it.Number || it.ChannelNumber).trim().toLowerCase() : '';
+        var chNumNorm = chNumRaw ? normalizeSearchText(chNumRaw) : '';
+        var curProgNorm = (it.Type === 'TvChannel' && it.CurrentProgram && it.CurrentProgram.Name) ? normalizeSearchText(it.CurrentProgram.Name) : '';
         var genresNorm = Array.isArray(it.Genres) ? normalizeSearchText(it.Genres.join(' ')) : '';
         var overviewNorm = (qNorm.length >= 3 && it.Overview) ? normalizeSearchText(it.Overview) : '';
 
+        var rawTrimLow = String(rawQuery == null ? '' : rawQuery).trim().toLowerCase();
         var score = 0;
         if (nameNorm === qNorm || (origNorm && origNorm === qNorm)) {
             score = 1000;
         } else if (qCompact.length >= 2 && (nameCompact === qCompact || (origCompact && origCompact === qCompact))) {
             score = 960;
+        } else if (chNumRaw && (chNumRaw === rawTrimLow || (chNumNorm && chNumNorm === qNorm))) {
+            score = 920;
         } else if (nameNorm.indexOf(qNorm) === 0 || (origNorm && origNorm.indexOf(qNorm) === 0) || (sortNorm && sortNorm.indexOf(qNorm) === 0)) {
             score = 780;
         } else if (qCompact.length >= 3 && (nameCompact.indexOf(qCompact) === 0 || (origCompact && origCompact.indexOf(qCompact) === 0))) {
@@ -1713,10 +1787,14 @@
             score = 590;
         } else if (qTokens.length > 1 && qTokens.every(function (tk) { return nameNorm.indexOf(tk) !== -1 || (origNorm && origNorm.indexOf(tk) !== -1); })) {
             score = 480;
+        } else if (curProgNorm && (curProgNorm === qNorm || curProgNorm.indexOf(qNorm) === 0 || (' ' + curProgNorm).indexOf(' ' + qNorm) !== -1)) {
+            score = 440;
         } else if (nameNorm.indexOf(qNorm) !== -1 || (origNorm && origNorm.indexOf(qNorm) !== -1)) {
             score = 360;
         } else if (qCompact.length >= 3 && (nameCompact.indexOf(qCompact) !== -1 || (origCompact && origCompact.indexOf(qCompact) !== -1))) {
             score = 330;
+        } else if (curProgNorm && qNorm.length >= 3 && curProgNorm.indexOf(qNorm) !== -1) {
+            score = 280;
         } else if (yearStr && yearStr === qNorm) {
             score = 260;
         } else if (qNorm.length >= 3 && genresNorm && (' ' + genresNorm).indexOf(' ' + qNorm) !== -1) {
@@ -1792,11 +1870,12 @@
             return [];
         }
         var d = state.hubData || {};
+        var liveTvOn = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
         var cachedList = [];
         if (state.itemCache && typeof state.itemCache === 'object') {
             Object.keys(state.itemCache).forEach(function (k) {
                 var cit = state.itemCache[k];
-                if (cit && cit.Id && (cit.Type === 'Movie' || cit.Type === 'Series' || cit.Type === 'BoxSet' || cit.Type === 'Video')) {
+                if (cit && cit.Id && (cit.Type === 'Movie' || cit.Type === 'Series' || cit.Type === 'BoxSet' || cit.Type === 'Video' || (liveTvOn && cit.Type === 'TvChannel'))) {
                     cachedList.push(cit);
                 }
             });
@@ -1808,6 +1887,7 @@
             d.rawHeroItems || [],
             d.rawTop10Items || [],
             d.favoriteItems || [],
+            (liveTvOn && state.liveTvData && Array.isArray(state.liveTvData.channels)) ? state.liveTvData.channels : [],
             cachedList
         );
         var ranked = rankSearchItems(pool, q, false);
@@ -1816,8 +1896,13 @@
 
     function fetchLocalSearchItems(uid, cleanQuery, fields, signal) {
         var reqOpts = signal ? { signal: signal } : {};
+        var liveTvOn = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
+        if (liveTvOn && (!state.liveTvData || !state.liveTvData.loaded) && typeof ensureLiveTvHubDataLoaded === 'function') {
+            ensureLiveTvHubDataLoaded(false);
+        }
+        var itemTypes = liveTvOn ? 'Movie,Series,BoxSet,Video,TvChannel' : 'Movie,Series,BoxSet,Video';
         var qs = 'SearchTerm=' + encodeURIComponent(cleanQuery)
-            + '&IncludeItemTypes=Movie,Series,BoxSet,Video&Recursive=true&Limit=60&Fields=' + fields;
+            + '&IncludeItemTypes=' + itemTypes + '&Recursive=true&Limit=60&Fields=' + fields + (liveTvOn ? ',ChannelInfo' : '');
 
         return apiFetch('/Users/' + uid + '/Items?' + qs, reqOpts)
             .then(function (r1) {
@@ -2294,23 +2379,30 @@
 
     function getSearchPageStats() {
         var seerrOk = isCurrentProfileSeerrAllowed();
+        var liveTvOn = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
         var hasQuery = Boolean(state.searchQuery && String(state.searchQuery).trim());
-        var baseLocal = hasQuery
+        var rawLocal = hasQuery
             ? (Array.isArray(state.searchResults) ? state.searchResults : [])
             : (state.searchGenreFilter ? getGenreFilteredPool(state.searchGenreFilter) : []);
+        var baseLocal = liveTvOn
+            ? rawLocal
+            : rawLocal.filter(function (it) { return it && it.Type !== 'TvChannel'; });
         var movies = baseLocal.filter(function (it) { return it && (it.Type === 'Movie' || it.Type === 'Video'); });
         var series = baseLocal.filter(function (it) { return it && it.Type === 'Series'; });
         var collections = baseLocal.filter(function (it) { return it && it.Type === 'BoxSet'; });
+        var channels = liveTvOn ? baseLocal.filter(function (it) { return it && it.Type === 'TvChannel'; }) : [];
         var seerrFiltered = (seerrOk && hasQuery)
             ? filterDeduplicatedSeerrResults(state.seerrSearchResults, baseLocal)
             : [];
         return {
             seerrOk: seerrOk,
+            liveTvOn: liveTvOn,
             hasQuery: hasQuery,
             baseLocal: baseLocal,
             movies: movies,
             series: series,
             collections: collections,
+            channels: channels,
             seerrFiltered: seerrFiltered
         };
     }
@@ -2326,6 +2418,7 @@
             { id: 'all', label: 'All', count: totalAll, show: true },
             { id: 'movie', label: 'Movies', count: st.movies.length, show: st.movies.length > 0 || tf === 'movie' },
             { id: 'series', label: 'Shows', count: st.series.length, show: st.series.length > 0 || tf === 'series' },
+            { id: 'livetv', label: 'Live TV', count: st.channels.length, show: st.liveTvOn && (st.channels.length > 0 || tf === 'livetv') },
             { id: 'collection', label: 'Collections', count: st.collections.length, show: st.collections.length > 0 || tf === 'collection' },
             { id: 'request', label: 'Request', count: st.seerrFiltered.length, show: st.seerrOk && st.hasQuery && (st.seerrFiltered.length > 0 || state.seerrSearchLoading || tf === 'request') }
         ];
@@ -2513,24 +2606,35 @@
 
         var st = getSearchPageStats();
         var tf = state.searchTypeFilter || 'all';
-        var visibleLocal = st.baseLocal;
+        var visibleChannels = (st.liveTvOn && (tf === 'all' || tf === 'livetv')) ? st.channels : [];
+        var visibleLocal = st.baseLocal.filter(function (it) { return it && it.Type !== 'TvChannel'; });
         if (tf === 'movie') {
             visibleLocal = st.movies;
         } else if (tf === 'series') {
             visibleLocal = st.series;
         } else if (tf === 'collection') {
             visibleLocal = st.collections;
-        } else if (tf === 'request') {
+        } else if (tf === 'livetv' || tf === 'request') {
             visibleLocal = [];
         }
         var visibleSeerr = (tf === 'all' || tf === 'request') ? st.seerrFiltered : [];
 
         var quickHtml = cleanQ ? buildSearchQuickMatchesHtml(cleanQ) : '';
+        var hasChannels = visibleChannels.length > 0;
         var hasLocal = visibleLocal.length > 0;
         var hasSeerr = visibleSeerr.length > 0;
 
-        if (hasLocal || hasSeerr) {
+        if (hasChannels || hasLocal || hasSeerr) {
             var html = quickHtml;
+            if (hasChannels && typeof buildLiveTvCardHtml === 'function') {
+                html += ''
+                    + '<section class="streamflix-row streamflix-row-grid bfx-unified-search-section" data-row-id="search-livetv">'
+                    + '  <div class="streamflix-row-header bfx-unified-search-header">'
+                    + '    <h2 class="streamflix-row-title">Live TV Channels<span class="streamflix-row-count">' + visibleChannels.length + '</span></h2>'
+                    + '  </div>'
+                    + '  <div class="bfx-ltv-grid">' + visibleChannels.map(function (ch) { return buildLiveTvCardHtml(ch, 'channel'); }).join('') + '</div>'
+                    + '</section>';
+            }
             if (hasLocal) {
                 var secHeading = state.searchGenreFilter && !cleanQ
                     ? (escapeHtml(state.searchGenreFilter) + ' Titles')
@@ -2551,7 +2655,7 @@
                     + '  </div>'
                     + '  <div class="streamflix-grid">' + visibleLocal.map(buildPosterCardHtml).join('') + '</div>'
                     + '</section>';
-            } else if (cleanQ && tf !== 'request') {
+            } else if (cleanQ && tf !== 'request' && !hasChannels) {
                 html += ''
                     + '<div class="bfx-search-lib-note">'
                     + '  <span>Not in your library yet for <strong>“' + escapeHtml(cleanQ) + '”</strong></span>'
@@ -2727,9 +2831,9 @@
             });
         });
 
-        // Save recent search when user clicks any poster card inside active search results
+        // Save recent search when user clicks any poster or Live TV card inside active search results
         if (state.searchQuery && String(state.searchQuery).trim().length >= 2) {
-            Array.prototype.forEach.call(bodyEl.querySelectorAll('.streamflix-poster-card'), function (card) {
+            Array.prototype.forEach.call(bodyEl.querySelectorAll('.streamflix-poster-card, .bfx-ltv-card'), function (card) {
                 if (card.__bfxRecentHooked) { return; }
                 card.__bfxRecentHooked = true;
                 card.addEventListener('click', function () {

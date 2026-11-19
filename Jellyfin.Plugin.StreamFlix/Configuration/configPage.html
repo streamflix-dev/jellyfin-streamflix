@@ -636,6 +636,10 @@
                                         <input type="checkbox" data-nav-builtin="movies" checked />
                                         <span>Movies</span>
                                     </label>
+                                    <label class="bfx-lib-chip hide" id="StreamFlixNavLiveTvChip">
+                                        <input type="checkbox" data-nav-builtin="livetv" checked />
+                                        <span>Live TV</span>
+                                    </label>
                                     <label class="bfx-lib-chip">
                                         <input type="checkbox" data-nav-builtin="hot" checked />
                                         <span>New &amp; Popular</span>
@@ -669,6 +673,20 @@
                                 <div class="bfx-libs-grid" id="StreamFlixNavLibrariesList">
                                     <div class="bfx-empty">Loading libraries…</div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" style="margin:0 0 16px;">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <div class="bfx-subbox-title" style="margin:0;">Live TV Compatibility</div>
+                                <span class="bfx-pill" id="LiveTvStatusPill">Off</span>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableLiveTv" name="EnableLiveTv" type="checkbox" is="emby-checkbox" />
+                                    <span>Enable Live TV in StreamFlix (off by default)</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Live TV</strong> tab to the top navigation bar with live channels, On Now programs, DVR recordings, Live TV channel search, and 1-click access to Jellyfin's full EPG TV Guide. Respects each Jellyfin user's Live TV access permission and stays hidden in Kids mode.</div>
                             </div>
                         </div>
 
@@ -1412,6 +1430,11 @@
                     $('#SeerrConfigBody').classList.toggle('hide', !enableSeerr);
                     $('#StreamFlixTestSeerrBtn').classList.toggle('hide', !enableSeerr);
                     $('#SeerrAllowGuestsRow').classList.toggle('hide', !enableGuestPasses);
+
+                    var liveTvChip = $('#StreamFlixNavLiveTvChip');
+                    if (liveTvChip) {
+                        liveTvChip.classList.toggle('hide', !$('#EnableLiveTv').checked);
+                    }
                 }
 
                 function renderStatus() {
@@ -1428,7 +1451,10 @@
                     var adminLanOnly = $('#AdminFallbackLanOnly').checked;
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
                     var enableGuestPasses = $('#EnableGuestPasses').checked;
+                    var enableLiveTv = $('#EnableLiveTv').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
+
+                    setPill('LiveTvStatusPill', enableLiveTv ? 'ok' : '', enableLiveTv ? 'Enabled' : 'Off');
 
                     var enableSeerr = $('#EnableSeerr').checked;
                     var seerrHasUrl = Boolean($('#SeerrUrl').value.trim());
@@ -2634,6 +2660,7 @@
                     '#BypassLoginGateOnLan',
                     '#TreatTailscaleAsLocalLan',
                     '#EnableGuestPasses',
+                    '#EnableLiveTv',
                     '#ShowLibrariesInNav',
                     '#ShowHeroAdvanced',
                     '#EnableSeerr'
@@ -2692,6 +2719,7 @@
                     guestPassManagersLoaded = true;
                     renderGuestPassManagers();
                     $('#EnableWatchTogether').checked = cfg.enableWatchTogether !== false;
+                    $('#EnableLiveTv').checked = Boolean(cfg.enableLiveTv);
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
                     $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
                     $('#HeroSelectionMode').value = cfg.heroSelectionMode || 'recent';
@@ -2815,6 +2843,7 @@
                         enableGuestPasses: $('#EnableGuestPasses').checked,
                         guestPassManagerProfileIds: getCheckedGuestPassManagerIds(),
                         enableWatchTogether: $('#EnableWatchTogether').checked,
+                        enableLiveTv: $('#EnableLiveTv').checked,
                         googleClientId: $('#GoogleClientId').value.trim(),
                         googleClientSecret: googleSecretTyped || '__KEEP__',
                         clearGoogleClientSecret: Boolean(secretState.googleClear && !googleSecretTyped),

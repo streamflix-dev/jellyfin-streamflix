@@ -500,4 +500,18 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     console.log('[PASS] Local LAN / Tailscale explicit profile sign-in stability & cancel flow verified (#21)');
 }
 
-console.log('ALL STREAMFLIX v0.9.8.9 SMOKE CHECKS PASSED!');
+// Verify Opt-In Live TV Compatibility (#19) — MUST default to OFF (false) and wire Hub, Search, EPG Guide & Config toggle
+{
+    const configHtml = fs.readFileSync(path.resolve('Jellyfin.Plugin.StreamFlix/Configuration/configPage.html'), 'utf8');
+    assert.match(combinedJs, /enableLiveTv:\s*false/, 'Live TV compatibility must default to false in DEFAULT_CONFIG');
+    assert.match(combinedJs, /function\s+isLiveTvEnabledForCurrentProfile\s*\(/, 'Live TV profile/config gate must be present');
+    assert.match(combinedJs, /function\s+ensureLiveTvHubDataLoaded\s*\(/, 'Live TV channel/program/recording loader must be present');
+    assert.match(combinedJs, /function\s+buildLiveTvHubHtml\s*\(/, 'Native StreamFlix Live TV Hub builder must be present');
+    assert.match(combinedJs, /function\s+buildLiveTvCardHtml\s*\(/, '16:9 Live TV channel/program card builder must be present');
+    assert.match(configHtml, /id="EnableLiveTv"[^>]*type="checkbox"/, 'Admin config page must expose #EnableLiveTv checkbox');
+    assert.doesNotMatch(configHtml, /id="EnableLiveTv"[^>]*checked/, '#EnableLiveTv checkbox must be unchecked (off) by default');
+    assert.match(css01, /body\.bfx-active:not\(\.bfx-livetv-route\)\s+\.skinHeader\s+\.headerTabs/, 'Native Jellyfin EPG headerTabs must remain visible on #/livetv');
+    console.log('[PASS] Opt-In Live TV compatibility (#19) defaults & UI/EPG hooks verified');
+}
+
+console.log('ALL STREAMFLIX v0.9.8.10 SMOKE CHECKS PASSED!');

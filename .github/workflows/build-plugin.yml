@@ -15,12 +15,12 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.9.8.9"
+  PLUGIN_VERSION: "0.9.8.10"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin"
-  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
-  PLUGIN_CHANGELOG: "- v0.9.2.12.5 Search Visual Alignment & Hover Preview Clipping Fix: unify the dedicated Search Page header, filter pills, genre pills, and search bar with StreamFlix's native frosted-glass .streamflix-subnav / .streamflix-FilterPills / .streamflix-search-box design language; eliminate sticky-header clipping; and hide the underlying 2:3 poster card while its 16:9 hover preview card is expanded so posters never poke above or clip into hover cards"
+  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, opt-in Live TV compatibility, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
+  PLUGIN_CHANGELOG: "- v0.9.8.10 Release Candidate (Dev Test Channel): Add opt-in Live TV compatibility (#19, disabled by default) in Dashboard -> Plugins -> StreamFlix -> Home & Hero; when enabled, adds a Live TV tab to the top navigation bar with live channels, On Now broadcasts with live progress bars, favorites, DVR recordings, instant Live TV channel search, upcoming channel schedules, and 1-click access to Jellyfin's full EPG TV Guide while respecting per-user Live TV permissions and Kids Mode safety"
 
 jobs:
   build-and-publish:

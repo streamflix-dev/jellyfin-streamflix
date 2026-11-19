@@ -1042,6 +1042,7 @@
             isOwner: Boolean(p.isOwner || p.id === 'streamflix_owner'),
             canActivate: p.canActivate !== false,
             canManageGuestPasses: Boolean(p.canManageGuestPasses || (p.isAdmin && !p.isKids)),
+            allowLiveTv: !p.isKids && p.allowLiveTv !== false,
             autoplayNextEpisode: p.autoplayNextEpisode !== false,
             autoplayPreviews: p.autoplayPreviews !== false,
             allowedLibraryIds: Array.isArray(p.allowedLibraryIds) ? p.allowedLibraryIds.slice() : [],

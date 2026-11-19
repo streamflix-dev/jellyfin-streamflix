@@ -971,6 +971,43 @@
         }
 
         var hLower = h.toLowerCase();
+        var onLiveTvRoute = hLower.indexOf('#/livetv') === 0 || hLower.indexOf('#!/livetv') === 0;
+        if (document.body) {
+            document.body.classList.toggle('bfx-livetv-route', onLiveTvRoute);
+        }
+        if (onLiveTvRoute && state.cinemaHubEnabled !== false && !(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile())) {
+            if (document.body) {
+                document.body.classList.remove('bfx-livetv-route');
+            }
+            window.location.hash = '#/home';
+            return;
+        }
+        var existingLtvBack = document.getElementById('streamflix-livetv-return-btn');
+        if (onLiveTvRoute && !isGateOpen() && !isVideoPlayerActive()) {
+            if (!existingLtvBack && document.body) {
+                var backBtn = document.createElement('button');
+                backBtn.type = 'button';
+                backBtn.id = 'streamflix-livetv-return-btn';
+                backBtn.className = 'bfx-livetv-return-btn';
+                backBtn.innerHTML = icon('chevronLeft') + '<span>Back to Live TV</span>';
+                backBtn.addEventListener('click', function () {
+                    state.activeCategory = 'livetv';
+                    window.location.hash = '#/home';
+                    setTimeout(function () {
+                        if (typeof ensureCinemaHubMounted === 'function') {
+                            ensureCinemaHubMounted();
+                        }
+                        if (typeof renderCinemaHubContents === 'function') {
+                            renderCinemaHubContents();
+                        }
+                    }, 35);
+                });
+                document.body.appendChild(backBtn);
+            }
+        } else if (existingLtvBack && existingLtvBack.parentNode) {
+            existingLtvBack.parentNode.removeChild(existingLtvBack);
+        }
+
         if ((hLower.indexOf('#/search') === 0 || hLower.indexOf('#!/search') === 0) && state.cinemaHubEnabled !== false) {
             state.mobileSearchOpen = true;
             var qMatch = h.match(/[?&]query=([^&]+)/i);
@@ -1015,9 +1052,9 @@
             }
         }
 
-        // Ensure serverId= is present on #/movies, #/tv, #/list, and #/details so ConnectionManager.getApiClient(params.serverId) never returns undefined
+        // Ensure serverId= is present on #/movies, #/tv, #/list, #/livetv, and #/details so ConnectionManager.getApiClient(params.serverId) never returns undefined
         if (serverId
-            && (hLower.indexOf('#/movies') === 0 || hLower.indexOf('#/tv') === 0 || hLower.indexOf('#/list') === 0 || hLower.indexOf('#/details') === 0)
+            && (hLower.indexOf('#/movies') === 0 || hLower.indexOf('#/tv') === 0 || hLower.indexOf('#/list') === 0 || hLower.indexOf('#/details') === 0 || hLower.indexOf('#/livetv') === 0 || hLower.indexOf('#!/livetv') === 0)
             && updatedHash.indexOf('serverId=') === -1) {
             updatedHash += (updatedHash.indexOf('?') === -1 ? '?' : '&') + 'serverId=' + encodeURIComponent(serverId);
         }
@@ -1126,6 +1163,10 @@
             state.browseFilter = null;
             state.libraryBrowser = null;
             state.libraryViewData = {};
+            state.liveTvData = null;
+            if (activated.isKids && state.activeCategory === 'livetv') {
+                state.activeCategory = 'all';
+            }
             state.searchQuery = '';
             state.searchResults = null;
             state.seerrSearchResults = null;

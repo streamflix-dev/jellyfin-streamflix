@@ -965,6 +965,8 @@
             ? ('In "' + (wpActiveGroup.name || wpActiveGroup.groupName || wpActiveGroup.GroupName || 'Watch Party') + '"' + (wpActiveGroup.roomId ? ' · ' + wpActiveGroup.roomId : ''))
             : 'Synced watch parties & invite links';
 
+        var liveTvMenuEnabled = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
+            && !(state.liveTvData && state.liveTvData.forbidden);
         var showClientSettingsRow = !isGuest && !isKidsActive && shouldShowClientSettingsAction();
         var clientSettingsSubLabel = hasNativeClientSettingsBridge()
             ? 'App player, downloads & device options'
@@ -1018,6 +1020,7 @@
                 ? ((isCurrentProfileSeerrAllowed() ? ('<div class="streamflix-dd-divider"></div>' + ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', 'Track requested movies & shows', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>')) : '')
                     + (isGuest ? ('<div class="streamflix-dd-divider"></div>' + ddItem('streamflix-dd-signout', 'logout', 'Exit Guest Pass', '', 'danger')) : ''))
                 : ('<div class="streamflix-dd-divider"></div>'
+                    + (liveTvMenuEnabled ? ddItem('streamflix-dd-livetv', 'tv', 'Live TV', 'Live channels, On Now & TV Guide', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (wpEnabled ? ddItem('streamflix-dd-watch-party', 'party', 'Watch Together', wpSubLabel, wpActiveGroup ? 'is-watchparty-live' : '', wpTrailingHtml) : '')
                     + (!isGuest ? ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', 'Subtitles, playback & ' + getBrandName() + ' Home', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
                     + (showClientSettingsRow ? ddItem('streamflix-dd-client-settings', 'smartphone', 'Client Settings', clientSettingsSubLabel, 'is-client-settings', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
@@ -1054,6 +1057,40 @@
         bind('streamflix-dd-exit-kids', function () {
             if (typeof exitKidsModeToPicker === 'function') {
                 exitKidsModeToPicker();
+            }
+        });
+        bind('streamflix-dd-livetv', function () {
+            if (state.cinemaHubEnabled === false) {
+                var sid = resolveKnownServerId();
+                window.location.hash = '#/livetv?tab=0' + (sid ? ('&serverId=' + encodeURIComponent(sid)) : '');
+                return;
+            }
+            if (typeof closeSearchPage === 'function') {
+                closeSearchPage(true);
+            } else {
+                cancelPendingSearch();
+                state.mobileSearchOpen = false;
+                state.searchQuery = '';
+                state.searchResults = null;
+                state.seerrSearchResults = null;
+            }
+            state.browseFilter = null;
+            state.libraryBrowser = null;
+            state.activeCategory = 'livetv';
+            state.heroIndex = 0;
+            if (!isOnHomeRoute()) {
+                window.location.hash = '#/home';
+                setTimeout(function () {
+                    ensureCinemaHubMounted();
+                    renderCinemaHubContents();
+                    syncMobileDockState();
+                    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) {}
+                }, 40);
+            } else {
+                ensureCinemaHubMounted();
+                renderCinemaHubContents();
+                syncMobileDockState();
+                try { window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' }); } catch (e) {}
             }
         });
         bind('streamflix-dd-watch-party', function () {

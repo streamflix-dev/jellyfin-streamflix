@@ -275,6 +275,7 @@ public partial class StreamFlixController : ControllerBase
                     "series",
                     "movies",
                     "hot",
+                    "livetv",
                     "collections",
                     "top10",
                     "mylist",
@@ -353,6 +354,7 @@ public partial class StreamFlixController : ControllerBase
             }
 
             config.EnableWatchTogether = request.EnableWatchTogether;
+            config.EnableLiveTv = request.EnableLiveTv;
 
             Plugin.Instance?.SaveConfiguration();
             if (StreamFlixOidcService.IsConfigured(config))
@@ -750,6 +752,7 @@ public partial class StreamFlixController : ControllerBase
             enableGuestPasses = config.EnableGuestPasses,
             guestPassManagerProfileIds = hasAccess && effectiveAdmin ? (config.GuestPassManagerProfileIds ?? new List<string>()).ToList() : new List<string>(),
             enableWatchTogether = config.EnableWatchTogether,
+            enableLiveTv = config.EnableLiveTv,
             hasAnyAdultPin = hasAccess && !isGuestPass && (config.Profiles ?? new List<StreamFlixProfileConfig>()).Any(p => !p.IsKids && !string.IsNullOrWhiteSpace(p.PinCode)),
             isGuestPass,
             guestPassLabel = activeGuestPass?.Label,
@@ -836,6 +839,7 @@ public partial class StreamFlixController : ControllerBase
             enableGuestPasses = config.EnableGuestPasses,
             guestPassManagerProfileIds = (config.GuestPassManagerProfileIds ?? new List<string>()).ToList(),
             enableWatchTogether = config.EnableWatchTogether,
+            enableLiveTv = config.EnableLiveTv,
             enableSeerr = config.EnableSeerr,
             seerrUrl = config.SeerrUrl ?? string.Empty,
             hasSeerrApiKey = !string.IsNullOrWhiteSpace(config.SeerrApiKey),

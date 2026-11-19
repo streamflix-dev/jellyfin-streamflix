@@ -164,6 +164,7 @@ public class PluginConfiguration : BasePluginConfiguration
         EnableGuestPasses = true;
         GuestPassManagerProfileIds = new List<string>();
         EnableWatchTogether = true;
+        EnableLiveTv = false;
         GuestPasses = new List<StreamFlixGuestPass>();
         EnableSeerr = false;
         SeerrUrl = string.Empty;
@@ -359,6 +360,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether StreamFlix Watch Together (SyncPlay rooms) is enabled for non-Kids profiles.
     /// </summary>
     public bool EnableWatchTogether { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether opt-in Live TV compatibility (top navigation tab, live channels, On Now, recordings, and EPG guide access) is enabled.
+    /// Defaults to <c>false</c> so administrators must explicitly turn it on.
+    /// </summary>
+    public bool EnableLiveTv { get; set; }
 
     /// <summary>
     /// Gets or sets temporary, revocable Guest Passes issued by administrators.

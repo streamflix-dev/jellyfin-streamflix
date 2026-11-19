@@ -97,7 +97,9 @@
             || h.indexOf('#/userprofile') === 0
             || h.indexOf('#!/userprofile') === 0
             || h.indexOf('#/quickconnect') === 0
-            || h.indexOf('#!/quickconnect') === 0;
+            || h.indexOf('#!/quickconnect') === 0
+            || h.indexOf('#/livetv') === 0
+            || h.indexOf('#!/livetv') === 0;
     }
 
     function enforceKidsRouteGuard() {

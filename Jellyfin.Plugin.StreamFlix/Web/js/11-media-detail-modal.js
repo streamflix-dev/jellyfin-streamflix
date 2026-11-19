@@ -42,15 +42,55 @@
         var modalTopRank = getTop10Rank(item && item.Id);
         var modalLogoUrl = getItemLogoUrl(item, 720);
 
-        var typeBadge = item.Type === 'Series'
-            ? 'SERIES'
-            : (item.Type === 'BoxSet' ? 'COLLECTION' : (item.Type === 'Episode' ? 'EPISODE' : 'FILM'));
+        var isLiveTvItem = item.Type === 'TvChannel' || item.Type === 'Program';
+        var isChannelOnlyArt = item.Type === 'TvChannel'
+            && !(item.BackdropImageTags && item.BackdropImageTags.length > 0)
+            && !(item.CurrentProgram && ((item.CurrentProgram.BackdropImageTags && item.CurrentProgram.BackdropImageTags.length > 0) || (item.CurrentProgram.ImageTags && (item.CurrentProgram.ImageTags.Thumb || item.CurrentProgram.ImageTags.Primary))));
+        if (isChannelOnlyArt) {
+            backdropUrl = '';
+            if (!modalLogoUrl && item.ImageTags && item.ImageTags.Primary) {
+                modalLogoUrl = apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Primary?maxWidth=480&quality=90';
+            }
+        }
+        var chNumLabel = (item.Number || item.ChannelNumber) ? ('CH ' + String(item.Number || item.ChannelNumber)) : '';
+        var typeBadge = item.Type === 'TvChannel'
+            ? (chNumLabel ? ('LIVE TV · ' + chNumLabel) : 'LIVE TV')
+            : (item.Type === 'Program'
+                ? (item.ChannelName ? ('ON TV · ' + item.ChannelName.toUpperCase()) : 'ON TV')
+                : (item.Type === 'Recording'
+                    ? 'RECORDING'
+                    : (item.Type === 'Series'
+                        ? 'SERIES'
+                        : (item.Type === 'BoxSet' ? 'COLLECTION' : (item.Type === 'Episode' ? 'EPISODE' : 'FILM')))));
         var displayTitle = (item.Type === 'Episode' && item.SeriesName) ? item.SeriesName : (item.Name || 'Untitled');
+        var formatShortProgTime = function (p) {
+            if (!p || !p.StartDate) {
+                return '';
+            }
+            try {
+                var s = new Date(p.StartDate);
+                var e = p.EndDate ? new Date(p.EndDate) : null;
+                if (isNaN(s.getTime())) {
+                    return '';
+                }
+                var fmt = function (dt) { return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+                return e && !isNaN(e.getTime()) ? (fmt(s) + ' – ' + fmt(e)) : fmt(s);
+            } catch (eTime) {
+                return '';
+            }
+        };
         var episodeSubline = item.Type === 'Episode'
             ? ('Season ' + (item.ParentIndexNumber || 1) + ' • Episode ' + (item.IndexNumber || 1) + ' — ' + (item.Name || ''))
-            : '';
+            : (item.Type === 'TvChannel' && item.CurrentProgram && item.CurrentProgram.Name
+                ? ('On Now: ' + item.CurrentProgram.Name + (formatShortProgTime(item.CurrentProgram) ? (' (' + formatShortProgTime(item.CurrentProgram) + ')') : ''))
+                : (item.Type === 'Program'
+                    ? ([item.EpisodeTitle || '', formatShortProgTime(item)].filter(Boolean).join(' • '))
+                    : ''));
+        var effectiveOverview = item.Overview
+            || (item.Type === 'TvChannel' && item.CurrentProgram && item.CurrentProgram.Overview ? item.CurrentProgram.Overview : '')
+            || (isLiveTvItem ? 'Live broadcast stream.' : 'No description available.');
 
-        var playBtnInitialLabel = iconLabel('play', item.Type === 'BoxSet' ? 'Play Collection' : (hasResume ? 'Resume' : 'Play'));
+        var playBtnInitialLabel = iconLabel('play', isLiveTvItem ? 'Watch Live' : (item.Type === 'BoxSet' ? 'Play Collection' : (hasResume ? 'Resume' : 'Play')));
         var genreChipsHtml = genres.length
             ? '<span class="streamflix-detail-genre-chips">' + genres.map(function (g) {
                 return '<button type="button" class="streamflix-genre-chip" data-filter-genre="' + escapeHtml(g) + '" title="Browse ' + escapeHtml(g) + '">' + escapeHtml(g) + '</button>';
@@ -107,16 +147,23 @@
                 : '')
             + '        <div class="streamflix-hero-actions">'
             + '          <button type="button" class="streamflix-hero-play" id="streamflix-modal-play-btn">' + playBtnInitialLabel + '</button>'
+            + (isLiveTvItem
+                ? '          <button type="button" class="streamflix-hero-secondary" id="streamflix-modal-tvguide-btn" title="Open Jellyfin Full TV Guide">' + iconLabel('calendar', 'TV Guide') + '</button>'
+                : '')
             + (opts.fromSurprise
                 ? '          <button type="button" class="streamflix-hero-secondary streamflix-modal-reshuffle" id="streamflix-modal-reshuffle-btn" title="Pick another random title">' + iconLabel('shuffle', 'Shuffle Again') + '</button>'
                 : '')
-            + '          <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-modal-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="My List">' + icon(isFav ? 'check' : 'plus') + '</button>'
-            + '          <button type="button" class="streamflix-hero-icon-btn' + (isPlayed ? ' active' : '') + '" id="streamflix-modal-watched-btn" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>'
-            + ((typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
+            + (item.Type !== 'Program'
+                ? '          <button type="button" class="streamflix-hero-icon-btn' + (isFav ? ' active' : '') + '" id="streamflix-modal-fav-btn" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="My List">' + icon(isFav ? 'check' : 'plus') + '</button>'
+                : '')
+            + (!isLiveTvItem
+                ? '          <button type="button" class="streamflix-hero-icon-btn' + (isPlayed ? ' active' : '') + '" id="streamflix-modal-watched-btn" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>'
+                : '')
+            + ((!isLiveTvItem && typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
                 ? '          <button type="button" class="streamflix-hero-icon-btn' + ((typeof watchPartyState !== 'undefined' && watchPartyState.activeGroup) ? ' active is-live' : '') + '" id="streamflix-modal-watchparty-btn" title="Watch Together" aria-label="Watch Together">' + icon('party') + '</button>'
                 : '')
             + '          <button type="button" class="streamflix-hero-icon-btn" id="streamflix-modal-download-btn" title="Download" aria-label="Download"' + (showModalDownload ? '' : ' style="display:none;"') + '>' + icon('download') + '</button>'
-            + (canManageMedia
+            + (!isLiveTvItem && canManageMedia
                 ? '          <button type="button" class="streamflix-hero-icon-btn" id="streamflix-modal-manage-btn" title="Manage media" aria-label="Manage media">' + icon('edit') + '</button>'
                 : '')
             + '        </div>'
@@ -132,7 +179,7 @@
             + '      </div>'
             + '      <div id="streamflix-modal-tagline" class="streamflix-detail-tagline"' + (initialTagline ? '' : ' style="display:none;"') + '>' + escapeHtml(initialTagline) + '</div>'
             + '      <p id="streamflix-modal-overview" class="streamflix-detail-overview">'
-            + escapeHtml(item.Overview || 'No description available.')
+            + escapeHtml(effectiveOverview)
             + '      </p>'
             + '      <div id="streamflix-modal-tracks-container"></div>'
             + '      <div id="streamflix-modal-credits-container"></div>'
@@ -217,6 +264,15 @@
                 closeModal(false);
             }
         });
+
+        var tvGuideBtn = qModal('#streamflix-modal-tvguide-btn');
+        if (tvGuideBtn) {
+            tvGuideBtn.addEventListener('click', function () {
+                closeModal(true);
+                var sid = resolveKnownServerId();
+                window.location.hash = '#/livetv?tab=1' + (sid ? ('&serverId=' + encodeURIComponent(sid)) : '');
+            });
+        }
 
         var mainPlayBtn = qModal('#streamflix-modal-play-btn');
         if (mainPlayBtn) {
@@ -407,7 +463,10 @@
             if (dlBtn && typeof canUserDownloadItem === 'function') {
                 dlBtn.style.display = canUserDownloadItem(fullItem) ? '' : 'none';
             }
-            var betterBg = safeCssUrl(getItemBackdropUrl(fullItem, 1600));
+            var fullHasBackdrop = (fullItem.BackdropImageTags && fullItem.BackdropImageTags.length > 0)
+                || (fullItem.Type !== 'TvChannel')
+                || (fullItem.CurrentProgram && ((fullItem.CurrentProgram.BackdropImageTags && fullItem.CurrentProgram.BackdropImageTags.length > 0) || (fullItem.CurrentProgram.ImageTags && (fullItem.CurrentProgram.ImageTags.Thumb || fullItem.CurrentProgram.ImageTags.Primary))));
+            var betterBg = fullHasBackdrop ? safeCssUrl(getItemBackdropUrl(fullItem, 1600)) : '';
             var heroBanner = qModal('#streamflix-modal-hero-banner');
             if (heroBanner && betterBg) {
                 heroBanner.style.backgroundImage = 'url("' + betterBg + '")';
@@ -797,8 +856,45 @@
             }
         }
 
+        // If Live TV Channel or airing Program, load upcoming EPG schedule for this channel
+        var schedChannelId = item.Type === 'TvChannel' ? item.Id : (item.Type === 'Program' ? item.ChannelId : '');
+        if (schedChannelId && auth.userId) {
+            var schedContainer = qModal('#streamflix-detail-episodes-section');
+            if (schedContainer) {
+                apiFetch('/LiveTv/Programs?ChannelIds=' + encodeURIComponent(schedChannelId) + '&userId=' + encodeURIComponent(auth.userId) + '&HasAired=false&Limit=8&Fields=Overview')
+                    .then(function (res) {
+                        var progs = (res && Array.isArray(res.Items)) ? res.Items : [];
+                        if (!progs.length || !modalBackdrop.parentNode || modalClosed) {
+                            return;
+                        }
+                        var nowMs = Date.now();
+                        var rows = progs.map(function (pr) {
+                            var sMs = pr.StartDate ? Date.parse(pr.StartDate) : NaN;
+                            var eMs = pr.EndDate ? Date.parse(pr.EndDate) : NaN;
+                            var airing = !isNaN(sMs) && !isNaN(eMs) && nowMs >= sMs && nowMs < eMs;
+                            var tWin = formatShortProgTime(pr);
+                            return ''
+                                + '<div class="bfx-ltv-sched-row' + (airing ? ' is-airing' : '') + '">'
+                                + '  <div class="bfx-ltv-sched-time">'
+                                + (airing ? '<span class="bfx-ltv-live-dot"></span><span>LIVE</span>' : ('<span>' + escapeHtml(tWin || 'Upcoming') + '</span>'))
+                                + '  </div>'
+                                + '  <div class="bfx-ltv-sched-main">'
+                                + '    <div class="bfx-ltv-sched-title">' + escapeHtml(pr.Name || 'Program') + (pr.EpisodeTitle ? (' <span class="bfx-ltv-sched-ep">· ' + escapeHtml(pr.EpisodeTitle) + '</span>') : '') + '</div>'
+                                + (airing && tWin ? ('    <div class="bfx-ltv-sched-sub">' + escapeHtml(tWin) + '</div>') : '')
+                                + (pr.Overview ? ('    <div class="bfx-ltv-sched-desc">' + escapeHtml(pr.Overview) + '</div>') : '')
+                                + '  </div>'
+                                + '</div>';
+                        }).join('');
+                        schedContainer.innerHTML = ''
+                            + '<h3 class="streamflix-detail-h3" style="margin-bottom:12px;">Schedule</h3>'
+                            + '<div class="bfx-ltv-sched-list">' + rows + '</div>';
+                    })
+                    .catch(function () {});
+            }
+        }
+
         // Load Similar Titles ("More Like This")
-        if (auth.userId) {
+        if (auth.userId && !isLiveTvItem) {
             var simTargetId = (item.Type === 'Episode' && item.SeriesId) ? item.SeriesId : item.Id;
             var simContainer = qModal('#streamflix-detail-similar-section');
             if (simContainer) {

@@ -1501,3 +1501,565 @@ html.bfx-no-flex-gap .bfx-pv-body > * + *,
 html.bfx-no-flex-gap .bfx-sp-mobile-list > * + * {
     margin-top: 9px;
 }
+
+/* ==========================================================================
+   OPT-IN LIVE TV HUB, CHANNEL CARDS, SCHEDULE & NATIVE EPG COMPATIBILITY
+   ========================================================================== */
+.bfx-ltv-hub {
+    padding-top: 4px;
+}
+
+.bfx-ltv-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bfx-ltv-head-left {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.bfx-ltv-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.bfx-ltv-title-row .streamflix-row-title {
+    margin: 0 !important;
+}
+
+.bfx-ltv-subpills {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bfx-ltv-head-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.bfx-ltv-filter-box {
+    min-width: 210px;
+    max-width: 270px;
+}
+
+.bfx-ltv-filter-box .streamflix-search-clear {
+    display: none;
+}
+
+.bfx-ltv-filter-box .streamflix-search-clear.is-visible {
+    display: inline-flex;
+}
+
+.bfx-ltv-guide-btns {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bfx-ltv-guide-btn,
+.bfx-ltv-refresh-btn {
+    height: 36px !important;
+    padding: 0 13px !important;
+    border-radius: 999px !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.bfx-ltv-refresh-btn {
+    width: 36px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+}
+
+.bfx-ltv-guide-btn svg,
+.bfx-ltv-refresh-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.bfx-ltv-live-pill,
+.bfx-ltv-rec-pill,
+.bfx-ltv-chnum {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+
+.bfx-ltv-live-pill {
+    background: rgba(229, 9, 20, 0.92);
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4);
+}
+
+.bfx-ltv-live-pill.is-lg {
+    height: 25px;
+    padding: 0 10px;
+    font-size: 11px;
+}
+
+.bfx-ltv-rec-pill {
+    background: rgba(30, 41, 59, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+}
+
+.bfx-ltv-chnum {
+    background: rgba(12, 12, 14, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e5e7eb;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.bfx-ltv-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+    flex-shrink: 0;
+}
+
+.bfx-ltv-subblock + .bfx-ltv-subblock {
+    margin-top: 26px;
+}
+
+.bfx-ltv-subtitle {
+    margin: 0 0 12px 0 !important;
+    font-size: 16.5px;
+    font-weight: 800;
+    color: #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bfx-ltv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    gap: 16px;
+}
+
+.bfx-row-livetv .bfx-ltv-card {
+    flex: 0 0 282px;
+    width: 282px;
+}
+
+.bfx-ltv-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 11px;
+    overflow: hidden;
+    background: #1b1b1e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bfx-ltv-card:hover,
+.bfx-ltv-card:focus-visible {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+    outline: none;
+}
+
+/* 16:9 stage via padding-top so Chromium 83 / QtWebEngine 5.15 renders identical aspect ratio */
+.bfx-ltv-media {
+    position: relative;
+    width: 100%;
+    height: 0;
+    padding-top: 56.25%;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 42%, #292930 0%, #16161a 72%, #111114 100%);
+}
+
+.bfx-ltv-bg {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.32s ease;
+}
+
+.bfx-ltv-card:hover .bfx-ltv-bg {
+    transform: scale(1.04);
+}
+
+.bfx-ltv-scrim {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(180deg, rgba(10, 10, 12, 0.42) 0%, rgba(10, 10, 12, 0.08) 44%, rgba(12, 12, 15, 0.86) 100%);
+    pointer-events: none;
+}
+
+.bfx-ltv-center-logo {
+    position: absolute;
+    top: 22%;
+    right: 18%;
+    bottom: 22%;
+    left: 18%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.bfx-ltv-center-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.65));
+}
+
+.bfx-ltv-center-fallback {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    pointer-events: none;
+}
+
+.bfx-ltv-center-fallback svg {
+    width: 28px;
+    height: 28px;
+}
+
+.bfx-ltv-top-badges {
+    position: absolute;
+    top: 9px;
+    left: 10px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.bfx-ltv-quick-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.bfx-ltv-card:hover .bfx-ltv-quick-actions,
+.bfx-ltv-card:focus-within .bfx-ltv-quick-actions,
+body.bfx-phone-mode .bfx-ltv-quick-actions {
+    opacity: 1;
+}
+
+.bfx-ltv-play {
+    z-index: 4;
+}
+
+.bfx-ltv-corner-logo {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 3;
+    max-width: 72px;
+    height: 26px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    background: rgba(12, 12, 15, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.bfx-ltv-corner-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.bfx-ltv-body {
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    background: #18181b;
+}
+
+.bfx-ltv-chline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #a1a1aa;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.bfx-ltv-chname {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bfx-ltv-progtitle {
+    font-size: 14px;
+    font-weight: 750;
+    color: #f9fafb;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bfx-ltv-progsub {
+    font-size: 12px;
+    color: #9ca3af;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bfx-ltv-empty-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.bfx-ltv-empty-actions {
+    margin-top: -6px;
+    padding-bottom: 20px;
+}
+
+/* Live TV Schedule list inside Detail Modal */
+.bfx-ltv-sched-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bfx-ltv-sched-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.bfx-ltv-sched-row.is-airing {
+    background: rgba(229, 9, 20, 0.11);
+    border-color: rgba(229, 9, 20, 0.36);
+}
+
+.bfx-ltv-sched-time {
+    flex: 0 0 128px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #cbd5e1;
+    padding-top: 2px;
+}
+
+.bfx-ltv-sched-row.is-airing .bfx-ltv-sched-time {
+    color: #fca5a5;
+}
+
+.bfx-ltv-sched-row.is-airing .bfx-ltv-live-dot {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.85);
+}
+
+.bfx-ltv-sched-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.bfx-ltv-sched-title {
+    font-size: 14px;
+    font-weight: 750;
+    color: #f8fafc;
+}
+
+.bfx-ltv-sched-ep {
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.bfx-ltv-sched-sub {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.bfx-ltv-sched-desc {
+    font-size: 12.5px;
+    color: #9ca3af;
+    margin-top: 4px;
+    line-height: 1.42;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Native Jellyfin #/livetv Route (Full EPG Guide, DVR Schedule & Series Timers) */
+body.bfx-active.bfx-livetv-route .skinHeader .headerTabs {
+    display: flex !important;
+    justify-content: center;
+    padding: 0 16px 8px !important;
+}
+
+body.bfx-active.bfx-livetv-route .skinHeader .emby-tab-button {
+    color: rgba(255, 255, 255, 0.72) !important;
+    font-weight: 700 !important;
+}
+
+body.bfx-active.bfx-livetv-route .skinHeader .emby-tab-button.emby-tab-button-active {
+    color: #ffffff !important;
+}
+
+.bfx-livetv-return-btn {
+    position: fixed;
+    left: 20px;
+    bottom: 22px;
+    z-index: 1200;
+    height: 40px;
+    padding: 0 16px 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(18, 18, 22, 0.92);
+    color: #ffffff;
+    font-family: "Netflix Sans", "Inter", sans-serif;
+    font-size: 13px;
+    font-weight: 750;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.bfx-livetv-return-btn:hover {
+    background: rgba(32, 32, 38, 0.96);
+    border-color: rgba(255, 255, 255, 0.36);
+    transform: translateY(-1px);
+}
+
+.bfx-livetv-return-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.bfx-phone-mode .bfx-livetv-return-btn {
+    bottom: 84px;
+    left: 14px;
+}
+
+@media (max-width: 720px) {
+    .bfx-ltv-grid {
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+        gap: 11px;
+    }
+    .bfx-ltv-head-right {
+        width: 100%;
+        margin-left: 0;
+    }
+    .bfx-ltv-filter-box {
+        flex: 1 1 180px;
+        max-width: none;
+    }
+    .bfx-ltv-sched-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .bfx-ltv-sched-time {
+        flex: none;
+    }
+}
+
+/* QtWebEngine 5.15 / Chromium 83 flex-gap fallbacks for Live TV UI */
+html.bfx-no-flex-gap .bfx-ltv-title-row > * + *,
+html.bfx-no-flex-gap .bfx-ltv-head-right > * + * {
+    margin-left: 10px;
+}
+html.bfx-no-flex-gap .bfx-ltv-subpills > * + *,
+html.bfx-no-flex-gap .bfx-ltv-guide-btns > * + *,
+html.bfx-no-flex-gap .bfx-ltv-subtitle > * + * {
+    margin-left: 8px;
+}
+html.bfx-no-flex-gap .bfx-ltv-top-badges > * + *,
+html.bfx-no-flex-gap .bfx-ltv-quick-actions > * + *,
+html.bfx-no-flex-gap .bfx-ltv-guide-btn > * + *,
+html.bfx-no-flex-gap .bfx-livetv-return-btn > * + *,
+html.bfx-no-flex-gap .bfx-ltv-sched-time > * + * {
+    margin-left: 6px;
+}
+html.bfx-no-flex-gap .bfx-ltv-head-left > * + *,
+html.bfx-no-flex-gap .bfx-ltv-sched-list > * + * {
+    margin-top: 8px;
+}
+html.bfx-no-flex-gap .bfx-ltv-sched-row > * + * {
+    margin-left: 14px;
+}
+

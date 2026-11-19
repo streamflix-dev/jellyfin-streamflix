@@ -275,6 +275,8 @@ public class SaveAdminConfigRequest
 
     public bool EnableWatchTogether { get; set; } = true;
 
+    public bool EnableLiveTv { get; set; }
+
     public bool EnableSeerr { get; set; }
 
     public string? SeerrUrl { get; set; }

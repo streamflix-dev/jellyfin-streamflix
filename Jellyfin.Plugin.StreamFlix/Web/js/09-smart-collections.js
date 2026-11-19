@@ -161,6 +161,9 @@
             d.allMovies, d.allSeries, d.collectionsItems,
             state.searchResults || [], (state.browseFilter && state.browseFilter.items) || [],
             (state.libraryBrowser && state.libraryBrowser.items) || [], collectLibraryViewCachedItems(),
+            (state.liveTvData && state.liveTvData.channels) || [],
+            (state.liveTvData && state.liveTvData.onNow) || [],
+            (state.liveTvData && state.liveTvData.recordings) || [],
             personalRowItems(), extraItemsList || []
         ].forEach(function (arr) {
             (arr || []).forEach(function (it) {
@@ -260,7 +263,7 @@
         if (cat === 'series') {
             return (d.recentSeries && d.recentSeries.length) ? d.recentSeries.slice(0, limit) : (d.heroItems || []).slice(0, limit);
         }
-        if (cat === 'collections' || cat === 'mylist' || cat === 'top10' || cat === 'hot') {
+        if (cat === 'collections' || cat === 'mylist' || cat === 'top10' || cat === 'hot' || cat === 'livetv') {
             return [];
         }
         if (d.heroItems && d.heroItems.length) {
@@ -429,9 +432,10 @@
     function getCurrentServerNavSig() {
         var cfg = state.config || {};
         var showLibs = cfg.showLibrariesInNav !== false;
+        var liveTvOn = Boolean(cfg.enableLiveTv);
         var hid = Array.isArray(cfg.navHiddenBuiltIns) ? cfg.navHiddenBuiltIns.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean).join(',') : '';
         var libs = Array.isArray(cfg.navLibraryIds) ? cfg.navLibraryIds.map(function (x) { return normalizeGuid(x) || String(x || '').trim(); }).filter(Boolean).join(',') : '';
-        return String(showLibs) + '|' + hid + '|' + libs;
+        return String(showLibs) + '|' + String(liveTvOn) + '|' + hid + '|' + libs;
     }
 
     function getProfileNavPrefs() {
@@ -610,6 +614,12 @@
             pills.push({ id: 'hot', label: 'New & Popular', hide: !(d.allMovies.length || d.allSeries.length) });
         }
 
+        var liveTvAllowed = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
+        if (liveTvAllowed && !hiddenBuiltInMap.livetv) {
+            var ltvForbidden = Boolean(state.liveTvData && state.liveTvData.forbidden);
+            pills.push({ id: 'livetv', label: 'Live TV', hide: ltvForbidden });
+        }
+
         eligibleViews.forEach(function (v) {
             var normId = normalizeGuid(v.Id);
             if (visibleLibMap[normId]) {
@@ -654,11 +664,16 @@
         var builtIns = [
             { id: 'series', label: 'Shows' },
             { id: 'movies', label: 'Movies' },
-            { id: 'hot', label: 'New & Popular' },
+            { id: 'hot', label: 'New & Popular' }
+        ];
+        if (typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()) {
+            builtIns.push({ id: 'livetv', label: 'Live TV' });
+        }
+        builtIns.push(
             { id: 'collections', label: 'Collections' },
             { id: 'top10', label: 'Top 10' },
             { id: 'mylist', label: 'My List' }
-        ];
+        );
 
         var builtInRowsHtml = ''
             + '<label class="bfx-nav-cust-chip is-locked">'
@@ -1495,6 +1510,484 @@
             + '</div>';
     }
 
+    /* ----------------------------------------------------------------------
+       Opt-In Live TV Hub (Channels, On Now, Favorites, Recordings & EPG Link)
+       ---------------------------------------------------------------------- */
+    function parseChannelSortNumber(ch) {
+        if (!ch) {
+            return Number.POSITIVE_INFINITY;
+        }
+        var raw = String(ch.Number || ch.ChannelNumber || '').trim();
+        if (!raw) {
+            return Number.POSITIVE_INFINITY;
+        }
+        var m = raw.match(/^(\d+)(?:[.-](\d+))?/);
+        if (!m) {
+            return Number.POSITIVE_INFINITY;
+        }
+        var major = parseInt(m[1], 10);
+        var minor = m[2] ? (parseInt(m[2], 10) / 1000) : 0;
+        return isNaN(major) ? Number.POSITIVE_INFINITY : (major + minor);
+    }
+
+    function ensureLiveTvHubDataLoaded(forceRefresh) {
+        if (!(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile())) {
+            return null;
+        }
+        var auth = getJellyfinAuthContext();
+        if (!auth || !auth.userId || !auth.token) {
+            return null;
+        }
+        var existing = state.liveTvData;
+        var sameUser = existing && normalizeGuid(existing.userId) === normalizeGuid(auth.userId);
+        if (sameUser && !forceRefresh) {
+            if (existing.loading) {
+                return existing;
+            }
+            if (existing.loaded && (Date.now() - (Number(existing.ts) || 0)) < 90000) {
+                return existing;
+            }
+        }
+
+        var entry = sameUser ? existing : {
+            userId: auth.userId,
+            loading: true,
+            loaded: false,
+            forbidden: false,
+            ts: 0,
+            channels: [],
+            onNow: [],
+            recordings: []
+        };
+        entry.loading = true;
+        state.liveTvData = entry;
+
+        var uid = encodeURIComponent(auth.userId);
+        var pChannels = apiFetch('/LiveTv/Channels?userId=' + uid + '&EnableImages=true&EnableUserData=true&AddCurrentProgram=true&Fields=PrimaryImageAspectRatio,ChannelInfo,Overview&Limit=300')
+            .catch(function (err) {
+                if (err && (err.status === 401 || err.status === 403)) {
+                    entry.forbidden = true;
+                }
+                return { Items: [] };
+            });
+        var pOnNow = apiFetch('/LiveTv/Programs/Recommended?userId=' + uid + '&IsAiring=true&HasAired=false&EnableImages=true&EnableUserData=true&Limit=36&Fields=Overview,PrimaryImageAspectRatio,ChannelInfo')
+            .catch(function () { return { Items: [] }; });
+        var pRecs = apiFetch('/LiveTv/Recordings?userId=' + uid + '&EnableImages=true&EnableUserData=true&Limit=36&Fields=Overview,PrimaryImageAspectRatio')
+            .catch(function () { return { Items: [] }; });
+
+        Promise.all([pChannels, pOnNow, pRecs]).then(function (resArr) {
+            if (state.liveTvData !== entry || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
+                return;
+            }
+            var rawChannels = (resArr[0] && Array.isArray(resArr[0].Items)) ? resArr[0].Items : [];
+            rawChannels.sort(function (a, b) {
+                var na = parseChannelSortNumber(a);
+                var nb = parseChannelSortNumber(b);
+                if (na !== nb) {
+                    return na - nb;
+                }
+                var sa = String((a && (a.SortName || a.Name)) || '').toLowerCase();
+                var sb = String((b && (b.SortName || b.Name)) || '').toLowerCase();
+                return sa < sb ? -1 : (sa > sb ? 1 : 0);
+            });
+            var onNowItems = (resArr[1] && Array.isArray(resArr[1].Items)) ? resArr[1].Items : [];
+            var recItems = (resArr[2] && Array.isArray(resArr[2].Items)) ? resArr[2].Items : [];
+
+            entry.channels = rawChannels;
+            entry.onNow = onNowItems;
+            entry.recordings = recItems;
+            entry.loading = false;
+            entry.loaded = true;
+            entry.ts = Date.now();
+
+            if (document.getElementById('streamflix-cinema-hub')
+                && (state.activeCategory === 'livetv' || (state.activeCategory === 'all' && rawChannels.length > 0))) {
+                renderCinemaHubContents();
+            }
+        }).catch(function () {
+            if (state.liveTvData === entry) {
+                entry.loading = false;
+                entry.loaded = true;
+                entry.ts = Date.now();
+                if (document.getElementById('streamflix-cinema-hub') && state.activeCategory === 'livetv') {
+                    renderCinemaHubContents();
+                }
+            }
+        });
+
+        return entry;
+    }
+
+    function computeLiveProgramProgress(prog) {
+        if (!prog || !prog.StartDate || !prog.EndDate) {
+            return { pct: 0, timeWindow: '', leftLabel: '', airing: false };
+        }
+        var sMs = Date.parse(prog.StartDate);
+        var eMs = Date.parse(prog.EndDate);
+        if (isNaN(sMs) || isNaN(eMs) || eMs <= sMs) {
+            return { pct: 0, timeWindow: '', leftLabel: '', airing: false };
+        }
+        var nowMs = Date.now();
+        var airing = nowMs >= sMs && nowMs < eMs;
+        var pct = airing ? Math.min(100, Math.max(3, Math.round((nowMs - sMs) / (eMs - sMs) * 100))) : 0;
+        var timeWindow = '';
+        try {
+            var fmt = function (ms) { return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+            timeWindow = fmt(sMs) + ' – ' + fmt(eMs);
+        } catch (eFmt) {}
+        var leftMins = airing ? Math.max(1, Math.round((eMs - nowMs) / 60000)) : 0;
+        var leftLabel = airing ? (leftMins >= 60 ? (Math.floor(leftMins / 60) + 'h ' + (leftMins % 60 ? (leftMins % 60) + 'm ' : '') + 'left') : (leftMins + 'm left')) : '';
+        return { pct: pct, timeWindow: timeWindow, leftLabel: leftLabel, airing: airing };
+    }
+
+    function buildLiveTvCardHtml(item, mode) {
+        if (!item || !item.Id) {
+            return '';
+        }
+        var isRecording = mode === 'recording' || item.Type === 'Recording' || (item.Type !== 'TvChannel' && item.Type !== 'Program');
+        var isProgramCard = !isRecording && (mode === 'program' || item.Type === 'Program');
+        var prog = isProgramCard ? item : (item.CurrentProgram || null);
+        var timing = prog ? computeLiveProgramProgress(prog) : { pct: 0, timeWindow: '', leftLabel: '', airing: false };
+        var isFav = Boolean(item.UserData && item.UserData.IsFavorite);
+        var isRadio = item.ChannelType === 'Radio';
+        var chNum = String(item.Number || item.ChannelNumber || '').trim();
+        var chName = isProgramCard ? String(item.ChannelName || item.Name || '') : String(item.Name || 'Channel');
+        var mainTitle = isRecording
+            ? String(item.Name || 'Recording')
+            : (prog && prog.Name ? String(prog.Name) : chName);
+        var subLine = isRecording
+            ? ([item.EpisodeTitle || '', formatRuntimeTicks(item.RunTimeTicks).trim()].filter(Boolean).join(' · ') || buildCardMetaText(item))
+            : (isProgramCard
+                ? ([chNum ? ('CH ' + chNum) : '', chName, timing.leftLabel || timing.timeWindow].filter(Boolean).join(' · '))
+                : (prog && prog.Name
+                    ? ([timing.timeWindow, timing.leftLabel].filter(Boolean).join(' · ') || (prog.EpisodeTitle || 'On Now'))
+                    : (isRadio ? 'Live Radio Stream' : 'Live Broadcast')));
+
+        var wideBgUrl = '';
+        var logoBadgeUrl = '';
+        if (isRecording) {
+            wideBgUrl = getItemBackdropUrl(item, 640);
+        } else if (isProgramCard) {
+            if ((item.BackdropImageTags && item.BackdropImageTags.length > 0) || (item.ImageTags && (item.ImageTags.Thumb || item.ImageTags.Primary))) {
+                wideBgUrl = getItemBackdropUrl(item, 640);
+            }
+            if (item.ChannelId && item.ChannelPrimaryImageTag) {
+                logoBadgeUrl = apiBase() + '/Items/' + encodeURIComponent(item.ChannelId) + '/Images/Primary?maxWidth=220&quality=88';
+            } else if (!wideBgUrl && item.ChannelId) {
+                logoBadgeUrl = apiBase() + '/Items/' + encodeURIComponent(item.ChannelId) + '/Images/Primary?maxWidth=320&quality=88';
+            }
+        } else {
+            if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
+                wideBgUrl = apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Backdrop/0?maxWidth=640&quality=85';
+            } else if (prog && prog.Id && ((prog.BackdropImageTags && prog.BackdropImageTags.length > 0) || (prog.ImageTags && (prog.ImageTags.Thumb || prog.ImageTags.Primary)))) {
+                wideBgUrl = getItemBackdropUrl(item, 640);
+            }
+            if (item.ImageTags && item.ImageTags.Primary) {
+                logoBadgeUrl = apiBase() + '/Items/' + encodeURIComponent(item.Id) + '/Images/Primary?maxWidth=320&quality=90';
+            }
+        }
+
+        var showLivePill = !isRecording && (timing.airing || item.Type === 'TvChannel' || isProgramCard);
+        var pctBar = isRecording
+            ? ((item.UserData && item.UserData.PlayedPercentage) ? Math.min(100, Math.max(2, Math.round(item.UserData.PlayedPercentage))) : 0)
+            : timing.pct;
+
+        return ''
+            + '<div class="bfx-ltv-card' + (wideBgUrl ? ' has-backdrop' : ' is-logo-stage') + '" data-item-id="' + escapeHtml(item.Id) + '" tabindex="0" role="button" aria-label="' + escapeHtml((chNum ? 'Channel ' + chNum + ' ' : '') + chName + (mainTitle !== chName ? ' — ' + mainTitle : '')) + '">'
+            + '  <div class="bfx-ltv-media">'
+            + (wideBgUrl
+                ? '    <img class="bfx-ltv-bg" loading="lazy" decoding="async" src="' + escapeHtml(wideBgUrl) + '" alt="" data-bfx-img="fade" />'
+                : '')
+            + '    <div class="bfx-ltv-scrim"></div>'
+            + (!wideBgUrl && logoBadgeUrl
+                ? '    <div class="bfx-ltv-center-logo"><img loading="lazy" decoding="async" src="' + escapeHtml(logoBadgeUrl) + '" alt="" data-bfx-img="fade" /></div>'
+                : (!wideBgUrl
+                    ? '    <div class="bfx-ltv-center-fallback">' + icon('tv') + '<span>' + escapeHtml(chNum || chName.slice(0, 6)) + '</span></div>'
+                    : ''))
+            + '    <div class="bfx-ltv-top-badges">'
+            + (showLivePill
+                ? '      <span class="bfx-ltv-live-pill"><span class="bfx-ltv-live-dot"></span>' + (isRadio ? 'RADIO' : 'LIVE') + '</span>'
+                : (isRecording ? '      <span class="bfx-ltv-rec-pill">DVR</span>' : ''))
+            + (chNum ? '      <span class="bfx-ltv-chnum">CH ' + escapeHtml(chNum) + '</span>' : '')
+            + '    </div>'
+            + '    <div class="bfx-ltv-quick-actions">'
+            + (!isProgramCard
+                ? '      <button type="button" class="streamflix-qbtn' + (isFav ? ' active' : '') + '" data-action="fav" title="' + (isFav ? 'Remove favorite channel' : 'Favorite channel') + '" aria-label="Favorite">' + icon(isFav ? 'check' : 'plus') + '</button>'
+                : '')
+            + '      <button type="button" class="streamflix-qbtn" data-action="info" title="Program &amp; Schedule" aria-label="Details">' + icon('info') + '</button>'
+            + '    </div>'
+            + '    <button type="button" class="streamflix-wide-play bfx-ltv-play" data-action="play" title="' + (isRecording ? 'Play Recording' : ('Watch ' + escapeHtml(chName) + ' Live')) + '" aria-label="Watch Live">' + icon('play') + '</button>'
+            + (wideBgUrl && logoBadgeUrl
+                ? '    <div class="bfx-ltv-corner-logo"><img loading="lazy" decoding="async" src="' + escapeHtml(logoBadgeUrl) + '" alt="" data-bfx-img="fade" /></div>'
+                : '')
+            + (pctBar > 0
+                ? '    <div class="streamflix-progress-track"><div class="streamflix-progress-fill" style="width:' + pctBar + '%;"></div></div>'
+                : '')
+            + '  </div>'
+            + '  <div class="bfx-ltv-body">'
+            + '    <div class="bfx-ltv-chline">'
+            + '      <span class="bfx-ltv-chname">' + escapeHtml(isRecording ? (item.ChannelName || 'Recorded TV') : chName) + '</span>'
+            + '    </div>'
+            + '    <div class="bfx-ltv-progtitle">' + escapeHtml(mainTitle) + '</div>'
+            + (subLine ? '    <div class="bfx-ltv-progsub">' + escapeHtml(subLine) + '</div>' : '')
+            + '  </div>'
+            + '</div>';
+    }
+
+    function getFilteredLiveTvChannels(channels, rawFilter) {
+        var q = String(rawFilter || '').trim().toLowerCase();
+        if (!q) {
+            return channels || [];
+        }
+        return (channels || []).filter(function (ch) {
+            if (!ch) {
+                return false;
+            }
+            var nm = String(ch.Name || '').toLowerCase();
+            var num = String(ch.Number || ch.ChannelNumber || '').toLowerCase();
+            var pr = (ch.CurrentProgram && ch.CurrentProgram.Name) ? String(ch.CurrentProgram.Name).toLowerCase() : '';
+            var ep = (ch.CurrentProgram && ch.CurrentProgram.EpisodeTitle) ? String(ch.CurrentProgram.EpisodeTitle).toLowerCase() : '';
+            return nm.indexOf(q) !== -1 || num.indexOf(q) !== -1 || pr.indexOf(q) !== -1 || ep.indexOf(q) !== -1;
+        });
+    }
+
+    function buildLiveTvContentSlotHtml(ltv) {
+        var ui = state.liveTvUi || { tab: 'all', filter: '' };
+        var tab = ui.tab || 'all';
+        var filterQ = String(ui.filter || '').trim();
+        var channels = (ltv && Array.isArray(ltv.channels)) ? ltv.channels : [];
+        var onNow = (ltv && Array.isArray(ltv.onNow)) ? ltv.onNow : [];
+        var recordings = (ltv && Array.isArray(ltv.recordings)) ? ltv.recordings : [];
+        var favChannels = channels.filter(function (c) { return c && c.UserData && c.UserData.IsFavorite; });
+
+        if (!ltv || (ltv.loading && !ltv.loaded)) {
+            return '<div class="streamflix-filter-loading"><div class="streamflix-spinner-ring"></div><span>Tuning Live TV channels…</span></div>';
+        }
+        if (ltv.forbidden) {
+            return buildEmptyStateHtml('lock', 'Live TV access is disabled for this profile', 'An administrator can grant Live TV access for this Jellyfin user in Dashboard → Users.');
+        }
+        if (channels.length === 0 && recordings.length === 0) {
+            var isAdminProf = typeof isActiveProfileAdmin === 'function' && isActiveProfileAdmin();
+            return '<div class="bfx-ltv-empty-wrap">'
+                + buildEmptyStateHtml('tv', 'No Live TV channels configured yet', 'Connect an HDHomeRun, M3U IPTV playlist, or TV tuner in Jellyfin Dashboard → Live TV to watch live channels here.')
+                + (isAdminProf
+                    ? '<div class="bfx-ltv-empty-actions"><button type="button" class="streamflix-btn-primary" data-ltv-admin-setup="1">' + iconLabel('gear', 'Open Live TV Setup') + '</button></div>'
+                    : '')
+                + '</div>';
+        }
+
+        if (tab === 'recordings') {
+            var filteredRecs = filterQ
+                ? recordings.filter(function (r) { return r && String(r.Name || '').toLowerCase().indexOf(filterQ.toLowerCase()) !== -1; })
+                : recordings;
+            if (!filteredRecs.length) {
+                return buildEmptyStateHtml('film', filterQ ? ('No recordings matching “' + filterQ + '”') : 'No DVR recordings yet', 'Schedule single or series recordings from the TV Guide.');
+            }
+            return '<div class="bfx-ltv-grid">' + filteredRecs.map(function (r) { return buildLiveTvCardHtml(r, 'recording'); }).join('') + '</div>';
+        }
+
+        if (tab === 'onnow') {
+            var airingPool = onNow.length > 0
+                ? onNow
+                : channels.filter(function (c) { return c && c.CurrentProgram && c.CurrentProgram.Name; });
+            var filteredOnNow = filterQ
+                ? airingPool.filter(function (p) {
+                    var nm = String(p.Name || '').toLowerCase();
+                    var cn = String(p.ChannelName || '').toLowerCase();
+                    var cp = (p.CurrentProgram && p.CurrentProgram.Name) ? String(p.CurrentProgram.Name).toLowerCase() : '';
+                    return nm.indexOf(filterQ.toLowerCase()) !== -1 || cn.indexOf(filterQ.toLowerCase()) !== -1 || cp.indexOf(filterQ.toLowerCase()) !== -1;
+                })
+                : airingPool;
+            if (!filteredOnNow.length) {
+                return buildEmptyStateHtml('tv', filterQ ? ('Nothing airing matching “' + filterQ + '”') : 'No EPG program guide data airing right now', 'Switch to All Channels to tune into any channel directly.');
+            }
+            var useProgMode = onNow.length > 0;
+            return '<div class="bfx-ltv-grid">' + filteredOnNow.map(function (it) { return buildLiveTvCardHtml(it, useProgMode ? 'program' : 'channel'); }).join('') + '</div>';
+        }
+
+        if (tab === 'favorites') {
+            var filteredFavs = getFilteredLiveTvChannels(favChannels, filterQ);
+            if (!filteredFavs.length) {
+                return buildEmptyStateHtml('plus', filterQ ? ('No favorite channels matching “' + filterQ + '”') : 'No favorite channels yet', 'Click the + button on any channel to pin it to your Favorites.');
+            }
+            return '<div class="bfx-ltv-grid">' + filteredFavs.map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join('') + '</div>';
+        }
+
+        var visibleChannels = getFilteredLiveTvChannels(channels, filterQ);
+        if (!visibleChannels.length) {
+            return buildEmptyStateHtml('search', 'No channels matching “' + filterQ + '”', 'Try searching by channel number, call sign, or airing show.');
+        }
+
+        var outHtml = '';
+        if (!filterQ && favChannels.length > 0 && favChannels.length < channels.length) {
+            outHtml += ''
+                + '<div class="bfx-ltv-subblock">'
+                + '  <h3 class="bfx-ltv-subtitle">Favorite Channels <span class="streamflix-row-count">' + favChannels.length + '</span></h3>'
+                + '  <div class="bfx-ltv-grid">' + favChannels.map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join('') + '</div>'
+                + '</div>';
+        }
+        outHtml += ''
+            + '<div class="bfx-ltv-subblock">'
+            + (favChannels.length > 0 && !filterQ ? ('  <h3 class="bfx-ltv-subtitle">All Channels <span class="streamflix-row-count">' + visibleChannels.length + '</span></h3>') : '')
+            + '  <div class="bfx-ltv-grid">' + visibleChannels.map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join('') + '</div>'
+            + '</div>';
+        return outHtml;
+    }
+
+    function buildLiveTvHubHtml() {
+        var ltv = ensureLiveTvHubDataLoaded(false);
+        if (!state.liveTvUi) {
+            state.liveTvUi = { tab: 'all', filter: '' };
+        }
+        var channels = (ltv && Array.isArray(ltv.channels)) ? ltv.channels : [];
+        var onNow = (ltv && Array.isArray(ltv.onNow)) ? ltv.onNow : [];
+        var recordings = (ltv && Array.isArray(ltv.recordings)) ? ltv.recordings : [];
+        var favCount = channels.filter(function (c) { return c && c.UserData && c.UserData.IsFavorite; }).length;
+        var airingCount = onNow.length || channels.filter(function (c) { return c && c.CurrentProgram && c.CurrentProgram.Name; }).length;
+
+        var tabs = [
+            { id: 'all', label: 'All Channels', count: channels.length, show: true },
+            { id: 'onnow', label: 'On Now', count: airingCount, show: airingCount > 0 || state.liveTvUi.tab === 'onnow' },
+            { id: 'favorites', label: 'Favorites', count: favCount, show: favCount > 0 || state.liveTvUi.tab === 'favorites' },
+            { id: 'recordings', label: 'Recordings', count: recordings.length, show: recordings.length > 0 || state.liveTvUi.tab === 'recordings' }
+        ];
+        if (!tabs.some(function (t) { return t.id === state.liveTvUi.tab && t.show; })) {
+            state.liveTvUi.tab = 'all';
+        }
+
+        var tabsHtml = tabs.filter(function (t) { return t.show; }).map(function (t) {
+            var active = state.liveTvUi.tab === t.id;
+            return '<button type="button" class="streamflix-pill' + (active ? ' active' : '') + '" data-ltv-tab="' + t.id + '">'
+                + escapeHtml(t.label)
+                + (t.count > 0 ? (' <span class="bfx-sp-pill-cnt">' + t.count + '</span>') : '')
+                + '</button>';
+        }).join('');
+
+        var filterVal = state.liveTvUi.filter || '';
+        return ''
+            + '<section class="streamflix-row streamflix-row-grid bfx-ltv-hub" data-row-id="livetv-hub">'
+            + '  <div class="bfx-ltv-header">'
+            + '    <div class="bfx-ltv-head-left">'
+            + '      <div class="bfx-ltv-title-row">'
+            + '        <span class="bfx-ltv-live-pill is-lg"><span class="bfx-ltv-live-dot"></span>LIVE TV</span>'
+            + '        <h2 class="streamflix-row-title">Channels &amp; Broadcasts' + (channels.length > 0 ? ('<span class="streamflix-row-count">' + channels.length + '</span>') : '') + '</h2>'
+            + '      </div>'
+            + '      <div class="streamflix-FilterPills bfx-ltv-subpills" role="tablist" aria-label="Live TV views">' + tabsHtml + '</div>'
+            + '    </div>'
+            + '    <div class="bfx-ltv-head-right">'
+            + (channels.length > 0 || recordings.length > 0
+                ? ('      <div class="streamflix-search-box bfx-ltv-filter-box' + (filterVal ? ' has-value' : '') + '">'
+                    + '        <span class="streamflix-search-icon">' + icon('search') + '</span>'
+                    + '        <input type="search" id="bfx-ltv-filter-input" class="streamflix-search-input" placeholder="Channel, # or show…" autocomplete="off" spellcheck="false" aria-label="Filter Live TV channels" value="' + escapeHtml(filterVal) + '" />'
+                    + '        <button type="button" id="bfx-ltv-filter-clear" class="streamflix-search-clear' + (filterVal ? ' is-visible' : '') + '" title="Clear filter" aria-label="Clear filter">' + icon('close') + '</button>'
+                    + '      </div>')
+                : '')
+            + '      <div class="bfx-ltv-guide-btns">'
+            + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-guide-btn" data-ltv-route="#/livetv?tab=1" title="Open Jellyfin Timeline EPG Guide">' + icon('calendar') + '<span>TV Guide</span></button>'
+            + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-guide-btn" data-ltv-route="#/livetv?tab=4" title="Open DVR Schedule &amp; Timers">' + icon('clock') + '<span>Schedule</span></button>'
+            + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-refresh-btn" data-ltv-refresh="1" title="Refresh Live TV program guide" aria-label="Refresh Live TV">' + icon('refresh') + '</button>'
+            + '      </div>'
+            + '    </div>'
+            + '  </div>'
+            + '  <div id="bfx-ltv-content-slot">' + buildLiveTvContentSlotHtml(ltv) + '</div>'
+            + '</section>';
+    }
+
+    function bindLiveTvHubInteractive(rowsScope) {
+        if (!rowsScope) {
+            return;
+        }
+        var hubSec = rowsScope.querySelector('.bfx-ltv-hub');
+        if (!hubSec) {
+            return;
+        }
+        Array.prototype.forEach.call(hubSec.querySelectorAll('[data-ltv-tab]'), function (btn) {
+            if (btn.__bfxBound) { return; }
+            btn.__bfxBound = true;
+            btn.addEventListener('click', function () {
+                if (!state.liveTvUi) { state.liveTvUi = { tab: 'all', filter: '' }; }
+                state.liveTvUi.tab = btn.getAttribute('data-ltv-tab') || 'all';
+                renderCinemaHubContents();
+            });
+        });
+
+        Array.prototype.forEach.call(hubSec.querySelectorAll('[data-ltv-route]'), function (btn) {
+            if (btn.__bfxBound) { return; }
+            btn.__bfxBound = true;
+            btn.addEventListener('click', function () {
+                var baseHash = btn.getAttribute('data-ltv-route') || '#/livetv?tab=1';
+                var sid = resolveKnownServerId();
+                window.location.hash = baseHash + (sid ? ('&serverId=' + encodeURIComponent(sid)) : '');
+            });
+        });
+
+        var refreshBtn = hubSec.querySelector('[data-ltv-refresh]');
+        if (refreshBtn && !refreshBtn.__bfxBound) {
+            refreshBtn.__bfxBound = true;
+            refreshBtn.addEventListener('click', function () {
+                ensureLiveTvHubDataLoaded(true);
+                renderCinemaHubContents();
+            });
+        }
+
+        var bindSlotExtra = function (slotEl) {
+            if (!slotEl) { return; }
+            var setupBtn = slotEl.querySelector('[data-ltv-admin-setup]');
+            if (setupBtn && !setupBtn.__bfxBound) {
+                setupBtn.__bfxBound = true;
+                setupBtn.addEventListener('click', function () {
+                    if (typeof openStreamFlixAdminRoute === 'function') {
+                        openStreamFlixAdminRoute('#/dashboard/livetv');
+                    } else {
+                        window.location.hash = '#/dashboard/livetv';
+                    }
+                });
+            }
+        };
+
+        var slotEl = hubSec.querySelector('#bfx-ltv-content-slot');
+        bindSlotExtra(slotEl);
+
+        var filterInput = hubSec.querySelector('#bfx-ltv-filter-input');
+        var filterClear = hubSec.querySelector('#bfx-ltv-filter-clear');
+        var filterBox = hubSec.querySelector('.bfx-ltv-filter-box');
+        var refreshFilterSlotInPlace = function () {
+            var val = filterInput ? filterInput.value : '';
+            if (!state.liveTvUi) { state.liveTvUi = { tab: 'all', filter: '' }; }
+            state.liveTvUi.filter = val;
+            if (filterBox) { filterBox.classList.toggle('has-value', Boolean(val)); }
+            if (filterClear) { filterClear.classList.toggle('is-visible', Boolean(val)); }
+            var curSlot = hubSec.querySelector('#bfx-ltv-content-slot');
+            if (curSlot) {
+                curSlot.innerHTML = buildLiveTvContentSlotHtml(state.liveTvData);
+                bindSlotExtra(curSlot);
+                bindInteractiveCardsInContainer(curSlot, null, null);
+            }
+        };
+        if (filterInput && !filterInput.__bfxBound) {
+            filterInput.__bfxBound = true;
+            filterInput.addEventListener('input', refreshFilterSlotInPlace);
+            filterInput.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Escape' && filterInput.value) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    filterInput.value = '';
+                    refreshFilterSlotInPlace();
+                }
+            });
+        }
+        if (filterClear && !filterClear.__bfxBound) {
+            filterClear.__bfxBound = true;
+            filterClear.addEventListener('click', function () {
+                if (filterInput) {
+                    filterInput.value = '';
+                    try { filterInput.focus(); } catch (eF) {}
+                }
+                refreshFilterSlotInPlace();
+            });
+        }
+    }
+
     function renderCinemaHubContents() {
         var hub = document.getElementById('streamflix-cinema-hub');
         if (!hub) {
@@ -1634,6 +2127,10 @@
 
         document.body.classList.toggle('streamflix-hub-filtered', Boolean(state.searchQuery) || Boolean(bf) || Boolean(lb) || cat !== 'all');
 
+        if (cat === 'livetv' && !(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile())) {
+            cat = 'all';
+            state.activeCategory = 'all';
+        }
         var pills = getConfiguredNavPills(d);
         if (cat.indexOf('lib:') === 0 && !pills.some(function (p) { return p.id === cat; })) {
             var activeLibView = findLibraryViewById(cat.slice(4));
@@ -1774,6 +2271,8 @@
                     footerHtml: serFooter
                 });
             }
+        } else if (cat === 'livetv') {
+            rowsHtml += buildLiveTvHubHtml();
         } else if (cat === 'collections') {
             rowsHtml += smartRowsHtml(['smart-acclaimed', 'smart-gems', 'smart-binge', 'smart-short', 'smart-decade', 'smart-family']);
             if (d.collectionsItems.length > 0) {
@@ -1834,6 +2333,24 @@
             }
             if (d.nextUpItems.length > 0) {
                 rowsHtml += buildRowHtml('nextup', rowTitle('Next Up'), d.nextUpItems.map(buildWideCardHtml).join(''), { className: 'streamflix-row-wide', link: 'series' });
+            }
+            if (typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
+                && !isNavBuiltInHidden('livetv')
+                && state.liveTvData && state.liveTvData.loaded && Array.isArray(state.liveTvData.channels) && state.liveTvData.channels.length > 0) {
+                var homeLtvPool = state.liveTvData.channels.filter(function (c) { return c && c.UserData && c.UserData.IsFavorite; });
+                if (homeLtvPool.length < 16) {
+                    var seenLtv = {};
+                    homeLtvPool.forEach(function (c) { seenLtv[normalizeGuid(c.Id)] = true; });
+                    state.liveTvData.channels.forEach(function (c) {
+                        if (homeLtvPool.length < 16 && c && !seenLtv[normalizeGuid(c.Id)]) {
+                            seenLtv[normalizeGuid(c.Id)] = true;
+                            homeLtvPool.push(c);
+                        }
+                    });
+                }
+                if (homeLtvPool.length > 0) {
+                    rowsHtml += buildRowHtml('livetv-home', rowTitle('Live TV · On Now'), homeLtvPool.slice(0, 16).map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join(''), { className: 'streamflix-row-wide bfx-row-livetv', link: 'livetv' });
+                }
             }
             var pr = getPersonalRows() || { topPicks: [], because: [], watchAgain: [] };
             var becauseRow = function (b, idx) {
@@ -1932,6 +2449,7 @@
             if (state.libraryBrowser && state.libraryBrowser.active) {
                 bindLibraryBrowserInteractive(rowsScope);
             }
+            bindLiveTvHubInteractive(rowsScope);
             if (typeof bindKidsWorldStrip === 'function') {
                 bindKidsWorldStrip(rowsScope);
             }

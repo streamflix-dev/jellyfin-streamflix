@@ -1447,6 +1447,7 @@ public partial class StreamFlixController
             isOwner = StreamFlixStartupTask.IsOwnerProfile(p),
             canActivate,
             canManageGuestPasses,
+            allowLiveTv = !p.IsKids && StreamFlixStartupTask.HasLiveTvAccessCompat(linkedUser),
             maturityRating = p.MaturityRating,
             hasPin = !isGuest && !string.IsNullOrWhiteSpace(p.PinCode),
             pinLength = isGuest || string.IsNullOrWhiteSpace(p.PinCode) ? 0 : p.PinCode.Trim().Length,
