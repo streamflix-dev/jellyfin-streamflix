@@ -96,12 +96,6 @@
             return;
         }
         desktopAuthPollTimer = setInterval(function () {
-            if (hasHouseholdAccess()) {
-                clearPendingGoogleDesktopFlow();
-                clearPendingOidcFlow();
-                stopDesktopAuthPollTimerIfIdle();
-                return;
-            }
             pollPendingGoogleDesktopFlowIfActive();
             pollPendingOidcFlowIfActive();
             stopDesktopAuthPollTimerIfIdle();
@@ -152,22 +146,58 @@
         try { localStorage.removeItem(GOOGLE_DESKTOP_PENDING_KEY); } catch (e2) {}
     }
 
+    function canCancelExplicitAuthToPicker() {
+        if (!state.explicitAuthPrompt) {
+            return false;
+        }
+        var cfg = state.config;
+        return Boolean(
+            isOpenWithoutLogin(cfg)
+            || (cfg && cfg.hasAccess)
+            || (state.googleUser && state.googleUser.token)
+            || (state.activeProfile && state.activeProfile.id && state.activeProfile.accessToken)
+        );
+    }
+
+    function cancelExplicitAuthPrompt() {
+        state.explicitAuthPrompt = false;
+        state.adminLoginExpanded = false;
+        state.guestPassExpanded = false;
+        state.startingGoogleDesktopRelay = false;
+        state.startingOidcRedirect = false;
+        clearPendingGoogleDesktopFlow();
+        clearPendingOidcFlow();
+        stopDesktopAuthPollTimerIfIdle();
+        takePendingProfileId();
+        if (typeof isKidsExitLockRequired === 'function' && isKidsExitLockRequired()) {
+            closeOverlayGate();
+            scheduleLifecycleTick(0);
+            return;
+        }
+        if (state.config && (isOpenWithoutLogin(state.config) || (state.googleUser && state.googleUser.token))) {
+            state.config.hasAccess = true;
+        }
+        if (hasHouseholdAccess()) {
+            renderProfilePickerGate();
+            fetchPublicConfig().then(rerenderPickerIfOpen).catch(function () {});
+        } else {
+            renderGoogleAuthGate();
+        }
+    }
+
     function cancelPendingDesktopAuthFlows() {
         state.startingGoogleDesktopRelay = false;
         state.startingOidcRedirect = false;
         clearPendingGoogleDesktopFlow();
         clearPendingOidcFlow();
         stopDesktopAuthPollTimerIfIdle();
-        if (!hasHouseholdAccess()) {
+        if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
             renderGoogleAuthGate();
         }
     }
 
     function pollPendingGoogleDesktopFlowIfActive() {
-        if (state.googleDesktopPollInFlight || state.verifyingGoogle || hasHouseholdAccess()) {
-            if (hasHouseholdAccess()) {
-                clearPendingGoogleDesktopFlow();
-            }
+        if (state.googleDesktopPollInFlight || state.verifyingGoogle) {
             return;
         }
         var pendingFlow = loadPendingGoogleDesktopFlow();
@@ -199,8 +229,8 @@
                     picture: res.picture || '',
                     expiresAt: res.expiresAt || ''
                 });
-                state.activeProfile = null;
-                localStorage.removeItem(PROFILE_KEY);
+                clearActiveProfileState(true);
+                clearLocalJellyfinAuth();
                 var pendingId = res.pendingProfileId || takePendingProfileId();
                 fetchPublicConfig().then(function () {
                     renderProfilePickerGate();
@@ -213,10 +243,14 @@
                 });
                 return;
             }
-            if (res.status === 'error' && res.message && !hasHouseholdAccess()) {
+            if (res.status === 'error' && res.message) {
                 takePendingProfileId();
-                renderGoogleAuthGate(null, res.message);
-            } else if (!hasHouseholdAccess()) {
+                if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
+                    renderGoogleAuthGate(null, res.message);
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } else if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
                 renderGoogleAuthGate();
             }
         }).catch(function () {
@@ -242,7 +276,7 @@
                     sessionStorage.removeItem(PENDING_PROFILE_KEY);
                 }
             } catch (ePend) {}
-            if (!hasHouseholdAccess()) {
+            if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
                 renderGoogleAuthGate('Finish Google sign-in in your browser…');
             }
             apiFetch('/StreamFlix/Auth/GoogleDesktopBegin', {
@@ -272,7 +306,7 @@
                 state.startingGoogleDesktopRelay = false;
                 clearPendingGoogleDesktopFlow();
                 var msg = (err && err.message) || 'Could not start Google sign-in.';
-                if (!hasHouseholdAccess()) {
+                if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
                     renderGoogleAuthGate(null, msg);
                 } else {
                     showToast(msg, 'error');
@@ -370,6 +404,7 @@
                 return res;
             }
 
+            clearPendingGoogleDesktopFlow();
             setHouseholdSession({
                 token: res.sessionToken,
                 email: res.email,
@@ -379,6 +414,7 @@
             });
             // Netflix-style: always choose who's watching after signing in
             clearActiveProfileState(true);
+            clearLocalJellyfinAuth();
 
             var pendingId = takePendingProfileId();
             return fetchPublicConfig().then(function () {
@@ -557,7 +593,7 @@
         } catch (e) {}
 
         var providerLabel = getOidcProviderLabel();
-        if (!hasHouseholdAccess()) {
+        if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
             renderGoogleAuthGate('Connecting to ' + providerLabel + '…');
         } else {
             var btn = document.getElementById('streamflix-oidc-login-btn');
@@ -589,7 +625,7 @@
             state.startingOidcRedirect = false;
             clearPendingOidcFlow();
             var msg = (err && err.message) || ('Could not start ' + providerLabel + ' sign-in.');
-            if (!hasHouseholdAccess()) {
+            if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
                 renderGoogleAuthGate(null, msg);
             } else {
                 showToast(msg, 'error');
@@ -600,6 +636,7 @@
     function applyVerifiedOidcSession(res, providerLabel) {
         clearPendingOidcFlow();
         state.startingOidcRedirect = false;
+        stopDesktopAuthPollTimerIfIdle();
         var resolvedProvider = res.providerName || providerLabel || getOidcProviderLabel();
         var resolvedEmail = res.email || '';
         var resolvedUser = res.username || res.name || (resolvedEmail ? '' : 'user');
@@ -614,8 +651,8 @@
             expiresAt: res.expiresAt || ''
         });
 
-        state.activeProfile = null;
-        localStorage.removeItem(PROFILE_KEY);
+        clearActiveProfileState(true);
+        clearLocalJellyfinAuth();
 
         var pendingId = res.pendingProfileId || takePendingProfileId();
         return fetchPublicConfig().then(function () {
@@ -670,10 +707,7 @@
     }
 
     function pollPendingOidcFlowIfActive() {
-        if (state.oidcPollInFlight || state.verifyingGoogle || hasHouseholdAccess()) {
-            if (hasHouseholdAccess()) {
-                clearPendingOidcFlow();
-            }
+        if (state.oidcPollInFlight || state.verifyingGoogle) {
             return;
         }
         var pendingFlow = loadPendingOidcFlow();
@@ -701,10 +735,15 @@
             }
             clearPendingOidcFlow();
             state.startingOidcRedirect = false;
-            if (res.status === 'error' && res.message && !hasHouseholdAccess()) {
+            stopDesktopAuthPollTimerIfIdle();
+            if (res.status === 'error' && res.message) {
                 takePendingProfileId();
-                renderGoogleAuthGate(null, res.message);
-            } else if (!hasHouseholdAccess()) {
+                if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
+                    renderGoogleAuthGate(null, res.message);
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } else if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
                 renderGoogleAuthGate();
             }
         }).catch(function () {
@@ -1015,6 +1054,7 @@
             })
         }).then(function (res) {
             state.activatingProfileId = null;
+            state.explicitAuthPrompt = false;
             state.legacyProfileToMigrate = null;
             var activated = normalizeProfileModel(res.profile || profile, 0);
             activated.jellyfinUserId = res.userId || activated.jellyfinUserId;
@@ -1105,14 +1145,19 @@
             var normNewUid = normalizeGuid(activated.jellyfinUserId);
             var normPrevUid = normalizeGuid(prevUserId);
             var hasFallbackPage = Boolean(document.querySelector('#fallbackPage:not(.hide)'));
+            var hasLoginPage = typeof isOnJellyfinLoginPage === 'function' && isOnJellyfinLoginPage();
             var missingHomePage = !document.getElementById('indexPage');
             var lastReloadUid = '';
+            var lastLoginReloadTs = 0;
             try {
                 lastReloadUid = sessionStorage.getItem('streamflix_reload_uid') || '';
+                lastLoginReloadTs = Number(sessionStorage.getItem('streamflix_login_reload_ts') || 0);
             } catch (e) {}
+            var needsLoginPageBoot = hasLoginPage && (!lastLoginReloadTs || (Date.now() - lastLoginReloadTs > 8000));
 
             var shouldReload = state.justCompletedGoogleOAuth
                 || hasFallbackPage
+                || needsLoginPageBoot
                 || (normNewUid && normNewUid !== normPrevUid && lastReloadUid !== normNewUid)
                 || (missingHomePage && lastReloadUid !== normNewUid);
 
@@ -1121,6 +1166,9 @@
             if (shouldReload) {
                 try {
                     sessionStorage.setItem('streamflix_reload_uid', normNewUid || 'reloaded');
+                    if (needsLoginPageBoot) {
+                        sessionStorage.setItem('streamflix_login_reload_ts', String(Date.now()));
+                    }
                 } catch (e) {}
                 window.location.hash = '#/home';
                 window.location.reload();

@@ -254,15 +254,17 @@
             }
         }
 
-        var onJellyfinLoginPage = isOnJellyfinLoginPage();
+        var hashHasLogin = (window.location.hash || '').toLowerCase().indexOf('login') !== -1;
 
-        if (!hasHouseholdAccess()) {
+        if (!hasHouseholdAccess() || state.explicitAuthPrompt) {
             state.explicitPickerOpen = false;
             state.openedDirectlyToManage = false;
-            if (typeof removeBedtimeLockOverlay === 'function') {
-                removeBedtimeLockOverlay();
+            if (!hasHouseholdAccess()) {
+                if (typeof removeBedtimeLockOverlay === 'function') {
+                    removeBedtimeLockOverlay();
+                }
+                clearUserPreferencesEnhancements();
             }
-            clearUserPreferencesEnhancements();
             var hasPendingOidc = typeof loadPendingOidcFlow === 'function' && Boolean(loadPendingOidcFlow());
             transitionAppPhase(hasPendingOidc ? APP_PHASES.OIDC_PENDING : APP_PHASES.AUTH_REQUIRED);
             var stage = document.getElementById('streamflix-stage');
@@ -321,7 +323,7 @@
             }
         }
 
-        if (!state.activeProfile || !state.activeProfile.id || !state.activeProfile.accessToken || onJellyfinLoginPage) {
+        if (!state.activeProfile || !state.activeProfile.id || !state.activeProfile.accessToken || hashHasLogin) {
             if (typeof removeBedtimeLockOverlay === 'function') {
                 removeBedtimeLockOverlay();
             }
@@ -415,7 +417,7 @@
         }
 
         // Periodically refresh server config (revoked sessions, profile changes on other devices)
-        if (!document.hidden && Date.now() - lastConfigFetchAt > 5 * 60 * 1000 && !state.verifyingGoogle && !state.activatingProfileId) {
+        if (!document.hidden && Date.now() - lastConfigFetchAt > 5 * 60 * 1000 && !state.verifyingGoogle && !state.activatingProfileId && !state.explicitAuthPrompt) {
             fetchPublicConfig().then(function () {
                 rerenderPickerIfOpen();
                 scheduleLifecycleTick(0);
@@ -603,6 +605,13 @@
                         ev.preventDefault();
                         state.adminLoginExpanded = false;
                         renderGoogleAuthGate();
+                        return;
+                    }
+                    if ((gateView.indexOf('auth') === 0 || gateView === 'setup')
+                        && typeof canCancelExplicitAuthToPicker === 'function'
+                        && canCancelExplicitAuthToPicker()) {
+                        ev.preventDefault();
+                        cancelExplicitAuthPrompt();
                         return;
                     }
                     if (gateView === 'picker-manage' && state.manageMode) {
@@ -1398,6 +1407,9 @@
         if (guestCb) {
             fetchPublicConfig().then(function () {
                 if (guestCb.error) {
+                    if (hasHouseholdAccess()) {
+                        state.explicitAuthPrompt = true;
+                    }
                     renderGoogleAuthGate(null, guestCb.error);
                 } else {
                     completeGuestHandoff();
@@ -1410,6 +1422,9 @@
                         clearPendingOidcFlow();
                     }
                     takePendingProfileId();
+                    if (hasHouseholdAccess()) {
+                        state.explicitAuthPrompt = true;
+                    }
                     renderGoogleAuthGate(null, oidcCb.error);
                 } else {
                     completeOidcHandoff(oidcCb);
@@ -1419,9 +1434,15 @@
             fetchPublicConfig().then(function () {
                 if (!oauth.stateOk) {
                     takePendingProfileId();
+                    if (hasHouseholdAccess()) {
+                        state.explicitAuthPrompt = true;
+                    }
                     renderGoogleAuthGate(null, 'That sign-in attempt couldn\'t be verified. Please try again.');
                 } else if (oauth.error || !oauth.token) {
                     takePendingProfileId();
+                    if (hasHouseholdAccess()) {
+                        state.explicitAuthPrompt = true;
+                    }
                     renderGoogleAuthGate(null, oauth.error === 'access_denied' ? 'Google sign-in was cancelled.' : ('Google sign-in failed (' + oauth.error + ').'));
                 } else {
                     verifyGoogleAccessToken(oauth.token, oauth.desktopRelayStateId);
@@ -1430,13 +1451,11 @@
         } else {
             evaluateAuthAndProfileGate();
             fetchPublicConfig().then(function () {
-                if (!hasHouseholdAccess()) {
-                    if (typeof pollPendingOidcFlowIfActive === 'function') {
-                        pollPendingOidcFlowIfActive();
-                    }
-                    if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
-                        pollPendingGoogleDesktopFlowIfActive();
-                    }
+                if (typeof pollPendingOidcFlowIfActive === 'function') {
+                    pollPendingOidcFlowIfActive();
+                }
+                if (typeof pollPendingGoogleDesktopFlowIfActive === 'function') {
+                    pollPendingGoogleDesktopFlowIfActive();
                 }
                 rerenderPickerIfOpen();
                 evaluateAuthAndProfileGate();

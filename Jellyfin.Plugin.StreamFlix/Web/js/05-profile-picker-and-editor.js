@@ -188,6 +188,9 @@
     }
 
     function renderProfilePickerGate() {
+        state.explicitAuthPrompt = false;
+        var hasValidActiveProf = Boolean(state.activeProfile && state.activeProfile.id && state.activeProfile.accessToken);
+        transitionAppPhase(hasValidActiveProf ? APP_PHASES.PICKER_OVERLAY : APP_PHASES.PICKER_REQUIRED);
         var profiles = getProfiles();
         var isGuest = isGuestPassSession();
         var isAdmin = !isGuest && isProfileManagementAdmin();
@@ -548,9 +551,23 @@
         }
         state.sessionVerifiedOnce = false;
         state.legacyProfileToMigrate = null;
+        state.explicitAuthPrompt = false;
+        state.explicitPickerOpen = false;
+        state.openedDirectlyToManage = false;
         state.manageMode = false;
         state.adminLoginExpanded = false;
         state.guestPassExpanded = false;
+        state.startingGoogleDesktopRelay = false;
+        state.startingOidcRedirect = false;
+        if (typeof clearPendingGoogleDesktopFlow === 'function') {
+            clearPendingGoogleDesktopFlow();
+        }
+        if (typeof clearPendingOidcFlow === 'function') {
+            clearPendingOidcFlow();
+        }
+        if (typeof stopDesktopAuthPollTimerIfIdle === 'function') {
+            stopDesktopAuthPollTimerIfIdle();
+        }
         clearLocalJellyfinAuth();
 
         var openAccess = isOpenWithoutLogin(state.config);
@@ -672,13 +689,12 @@
                     try {
                         sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
                     } catch (ePend) {}
-                    if (profile.isAdmin && state.config && state.config.canShowAdminFallback) {
-                        state.adminLoginExpanded = true;
-                    }
-                    clearHouseholdSession();
-                    if (state.config) {
-                        state.config.hasAccess = false;
-                    }
+                    state.explicitAuthPrompt = true;
+                    state.explicitPickerOpen = false;
+                    state.openedDirectlyToManage = false;
+                    state.manageMode = false;
+                    state.guestPassExpanded = false;
+                    state.adminLoginExpanded = Boolean(profile.isAdmin && state.config && state.config.canShowAdminFallback);
                     renderGoogleAuthGate();
                 }
             });
@@ -808,6 +824,7 @@
             showOidc = oidcEnabled;
             showJellyfin = stdEnabled;
         }
+        var showAdminFallback = Boolean(profile.isAdmin && !showJellyfin && (cfg.canShowAdminFallback || (!googleEnabled && !oidcEnabled && !stdEnabled)));
 
         var ssoBtnsHtml = '<div class="streamflix-sso-stack">'
             + (showGoogle
@@ -818,6 +835,9 @@
                 : '')
             + (showJellyfin
                 ? '<button type="button" class="streamflix-oidc-btn' + (!showGoogle && !showOidc ? ' streamflix-oidc-btn-primary' : '') + '" data-act="jellyfin">' + JELLYFIN_USER_SVG + '<span>Sign in with Jellyfin Account</span></button>'
+                : '')
+            + (showAdminFallback
+                ? '<button type="button" class="streamflix-oidc-btn' + (!showGoogle && !showOidc ? ' streamflix-oidc-btn-primary' : '') + '" data-act="admin">' + icon('shield') + '<span>Admin Sign-In</span></button>'
                 : '')
             + '</div>';
 
@@ -839,6 +859,9 @@
         if (gBtn) {
             gBtn.addEventListener('click', function () {
                 m.close();
+                if (typeof canOpenExternalSystemBrowser === 'function' && canOpenExternalSystemBrowser()) {
+                    state.explicitAuthPrompt = true;
+                }
                 startGoogleOAuthRedirect(profile.id, profile.googleAccountEmail || '');
             });
         }
@@ -846,6 +869,7 @@
         if (oBtn) {
             oBtn.addEventListener('click', function () {
                 m.close();
+                state.explicitAuthPrompt = true;
                 startOidcRedirect(profile.id, profile.googleAccountEmail || '');
             });
         }
@@ -855,10 +879,28 @@
                 try {
                     sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
                 } catch (e) {}
-                clearHouseholdSession();
-                if (state.config) {
-                    state.config.hasAccess = false;
-                }
+                state.explicitAuthPrompt = true;
+                state.explicitPickerOpen = false;
+                state.openedDirectlyToManage = false;
+                state.manageMode = false;
+                state.guestPassExpanded = false;
+                state.adminLoginExpanded = false;
+                m.close();
+                renderGoogleAuthGate();
+            });
+        }
+        var admBtn = m.modal.querySelector('[data-act="admin"]');
+        if (admBtn) {
+            admBtn.addEventListener('click', function () {
+                try {
+                    sessionStorage.setItem(PENDING_PROFILE_KEY, profile.id);
+                } catch (e) {}
+                state.explicitAuthPrompt = true;
+                state.explicitPickerOpen = false;
+                state.openedDirectlyToManage = false;
+                state.manageMode = false;
+                state.guestPassExpanded = false;
+                state.adminLoginExpanded = Boolean(cfg.canShowAdminFallback);
                 m.close();
                 renderGoogleAuthGate();
             });

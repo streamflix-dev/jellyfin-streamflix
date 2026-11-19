@@ -125,6 +125,7 @@ public partial class StreamFlixController
             allowAdminFallbackLogin = config.AllowAdminFallbackLogin,
             adminFallbackLanOnly = config.AdminFallbackLanOnly,
             bypassLoginGateOnLan = config.BypassLoginGateOnLan,
+            treatTailscaleAsLocalLan = config.TreatTailscaleAsLocalLan,
             autoProvisionJellyfinUsers = config.AutoProvisionJellyfinUsers,
             approvedGoogleAccounts = (config.ApprovedGoogleAccounts ?? new List<string>()).ToList(),
             sessionLifetimeDays = Math.Clamp(config.SessionLifetimeDays <= 0 ? 30 : config.SessionLifetimeDays, 1, 365),
@@ -217,6 +218,11 @@ public partial class StreamFlixController
                 config.BypassLoginGateOnLan = request.BypassLoginGateOnLan.Value;
             }
 
+            if (request.TreatTailscaleAsLocalLan.HasValue)
+            {
+                config.TreatTailscaleAsLocalLan = request.TreatTailscaleAsLocalLan.Value;
+            }
+
             if (request.AutoProvisionJellyfinUsers.HasValue)
             {
                 config.AutoProvisionJellyfinUsers = request.AutoProvisionJellyfinUsers.Value;
@@ -229,6 +235,10 @@ public partial class StreamFlixController
                     .Where(e => EmailRegex.IsMatch(e))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
+                if (config.ApprovedGoogleAccounts.Count > 0)
+                {
+                    config.FirstGoogleAccountClaimed = true;
+                }
             }
 
             if (request.SessionLifetimeDays.HasValue)
@@ -624,7 +634,7 @@ public partial class StreamFlixController
         // 6. Reverse Proxy & HTTPS Scheme Check (SF-HC-06)
         var fwdProto = Request.Headers["X-Forwarded-Proto"].FirstOrDefault();
         var effectiveHttps = Request.IsHttps || string.Equals(fwdProto, "https", StringComparison.OrdinalIgnoreCase);
-        if ((googleReady || oidcReady) && !effectiveHttps && !StreamFlixSessionService.IsLocalLanRequest(HttpContext))
+        if ((googleReady || oidcReady) && !effectiveHttps && !StreamFlixSessionService.IsLocalLanRequest(HttpContext, config.TreatTailscaleAsLocalLan))
         {
             AddCheck("warn", StreamFlixErrorCodes.OidcProxyHeaderMismatch, "Reverse Proxy & HTTPS Headers", $"Request arrived over plain HTTP without X-Forwarded-Proto: https (Host: {Request.Host}). OAuth/OIDC providers usually require HTTPS or ForwardedHeaders configured.");
         }

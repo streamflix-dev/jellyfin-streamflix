@@ -1075,6 +1075,7 @@
     }
 
     function setHouseholdSession(session) {
+        state.explicitAuthPrompt = false;
         state.googleUser = session;
         saveJson(GOOGLE_KEY, session);
     }
@@ -1085,12 +1086,23 @@
         saveJson(GOOGLE_KEY, null);
     }
 
+    function isGateConfiguredClient(cfg) {
+        cfg = cfg || state.config;
+        if (!cfg) {
+            return false;
+        }
+        var googleOn = cfg.enableGoogleSignIn !== false && Boolean(cfg.googleConfigured || cfg.googleClientId);
+        var oidcOn = Boolean(cfg.enableCustomOidc && cfg.oidcConfigured);
+        var stdOn = Boolean(cfg.allowStandardJellyfinLogin);
+        return googleOn || oidcOn || stdOn;
+    }
+
     function isOpenWithoutLogin(cfg) {
         cfg = cfg || state.config;
         if (!cfg) {
             return false;
         }
-        return Boolean(cfg.bypassLoginGateOnLan && cfg.isLocalLan);
+        return Boolean(cfg.bypassLoginGateOnLan && cfg.isLocalLan && (isGateConfiguredClient(cfg) || cfg.hasAccess));
     }
 
     function hasHouseholdAccess() {
@@ -1198,7 +1210,10 @@
         var requireGoogle = true;
         var isLocalLan = Boolean(cfg.isLocalLan);
         var bypassLan = Boolean(cfg.bypassLoginGateOnLan);
-        var resolvedAccess = Boolean(cfg.hasAccess) || (bypassLan && isLocalLan);
+        var gateConfigured = (cfg.enableGoogleSignIn !== false && Boolean(cfg.googleConfigured || cfg.googleClientId))
+            || Boolean(cfg.enableCustomOidc && cfg.oidcConfigured)
+            || Boolean(cfg.allowStandardJellyfinLogin);
+        var resolvedAccess = Boolean(cfg.hasAccess) || (bypassLan && isLocalLan && gateConfigured);
         var serverShowcase = [];
         if (resolvedAccess) {
             serverShowcase = Array.isArray(cfg.showcaseItems) && cfg.showcaseItems.length > 0

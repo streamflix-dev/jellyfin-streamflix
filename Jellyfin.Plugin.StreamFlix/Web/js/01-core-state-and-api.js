@@ -170,6 +170,7 @@
         legacyProfileToMigrate: legacyProfileToMigrate,
         manageMode: false,
         explicitPickerOpen: false,
+        explicitAuthPrompt: false,
         openedDirectlyToManage: false,
         embeddedAdminModalOpen: false,
         noBackdropItemIds: {},
@@ -292,6 +293,9 @@
     function clearActiveProfileState(clearHouseholdDefault) {
         state.activeProfile = null;
         saveSessionJson(TAB_PROFILE_KEY, null);
+        try {
+            sessionStorage.removeItem('streamflix_reload_uid');
+        } catch (eR) {}
         if (clearHouseholdDefault !== false) {
             try {
                 localStorage.removeItem(PROFILE_KEY);
@@ -351,6 +355,7 @@
         return state.appPhase === APP_PHASES.PICKER_OVERLAY
             || state.appPhase === APP_PHASES.EMBEDDED_ADMIN
             || Boolean(state.explicitPickerOpen)
+            || Boolean(state.explicitAuthPrompt)
             || Boolean(state.manageMode)
             || Boolean(state.embeddedAdminModalOpen);
     }

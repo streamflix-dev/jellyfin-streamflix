@@ -338,4 +338,166 @@ assert.match(combinedJs, /streamflix-search-page-input/, 'Dedicated Search Page 
 assert.match(combinedJs, /is-pv-source/, 'Underlying poster card must be hidden via .is-pv-source while hover preview is expanded');
 console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closing JMP SSO tab & unified Search UX verified');
 
+// Verify Issue #21 fix: Local LAN / Tailscale profile sign-in prompt stays open across 2.5s lifecycle ticks & config refreshes until auth or manual cancel
+{
+    sharedLocalStorage.clear();
+    const lanSession = makeStorage();
+    const lanDoc = createDomStub();
+    const lanStage = lanDoc.createElement('div');
+    lanStage.setAttribute('id', 'streamflix-stage');
+    const lanActions = lanDoc.createElement('div');
+    lanActions.setAttribute('id', 'streamflix-gate-actions');
+    let cancelBtnClickHandler = null;
+    let confirmOkClickHandler = null;
+
+    const origCreateElement = lanDoc.createElement.bind(lanDoc);
+    lanDoc.createElement = (tag) => {
+        const el = origCreateElement(tag);
+        el.querySelector = (sel) => {
+            if (sel === '#streamflix-stage') return lanStage;
+            if (sel === '#streamflix-gate-actions') return lanActions;
+            if (sel === '#streamflix-cancel-explicit-auth-btn' && String(lanActions.innerHTML || '').includes('streamflix-cancel-explicit-auth-btn')) {
+                return {
+                    addEventListener: (ev, fn) => {
+                        if (ev === 'click') cancelBtnClickHandler = fn;
+                    },
+                };
+            }
+            return null;
+        };
+        const modalChild = origCreateElement('div');
+        modalChild.querySelector = (sel) => {
+            if (sel === '[data-act="ok"]') {
+                return {
+                    addEventListener: (ev, fn) => {
+                        if (ev === 'click') confirmOkClickHandler = fn;
+                    },
+                    focus() {},
+                };
+            }
+            return { addEventListener() {}, focus() {} };
+        };
+        el.firstChild = modalChild;
+        return el;
+    };
+
+    const lanTimers = [];
+    const lanIntervals = [];
+    const lanMockConfig = {
+        version: '0.9.8.9',
+        assetVersion: '0.9.8.9',
+        serverId: 'srv1',
+        serverName: 'StreamFlix',
+        enableStreamFlixUi: true,
+        enableGoogleSignIn: false,
+        googleConfigured: false,
+        allowStandardJellyfinLogin: true,
+        bypassLoginGateOnLan: true,
+        treatTailscaleAsLocalLan: true,
+        isLocalLan: true,
+        hasAccess: true,
+        isAdmin: false,
+        profiles: [
+            { id: 'prof_owner', name: 'Home', isAdmin: true, isOwner: true, canActivate: false, jellyfinUserId: '11111111111111111111111111111111' },
+            { id: 'prof_member', name: 'Living Room', isAdmin: false, isOwner: false, canActivate: true, jellyfinUserId: '33333333333333333333333333333333' },
+        ],
+    };
+
+    const flushLanTimers = () => {
+        while (lanTimers.length > 0) {
+            const fn = lanTimers.shift();
+            fn();
+        }
+    };
+
+    const lanWin = {
+        location: {
+            origin: 'http://100.101.202.42:8096',
+            pathname: '/web/index.html',
+            hash: '#/home',
+            search: '',
+            assign() {},
+            reload() {},
+            replace() {},
+        },
+        history: { length: 1, replaceState() {}, back() {} },
+        navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', clipboard: { writeText: async () => {} } },
+        document: lanDoc,
+        localStorage: sharedLocalStorage,
+        sessionStorage: lanSession,
+        BroadcastChannel: MockBroadcastChannel,
+        URL,
+        URLSearchParams,
+        Headers,
+        Response,
+        AbortController,
+        MutationObserver: class { observe() {} disconnect() {} },
+        CustomEvent: class { constructor(type) { this.type = type; } },
+        Image: class { set src(_) { if (this.onload) this.onload(); } },
+        matchMedia: () => ({ matches: false, addEventListener() {} }),
+        requestAnimationFrame: (fn) => { fn(); return 1; },
+        setTimeout: (fn) => { lanTimers.push(fn); return lanTimers.length; },
+        clearTimeout() {},
+        setInterval: (fn) => { lanIntervals.push(fn); return lanIntervals.length; },
+        clearInterval() {},
+        addEventListener() {},
+        scrollTo() {},
+        innerWidth: 1440,
+        innerHeight: 900,
+        fetch: async (url) => {
+            if (String(url).includes('/StreamFlix/PublicConfig')) {
+                return new Response(JSON.stringify(lanMockConfig), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
+            return new Response(JSON.stringify({ Items: [] }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        },
+    };
+    lanWin.window = lanWin;
+    lanWin.self = lanWin;
+    vm.runInContext(combinedJs, vm.createContext(lanWin));
+    await new Promise((r) => setTimeout(r, 25));
+    flushLanTimers();
+
+    assert.equal(lanWin.__STREAMFLIX_GET_APP_PHASE__(), 'PICKER_REQUIRED', 'LAN bypass user with no active profile must start on Who\'s Watching');
+    assert.equal(lanStage.getAttribute('data-view'), 'picker');
+
+    // Click admin "Home" profile -> confirm "Go to Sign In"
+    await lanWin.__STREAMFLIX_SWITCH_PROFILE__('prof_owner');
+    assert.ok(typeof confirmOkClickHandler === 'function', 'Selecting admin profile on LAN without admin auth must prompt to sign in');
+    confirmOkClickHandler();
+    await new Promise((r) => setTimeout(r, 10));
+    flushLanTimers();
+
+    assert.equal(lanWin.__STREAMFLIX_GET_APP_PHASE__(), 'AUTH_REQUIRED', 'Confirming Go to Sign In must enter AUTH_REQUIRED phase');
+    assert.equal(lanStage.getAttribute('data-view'), 'auth-standard', 'Sign-In form must be displayed');
+    assert.equal(lanSession.getItem('streamflix_pending_profile'), 'prof_owner', 'Pending profile must be preserved while signing in');
+    assert.ok(typeof cancelBtnClickHandler === 'function', 'Back to Profiles cancel button must be bound on explicit LAN sign-in');
+
+    // Simulate multiple 2.5s lifecycle ticks + background PublicConfig refreshes ("Wait a few seconds")
+    assert.ok(lanIntervals.length >= 1, 'Expected 2.5s safety lifecycle interval to be registered');
+    for (let tick = 0; tick < 4; tick++) {
+        lanIntervals.forEach((fn) => fn());
+        flushLanTimers();
+    }
+    await lanWin.__STREAMFLIX_REFRESH_CONFIG__();
+    lanIntervals.forEach((fn) => fn());
+    flushLanTimers();
+
+    assert.equal(lanWin.__STREAMFLIX_GET_APP_PHASE__(), 'AUTH_REQUIRED', 'Sign-In screen must NOT close on 2.5s lifecycle ticks over LAN/Tailscale (#21)');
+    assert.equal(lanStage.getAttribute('data-view'), 'auth-standard', 'Sign-In view must remain mounted until auth succeeds or user cancels (#21)');
+
+    // Manual cancel returns cleanly to Profile Picker
+    cancelBtnClickHandler();
+    flushLanTimers();
+    assert.equal(lanWin.__STREAMFLIX_GET_APP_PHASE__(), 'PICKER_REQUIRED', 'Cancelling explicit LAN sign-in must return to Profile Picker');
+    assert.equal(lanStage.getAttribute('data-view'), 'picker');
+    assert.equal(lanSession.getItem('streamflix_pending_profile'), null, 'Cancelling explicit sign-in must clear pending profile');
+    console.log('[PASS] Local LAN / Tailscale explicit profile sign-in stability & cancel flow verified (#21)');
+}
+
 console.log('ALL STREAMFLIX v0.9.8.9 SMOKE CHECKS PASSED!');

@@ -306,6 +306,8 @@ public class ImportConfigBackupRequest
 
     public bool? BypassLoginGateOnLan { get; set; }
 
+    public bool? TreatTailscaleAsLocalLan { get; set; }
+
     public bool? AutoProvisionJellyfinUsers { get; set; }
 
     public List<string>? ApprovedGoogleAccounts { get; set; }
