@@ -1692,13 +1692,15 @@
                 }
 
                 function getUncheckedNavBuiltIns() {
+                    var liveTvOn = Boolean($('#EnableLiveTv') && $('#EnableLiveTv').checked);
                     var out = [];
                     Array.prototype.forEach.call(page.querySelectorAll('input[data-nav-builtin]'), function (cb) {
-                        if (!cb.checked) {
-                            var id = cb.getAttribute('data-nav-builtin');
-                            if (id) {
-                                out.push(id);
-                            }
+                        var id = cb.getAttribute('data-nav-builtin');
+                        if (id === 'livetv' && !liveTvOn) {
+                            return;
+                        }
+                        if (!cb.checked && id) {
+                            out.push(id);
                         }
                     });
                     return out;
@@ -1742,7 +1744,7 @@
                                 };
                             })
                             .filter(function (f) {
-                                return f.id && f.rawType !== 'music' && f.rawType !== 'books' && f.rawType !== 'photos' && f.rawType !== 'playlists';
+                                return f.id && f.rawType !== 'music' && f.rawType !== 'books' && f.rawType !== 'photos' && f.rawType !== 'playlists' && f.rawType !== 'livetv';
                             });
                         heroLibrariesLoaded = true;
                         renderHeroLibraries();
@@ -2671,6 +2673,14 @@
                     var wrap = $('#StreamFlixNavLibrariesWrap');
                     if (wrap) {
                         wrap.classList.toggle('hide', !$('#ShowLibrariesInNav').checked);
+                    }
+                });
+                $('#EnableLiveTv').addEventListener('change', function () {
+                    if ($('#EnableLiveTv').checked) {
+                        var ltvBuiltIn = page.querySelector('input[data-nav-builtin="livetv"]');
+                        if (ltvBuiltIn) {
+                            ltvBuiltIn.checked = true;
+                        }
                     }
                 });
                 Array.prototype.forEach.call(page.querySelectorAll('input[data-nav-builtin]'), function (cb) {

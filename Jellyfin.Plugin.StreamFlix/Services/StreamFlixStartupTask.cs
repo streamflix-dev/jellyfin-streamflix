@@ -706,6 +706,7 @@ public class StreamFlixStartupTask : IScheduledTask
                 config.ProfilesSeeded = true;
             }
 
+            var profileConfigDirty = false;
             for (var i = 0; i < config.Profiles.Count; i++)
             {
                 var profile = config.Profiles[i];
@@ -851,6 +852,31 @@ public class StreamFlixStartupTask : IScheduledTask
                         {
                             needsUpdate = true;
                         }
+
+                        if (profile.IsKids)
+                        {
+                            if (!profile.LiveTvPermissionInitialized)
+                            {
+                                if (TrySetUserPermissionCompat(user, "EnableLiveTvAccess", false))
+                                {
+                                    needsUpdate = true;
+                                }
+
+                                profile.LiveTvPermissionInitialized = true;
+                                profileConfigDirty = true;
+                            }
+                        }
+                        else if (config.EnableLiveTv && !profile.LiveTvPermissionInitialized)
+                        {
+                            var adminAllowsLiveTv = primaryAdmin == null || HasLiveTvAccessCompat(primaryAdmin);
+                            if (adminAllowsLiveTv && TrySetUserPermissionCompat(user, "EnableLiveTvAccess", true))
+                            {
+                                needsUpdate = true;
+                            }
+
+                            profile.LiveTvPermissionInitialized = true;
+                            profileConfigDirty = true;
+                        }
                     }
 
                     if (needsUpdate)
@@ -865,6 +891,11 @@ public class StreamFlixStartupTask : IScheduledTask
                         }
                     }
                 }
+            }
+
+            if (profileConfigDirty)
+            {
+                Plugin.Instance?.SaveConfiguration(config);
             }
         }
         catch (Exception ex)
@@ -921,7 +952,8 @@ public class StreamFlixStartupTask : IScheduledTask
                 requiredPermissions.Add("EnableRemoteAccess");
             }
 
-            var allowLiveTv = sourceAdminUser == null || HasUserPermissionCompat(sourceAdminUser, adminPermsProp, "EnableLiveTvAccess");
+            var allowLiveTv = (Plugin.Instance?.Configuration?.EnableLiveTv ?? true)
+                && (sourceAdminUser == null || HasLiveTvAccessCompat(sourceAdminUser));
             if (allowLiveTv)
             {
                 requiredPermissions.Add("EnableLiveTvAccess");
@@ -1179,6 +1211,137 @@ public class StreamFlixStartupTask : IScheduledTask
         return false;
     }
 
+    public static bool TrySetUserPermissionCompat(object targetUser, string permissionName, bool desiredValue)
+    {
+        if (targetUser == null || string.IsNullOrWhiteSpace(permissionName))
+        {
+            return false;
+        }
+
+        try
+        {
+            var permsProp = targetUser.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (permsProp?.GetValue(targetUser) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindProp = perm.GetType().GetProperty("Kind", BindingFlags.Public | BindingFlags.Instance);
+                    var valProp = perm.GetType().GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+                    var kindName = kindProp?.GetValue(perm)?.ToString();
+                    if (!string.IsNullOrEmpty(kindName) && string.Equals(kindName, permissionName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (valProp != null && valProp.CanWrite && valProp.GetValue(perm) is bool curVal)
+                        {
+                            if (curVal == desiredValue)
+                            {
+                                return false;
+                            }
+
+                            valProp.SetValue(perm, desiredValue);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                }
+            }
+
+            if (!desiredValue)
+            {
+                return false;
+            }
+
+            var instanceSetPerm = targetUser.GetType().GetMethod("SetPermission", BindingFlags.Public | BindingFlags.Instance);
+            if (instanceSetPerm != null)
+            {
+                var enumType = instanceSetPerm.GetParameters()[0].ParameterType;
+                if (Enum.TryParse(enumType, permissionName, ignoreCase: true, out var enumVal) && enumVal != null)
+                {
+                    instanceSetPerm.Invoke(targetUser, new object[] { enumVal, true });
+                    return true;
+                }
+            }
+
+            MethodInfo? extSetPerm;
+            lock (ExtSetPermLock)
+            {
+                if (!_extSetPermSearched)
+                {
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            var asmName = asm.GetName().Name ?? string.Empty;
+                            if (!asmName.StartsWith("Jellyfin", StringComparison.OrdinalIgnoreCase)
+                                && !asmName.StartsWith("MediaBrowser", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            foreach (var t in asm.GetExportedTypes())
+                            {
+                                if (!t.IsAbstract || !t.IsSealed)
+                                {
+                                    continue;
+                                }
+
+                                foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                                {
+                                    if (m.Name == "SetPermission")
+                                    {
+                                        var ps = m.GetParameters();
+                                        if (ps.Length == 3 && ps[0].ParameterType.IsAssignableFrom(targetUser.GetType()) && ps[1].ParameterType.IsEnum && ps[2].ParameterType == typeof(bool))
+                                        {
+                                            _cachedExtSetPermMethod = m;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (_cachedExtSetPermMethod != null)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                        }
+
+                        if (_cachedExtSetPermMethod != null)
+                        {
+                            break;
+                        }
+                    }
+
+                    _extSetPermSearched = true;
+                }
+
+                extSetPerm = _cachedExtSetPermMethod;
+            }
+
+            if (extSetPerm != null)
+            {
+                var enumType = extSetPerm.GetParameters()[1].ParameterType;
+                if (Enum.TryParse(enumType, permissionName, ignoreCase: true, out var enumVal) && enumVal != null)
+                {
+                    extSetPerm.Invoke(null, new object[] { targetUser, enumVal, true });
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
     public static bool HasLiveTvAccessCompat(object? user)
     {
         if (user == null || IsUserAdminCompat(user))
@@ -1191,6 +1354,7 @@ public class StreamFlixStartupTask : IScheduledTask
             var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
             if (permsProp?.GetValue(user) is IEnumerable perms)
             {
+                var hasAnyPerm = false;
                 foreach (var perm in perms)
                 {
                     if (perm == null)
@@ -1198,12 +1362,18 @@ public class StreamFlixStartupTask : IScheduledTask
                         continue;
                     }
 
+                    hasAnyPerm = true;
                     var kindObj = perm.GetType().GetProperty("Kind")?.GetValue(perm);
                     var valObj = perm.GetType().GetProperty("Value")?.GetValue(perm);
                     if (kindObj != null && string.Equals(kindObj.ToString(), "EnableLiveTvAccess", StringComparison.OrdinalIgnoreCase))
                     {
                         return valObj is bool b && b;
                     }
+                }
+
+                if (hasAnyPerm)
+                {
+                    return false;
                 }
             }
 

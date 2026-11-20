@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.12",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.12 Release Candidate (Dev Test Channel): Fix Live TV compatibility (#19) by preserving enableLiveTv in client PublicConfig hydration (applyConfigFromServerResponse), prefetching Live TV channels after Hub Bootstrap, and auto-initializing EnableLiveTvAccess on pre-existing plugin-managed adult household profiles when Live TV is enabled.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.12_12.0.0.zip",
+        "checksum": "5559619c2075b5b638070d3d12e666d7",
+        "timestamp": "2026-11-20T01:18:21Z"
+      },
+      {
+        "version": "0.9.8.12",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.12 Release Candidate (Dev Test Channel): Fix Live TV compatibility (#19) by preserving enableLiveTv in client PublicConfig hydration (applyConfigFromServerResponse), prefetching Live TV channels after Hub Bootstrap, and auto-initializing EnableLiveTvAccess on pre-existing plugin-managed adult household profiles when Live TV is enabled.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.12_10.11.0.zip",
+        "checksum": "48dcc25b9093463d88da6ae4cc157989",
+        "timestamp": "2026-11-20T01:18:21Z"
+      },
+      {
+        "version": "0.9.8.12",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.12 Release Candidate (Dev Test Channel): Fix Live TV compatibility (#19) by preserving enableLiveTv in client PublicConfig hydration (applyConfigFromServerResponse), prefetching Live TV channels after Hub Bootstrap, and auto-initializing EnableLiveTvAccess on pre-existing plugin-managed adult household profiles when Live TV is enabled.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.12_10.9.0.zip",
+        "checksum": "ab9a09816383c27991f2a7580e01fe23",
+        "timestamp": "2026-11-20T01:18:21Z"
+      },
+      {
         "version": "0.9.8.11",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.11 Release Candidate (Dev Test Channel): Fix the mobile app Search Page header where phone subnav declutter CSS hid the Search input bar (.bfx-sp-bar) and result filter pills (.bfx-sp-filter-pills), keeping the full-width search bar always visible and focusable beside the Back button on Android and iOS phones.",
         "targetAbi": "12.0.0.0",

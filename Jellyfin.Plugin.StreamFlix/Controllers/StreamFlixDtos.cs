@@ -352,6 +352,8 @@ public class ImportConfigBackupRequest
 
     public bool? EnableWatchTogether { get; set; }
 
+    public bool? EnableLiveTv { get; set; }
+
     public bool? EnableSeerr { get; set; }
 
     public string? SeerrUrl { get; set; }

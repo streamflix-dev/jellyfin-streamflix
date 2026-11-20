@@ -1601,7 +1601,7 @@
             entry.ts = Date.now();
 
             if (document.getElementById('streamflix-cinema-hub')
-                && (state.activeCategory === 'livetv' || (state.activeCategory === 'all' && rawChannels.length > 0))) {
+                && (state.activeCategory === 'livetv' || entry.forbidden || (state.activeCategory === 'all' && rawChannels.length > 0))) {
                 renderCinemaHubContents();
             }
         }).catch(function () {

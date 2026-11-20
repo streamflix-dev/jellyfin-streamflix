@@ -147,6 +147,7 @@ public partial class StreamFlixController
             enableGuestPasses = config.EnableGuestPasses,
             guestPassManagerProfileIds = (config.GuestPassManagerProfileIds ?? new List<string>()).ToList(),
             enableWatchTogether = config.EnableWatchTogether,
+            enableLiveTv = config.EnableLiveTv,
             enableSeerr = config.EnableSeerr,
             seerrUrl = config.SeerrUrl ?? string.Empty,
             seerrAllowKids = config.SeerrAllowKids,
@@ -347,6 +348,11 @@ public partial class StreamFlixController
             if (request.EnableWatchTogether.HasValue)
             {
                 config.EnableWatchTogether = request.EnableWatchTogether.Value;
+            }
+
+            if (request.EnableLiveTv.HasValue)
+            {
+                config.EnableLiveTv = request.EnableLiveTv.Value;
             }
 
             if (request.EnableSeerr.HasValue)

@@ -1276,6 +1276,9 @@
                 state.searchResults = mergeUniqueMediaItems(freshLocalHits, state.searchResults || []);
             }
         }
+        if (typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile() && typeof ensureLiveTvHubDataLoaded === 'function') {
+            ensureLiveTvHubDataLoaded(false);
+        }
         renderCinemaHubContents();
         enhanceLibraryListPages();
         setTimeout(function () {
@@ -1417,7 +1420,12 @@
                 state.hubData.rawTop10Items = state.hubData.rawHeroItems.slice(0, 10);
             }
 
-            if (!hadSwr && !silentRefresh && (state.hubData.rawHeroItems.length || state.hubData.resumeItems.length || state.hubData.views.length)) {
+            var ltvStage1On = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
+            if (ltvStage1On && typeof ensureLiveTvHubDataLoaded === 'function') {
+                ensureLiveTvHubDataLoaded(false);
+            }
+
+            if (!hadSwr && !silentRefresh && (state.hubData.rawHeroItems.length || state.hubData.resumeItems.length || state.hubData.views.length || ltvStage1On)) {
                 recomputeHubDerivedLists();
                 state.hubData.loaded = true;
                 state.heroIndex = 0;

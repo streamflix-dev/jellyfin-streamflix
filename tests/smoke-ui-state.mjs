@@ -523,4 +523,375 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     console.log('[PASS] Mobile App Search Page input bar & filter pills visibility invariants verified');
 }
 
-console.log('ALL STREAMFLIX v0.9.8.11 SMOKE CHECKS PASSED!');
+// End-to-End VM Execution Test for Issue #19: PublicConfig hydration, Hub Bootstrap Live TV row, Nav Pill, Hub Click, Hot Toggle & Kids/Policy Isolation
+{
+    const createLiveTvHubDom = () => {
+        const elementsById = new Map();
+        let doc;
+        const parseButtonsFromHtml = (html, ownerDoc) => {
+            const nodes = [];
+            const tagRe = /<button\b([^>]*)>([\s\S]*?)<\/button>/gi;
+            let m;
+            while ((m = tagRe.exec(String(html || ''))) !== null) {
+                const el = ownerDoc.createElement('button');
+                const attrStr = m[1] || '';
+                const inner = m[2] || '';
+                el.innerHTML = inner;
+                el.textContent = inner.replace(/<[^>]+>/g, '').trim();
+                const attrRe = /([a-zA-Z0-9_-]+)(?:="([^"]*)")?/g;
+                let am;
+                while ((am = attrRe.exec(attrStr)) !== null) {
+                    el.setAttribute(am[1], am[2] !== undefined ? am[2] : '');
+                }
+                nodes.push(el);
+            }
+            return nodes;
+        };
+        const makeEl = (tag = 'div') => {
+            const attrs = new Map();
+            const classes = new Set();
+            const listeners = new Map();
+            const heroChildren = new Map();
+            let rawHtml = '';
+            let parsedChildren = [];
+            const el = {
+                nodeType: 1,
+                tagName: String(tag).toUpperCase(),
+                id: '',
+                value: '',
+                offsetHeight: 62,
+                clientWidth: 1200,
+                scrollTop: 0,
+                parentNode: null,
+                children: [],
+                childNodes: [],
+                style: { display: '', setProperty() {}, removeProperty() {} },
+                get className() { return Array.from(classes).join(' '); },
+                set className(v) {
+                    classes.clear();
+                    String(v || '').split(/\s+/).filter(Boolean).forEach((c) => classes.add(c));
+                },
+                get innerHTML() { return rawHtml; },
+                set innerHTML(v) {
+                    rawHtml = String(v || '');
+                    parsedChildren = parseButtonsFromHtml(rawHtml, doc);
+                    const idRe = /\bid="([^"]+)"/g;
+                    let im;
+                    while ((im = idRe.exec(rawHtml)) !== null) {
+                        const foundId = im[1];
+                        const sub = elementsById.get(foundId) || makeEl('div');
+                        sub.setAttribute('id', foundId);
+                        sub.parentNode = el;
+                        if (!el.children.includes(sub)) el.children.push(sub);
+                    }
+                },
+                textContent: '',
+                classList: {
+                    add: (...c) => c.forEach((x) => classes.add(x)),
+                    remove: (...c) => c.forEach((x) => classes.delete(x)),
+                    toggle: (x, force) => {
+                        const next = force === undefined ? !classes.has(x) : Boolean(force);
+                        if (next) classes.add(x); else classes.delete(x);
+                        return next;
+                    },
+                    contains: (x) => classes.has(x),
+                },
+                setAttribute(k, v) {
+                    attrs.set(k, String(v));
+                    if (k === 'id') { this.id = String(v); elementsById.set(this.id, this); }
+                    if (k === 'class') { this.className = v; }
+                },
+                getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+                removeAttribute: (k) => attrs.delete(k),
+                hasAttribute: (k) => attrs.has(k),
+                contains: (other) => Boolean(other && (other === el || other.parentNode === el)),
+                appendChild(child) {
+                    if (child) {
+                        child.parentNode = this;
+                        this.children.push(child);
+                        if (child.id) elementsById.set(child.id, child);
+                    }
+                    return child;
+                },
+                removeChild(child) {
+                    if (child && child.id) elementsById.delete(child.id);
+                    if (child) child.parentNode = null;
+                    this.children = this.children.filter((x) => x !== child);
+                    return child;
+                },
+                insertBefore(child) { return this.appendChild(child); },
+                insertAdjacentHTML(pos, htmlFrag) {
+                    if ((pos === 'beforebegin' || pos === 'afterend') && this.parentNode) {
+                        if (pos === 'beforebegin') {
+                            this.parentNode.innerHTML = String(htmlFrag || '') + '<div id="' + this.id + '"></div>';
+                        } else {
+                            this.parentNode.innerHTML = (this.parentNode.innerHTML || '') + String(htmlFrag || '');
+                        }
+                        return;
+                    }
+                    this.innerHTML = (this.innerHTML || '') + String(htmlFrag || '');
+                },
+                insertAdjacentElement(_pos, child) { return this.appendChild(child); },
+                addEventListener(type, fn) {
+                    if (!listeners.has(type)) listeners.set(type, []);
+                    listeners.get(type).push(fn);
+                },
+                removeEventListener() {},
+                click() {
+                    (listeners.get('click') || []).forEach((fn) => fn({ preventDefault() {}, stopPropagation() {}, target: el }));
+                },
+                querySelector(sel) {
+                    if (sel === '.streamflix-hero-bg-stack' || sel === '.streamflix-hero-content-slot' || sel === '.streamflix-hero-nav' || sel === '.streamflix-hero-dots') {
+                        if (!rawHtml.includes('streamflix-hero-bg-stack')) return null;
+                        if (!heroChildren.has(sel)) heroChildren.set(sel, makeEl('div'));
+                        return heroChildren.get(sel);
+                    }
+                    const all = this.querySelectorAll(sel);
+                    return all.length ? all[0] : null;
+                },
+                querySelectorAll(sel) {
+                    if (sel === '[data-cat-id]') return parsedChildren.filter((c) => c.hasAttribute('data-cat-id'));
+                    if (sel === '.bfx-ltv-hub' && rawHtml.includes('bfx-ltv-hub')) return [el];
+                    if (sel === '.streamflix-rows' && rawHtml.includes('streamflix-rows')) return [el];
+                    return [];
+                },
+                closest: () => null,
+                getBoundingClientRect: () => ({ top: 64, left: 0, right: 1440, width: 1440, height: 600 }),
+                focus() {},
+                blur() {},
+            };
+            return el;
+        };
+        doc = {
+            readyState: 'complete',
+            hidden: false,
+            title: 'StreamFlix',
+            activeElement: null,
+            createElement: (t) => makeEl(t),
+            getElementById: (id) => elementsById.get(id) || null,
+            querySelector: (sel) => {
+                if (sel && sel.startsWith('#') && !sel.includes(' ') && !sel.includes(':')) return elementsById.get(sel.slice(1)) || null;
+                if (sel === '#indexPage:not(.hide)' || sel === '.page.homePage:not(.hide)' || sel === '.homeView, #indexPage, .homeSectionsContainer') return elementsById.get('indexPage') || null;
+                if (sel && sel.includes('.homeSectionsContainer')) return elementsById.get('homeSections') || null;
+                return null;
+            },
+            querySelectorAll: (sel) => (sel === '#indexPage, .homeView' && elementsById.get('indexPage') ? [elementsById.get('indexPage')] : []),
+            addEventListener() {},
+            removeEventListener() {},
+            createTreeWalker: () => ({ nextNode: () => null }),
+        };
+        doc.documentElement = makeEl('html');
+        doc.head = makeEl('head');
+        doc.body = makeEl('body');
+        const indexPage = makeEl('div');
+        indexPage.setAttribute('id', 'indexPage');
+        indexPage.className = 'page homePage';
+        doc.body.appendChild(indexPage);
+        const homeSections = makeEl('div');
+        homeSections.setAttribute('id', 'homeSections');
+        homeSections.className = 'homeSectionsContainer sections';
+        indexPage.appendChild(homeSections);
+        return doc;
+    };
+
+    const runLiveTvVmScenario = async ({ enableLiveTv, profile, staleCachedConfig = false }) => {
+        let serverEnableLiveTv = enableLiveTv;
+        const localStore = makeStorage();
+        const sessionStore = makeStorage();
+        const fullProfile = { ...profile, accessToken: 'tok_live' };
+        localStore.setItem('streamflix_session_v7', JSON.stringify({
+            token: 'signed.household.token',
+            email: 'owner@example.com',
+            authKind: 'google',
+            isAdmin: Boolean(profile.isAdmin),
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        }));
+        localStore.setItem('jellyfin_credentials', JSON.stringify({
+            Servers: [{ Id: 'srv_ltv', UserId: profile.jellyfinUserId, AccessToken: 'tok_live', ManualAddress: 'https://jellyfin.example.com' }],
+        }));
+        localStore.setItem('streamflix_active_profile_v64', JSON.stringify(fullProfile));
+        sessionStore.setItem('streamflix_tab_profile_v1', JSON.stringify(fullProfile));
+        if (staleCachedConfig) {
+            localStore.setItem('streamflix_cached_config_v7', JSON.stringify({
+                version: '0.9.2.16',
+                serverId: 'srv_ltv',
+                enableStreamFlixUi: true,
+                hasAccess: true,
+                showLibrariesInNav: true,
+                profiles: [profile],
+            }));
+        }
+
+        const doc = createLiveTvHubDom();
+        const fetchedUrls = [];
+        const mockViews = [
+            { Id: 'lib_m', Name: 'Movies', CollectionType: 'movies' },
+            { Id: 'lib_s', Name: 'Series', CollectionType: 'tvshows' },
+            { Id: 'lib_a', Name: 'Anime', CollectionType: 'tvshows' },
+            { Id: 'lib_r', Name: 'Recordings', CollectionType: 'mixed' },
+            { Id: 'lib_ltv', Name: 'Live TV', CollectionType: 'livetv' },
+        ];
+        const mockMovies = [{ Id: 'mov_1', Name: 'Interstellar', Type: 'Movie', ProductionYear: 2014, CommunityRating: 8.7, ImageTags: { Primary: 'p1' }, BackdropImageTags: ['b1'] }];
+        const mockSeries = [{ Id: 'ser_1', Name: 'Severance', Type: 'Series', ProductionYear: 2022, CommunityRating: 8.7, ImageTags: { Primary: 'p2' }, BackdropImageTags: ['b2'] }];
+        const mockChannels = [{
+            Id: 'ch_101',
+            Name: 'BBC One HD',
+            Number: '101',
+            Type: 'TvChannel',
+            ChannelType: 'TV',
+            ImageTags: { Primary: 'ch1' },
+            UserData: { IsFavorite: true },
+            CurrentProgram: {
+                Id: 'prog_1',
+                Name: 'Planet Earth III',
+                StartDate: new Date(Date.now() - 10 * 60000).toISOString(),
+                EndDate: new Date(Date.now() + 50 * 60000).toISOString(),
+            },
+        }];
+
+        const win = {
+            location: { origin: 'https://jellyfin.example.com', pathname: '/web/index.html', hash: '#/home', search: '', assign() {}, reload() {}, replace() {} },
+            history: { length: 1, replaceState() {}, back() {} },
+            navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', clipboard: { writeText: async () => {} } },
+            document: doc,
+            localStorage: localStore,
+            sessionStorage: sessionStore,
+            BroadcastChannel: MockBroadcastChannel,
+            ApiClient: {
+                _serverInfo: { Id: 'srv_ltv', UserId: profile.jellyfinUserId, AccessToken: 'tok_live' },
+                accessToken: () => 'tok_live',
+                getCurrentUserId: () => profile.jellyfinUserId,
+                serverId: () => 'srv_ltv',
+            },
+            URL,
+            URLSearchParams,
+            Headers,
+            Response,
+            AbortController,
+            MutationObserver: class { observe() {} disconnect() {} },
+            CustomEvent: class { constructor(type) { this.type = type; } },
+            Image: class { set src(_) { if (this.onload) this.onload(); } },
+            matchMedia: () => ({ matches: false, addEventListener() {} }),
+            requestAnimationFrame: (fn) => { fn(); return 1; },
+            setTimeout: (fn, ms) => (!ms || ms <= 400 ? setTimeout(() => { try { fn(); } catch {} }, Math.min(Number(ms) || 0, 15)) : 1),
+            clearTimeout() {},
+            setInterval: () => 1,
+            clearInterval() {},
+            addEventListener() {},
+            scrollTo() {},
+            innerWidth: 1440,
+            innerHeight: 900,
+            fetch: async (url) => {
+                const u = String(url);
+                fetchedUrls.push(u);
+                if (u.includes('/StreamFlix/PublicConfig')) {
+                    return new Response(JSON.stringify({
+                        version: '0.9.8.12',
+                        assetVersion: '0.9.8.12',
+                        serverId: 'srv_ltv',
+                        serverName: 'StreamFlix',
+                        enableStreamFlixUi: true,
+                        hasAccess: true,
+                        isAdmin: Boolean(profile.isAdmin),
+                        enableLiveTv: serverEnableLiveTv,
+                        session: { authKind: 'google', email: 'owner@example.com', expiresAt: new Date(Date.now() + 86400000).toISOString() },
+                        showLibrariesInNav: true,
+                        navHiddenBuiltIns: [],
+                        navLibraryIds: [],
+                        profiles: [profile],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/StreamFlix/Hub/Bootstrap')) {
+                    return new Response(JSON.stringify({
+                        allMovies: mockMovies,
+                        allSeries: mockSeries,
+                        resumeItems: [],
+                        nextUpItems: [],
+                        favoriteItems: [],
+                        collectionsItems: [],
+                        filteredHeroPool: [],
+                        views: mockViews,
+                        popularScores: {},
+                        totalMoviesCount: 1,
+                        totalSeriesCount: 1,
+                        totalCollectionsCount: 0,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/Users/Me')) {
+                    return new Response(JSON.stringify({ Id: profile.jellyfinUserId, Name: profile.name, Policy: { IsAdministrator: Boolean(profile.isAdmin), EnableLiveTvAccess: profile.allowLiveTv !== false } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Channels')) {
+                    return new Response(JSON.stringify({ Items: mockChannels, TotalRecordCount: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Programs/Recommended')) {
+                    return new Response(JSON.stringify({ Items: [mockChannels[0].CurrentProgram] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Recordings')) {
+                    return new Response(JSON.stringify({ Items: [{ Id: 'rec_1', Name: 'Recorded Match', Type: 'Recording' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ Items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            },
+        };
+        win.window = win;
+        win.self = win;
+        vm.runInContext(combinedJs, vm.createContext(win));
+        await new Promise((r) => setTimeout(r, 70));
+        return {
+            hub: doc.getElementById('streamflix-cinema-hub'),
+            cachedCfg: JSON.parse(localStore.getItem('streamflix_cached_config_v7') || '{}'),
+            localStore,
+            fetchedUrls,
+            win,
+            setServerEnableLiveTv: (v) => { serverEnableLiveTv = v; },
+        };
+    };
+
+    // 1. Enabled + Stale v0.9.2.16 cached config upgrade + Hub Bootstrap
+    const ltvOn = await runLiveTvVmScenario({
+        enableLiveTv: true,
+        staleCachedConfig: true,
+        profile: { id: 'streamflix_owner', name: 'Owner', isAdmin: true, isOwner: true, allowLiveTv: true, jellyfinUserId: '11111111111111111111111111111111' },
+    });
+    assert.equal(ltvOn.cachedCfg.enableLiveTv, true, 'applyConfigFromServerResponse MUST preserve enableLiveTv: true (#19)');
+    assert.ok(ltvOn.hub, 'Cinema Hub must mount');
+    assert.match(ltvOn.hub.innerHTML, /data-cat-id="livetv"[^>]*>Live TV<\/button>/, 'Live TV pill MUST render in .streamflix-FilterPills');
+    assert.doesNotMatch(ltvOn.hub.innerHTML, /data-cat-id="lib:lib_ltv"/, 'Virtual livetv view must not duplicate Live TV pill');
+    assert.match(ltvOn.hub.innerHTML, /data-row-id="livetv-home"/, 'Home page MUST render Live TV · On Now row after Hub Bootstrap');
+    const ltvBtn = ltvOn.hub.querySelectorAll('[data-cat-id]').find((b) => b.getAttribute('data-cat-id') === 'livetv');
+    assert.ok(ltvBtn, 'Live TV pill must be interactive');
+    ltvBtn.click();
+    assert.match(ltvOn.hub.innerHTML, /class="streamflix-row streamflix-row-grid bfx-ltv-hub"/, 'Clicking Live TV pill must render .bfx-ltv-hub');
+    assert.match(ltvOn.hub.innerHTML, /Planet Earth III/, 'Live TV Hub must render airing program');
+
+    // 2. Default OFF -> zero Live TV UI & zero /LiveTv/* requests, then hot-enable via __STREAMFLIX_REFRESH_CONFIG__
+    const ltvOff = await runLiveTvVmScenario({
+        enableLiveTv: false,
+        profile: { id: 'streamflix_owner', name: 'Owner', isAdmin: true, isOwner: true, allowLiveTv: true, jellyfinUserId: '11111111111111111111111111111111' },
+    });
+    assert.equal(ltvOff.cachedCfg.enableLiveTv, false);
+    assert.doesNotMatch(ltvOff.hub.innerHTML, /data-cat-id="livetv"/, 'Live TV pill must NOT render when enableLiveTv is false');
+    assert.equal(ltvOff.fetchedUrls.some((u) => u.includes('/LiveTv/')), false, 'No /LiveTv/* requests when enableLiveTv is false');
+    ltvOff.setServerEnableLiveTv(true);
+    ltvOff.win.__STREAMFLIX_REFRESH_CONFIG__();
+    await new Promise((r) => setTimeout(r, 70));
+    assert.match(ltvOff.hub.innerHTML, /data-cat-id="livetv"[^>]*>Live TV<\/button>/, 'Hot config refresh must surface Live TV pill without reload');
+
+    // 3. Kids profile & revoked user policy isolation
+    const ltvKids = await runLiveTvVmScenario({
+        enableLiveTv: true,
+        profile: { id: 'prof_kids', name: 'Kids', isKids: true, allowLiveTv: false, jellyfinUserId: '22222222222222222222222222222222' },
+    });
+    assert.doesNotMatch(ltvKids.hub.innerHTML, /data-cat-id="livetv"/, 'Kids profile must never render Live TV pill');
+    assert.equal(ltvKids.fetchedUrls.some((u) => u.includes('/LiveTv/')), false, 'Kids profile must never query /LiveTv/*');
+
+    const ltvDenied = await runLiveTvVmScenario({
+        enableLiveTv: true,
+        profile: { id: 'prof_denied', name: 'Restricted', isKids: false, allowLiveTv: false, jellyfinUserId: '33333333333333333333333333333333' },
+    });
+    assert.doesNotMatch(ltvDenied.hub.innerHTML, /data-cat-id="livetv"/, 'Profile with allowLiveTv: false must not render Live TV pill');
+    assert.equal(ltvDenied.fetchedUrls.some((u) => u.includes('/LiveTv/')), false, 'Profile with allowLiveTv: false must not query /LiveTv/*');
+
+    console.log('[PASS] End-to-End VM Live TV hydration, Hub Bootstrap row, Nav Pill, Hub Click, Hot Toggle & Kids/Policy isolation verified (#19)');
+}
+
+console.log('ALL STREAMFLIX v0.9.8.12 SMOKE CHECKS PASSED!');

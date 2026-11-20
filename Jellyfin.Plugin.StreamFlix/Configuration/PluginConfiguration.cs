@@ -83,6 +83,12 @@ public class StreamFlixProfileConfig
     /// ensuring subsequent permission adjustments made by an administrator in Jellyfin Dashboard are preserved.
     /// </summary>
     public bool PermissionsInitialized { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether initial Live TV access permission has been synchronized on a plugin-created Jellyfin user,
+    /// ensuring pre-existing plugin-managed household profiles receive Live TV access once when Live TV is enabled while preserving subsequent admin changes.
+    /// </summary>
+    public bool LiveTvPermissionInitialized { get; set; }
 }
 
 /// <summary>

@@ -184,12 +184,28 @@ public class StreamFlixCoreTests
         var defaultReq = new SaveAdminConfigRequest();
         Assert.False(defaultReq.EnableLiveTv);
 
+        var defaultProf = new StreamFlixProfileConfig();
+        Assert.False(defaultProf.LiveTvPermissionInitialized);
+
         var allowedUser = new FakeUserEntity();
         allowedUser.Permissions.Add(new FakePerm { Kind = "EnableLiveTvAccess", Value = true });
         Assert.True(StreamFlixStartupTask.HasLiveTvAccessCompat(allowedUser));
 
         var deniedUser = new FakeUserEntity();
         deniedUser.Permissions.Add(new FakePerm { Kind = "EnableLiveTvAccess", Value = false });
+        Assert.False(StreamFlixStartupTask.HasLiveTvAccessCompat(deniedUser));
+
+        // Pre-existing plugin user with populated Permissions but no EnableLiveTvAccess entry yet:
+        // Jellyfin's HasPermission evaluates missing permission rows as false until initialized.
+        var preExistingPluginUser = new FakeUserEntity();
+        preExistingPluginUser.Permissions.Add(new FakePerm { Kind = "EnableMediaPlayback", Value = true });
+        Assert.False(StreamFlixStartupTask.HasLiveTvAccessCompat(preExistingPluginUser));
+
+        // TrySetUserPermissionCompat flips an existing EnableLiveTvAccess row cleanly
+        Assert.True(StreamFlixStartupTask.TrySetUserPermissionCompat(deniedUser, "EnableLiveTvAccess", true));
+        Assert.True(StreamFlixStartupTask.HasLiveTvAccessCompat(deniedUser));
+        Assert.False(StreamFlixStartupTask.TrySetUserPermissionCompat(deniedUser, "EnableLiveTvAccess", true));
+        Assert.True(StreamFlixStartupTask.TrySetUserPermissionCompat(deniedUser, "EnableLiveTvAccess", false));
         Assert.False(StreamFlixStartupTask.HasLiveTvAccessCompat(deniedUser));
     }
 }

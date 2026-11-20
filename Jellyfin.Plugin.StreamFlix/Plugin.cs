@@ -280,6 +280,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !cfg.EnableGoogleSignIn
             || !cfg.EnableGuestPasses
             || !cfg.EnableWatchTogether
+            || cfg.EnableLiveTv
             || !cfg.EnableStreamFlixUi
             || !cfg.ShowLibrariesInNav
             || !string.Equals((cfg.CustomAccentColor ?? "#E50914").Trim(), "#E50914", StringComparison.OrdinalIgnoreCase)
@@ -310,6 +311,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 || xmlText.Contains("<GoogleClientId>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<OidcIssuerUrl>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<SeerrUrl>", StringComparison.OrdinalIgnoreCase)
+                || xmlText.Contains("<EnableLiveTv>true</EnableLiveTv>", StringComparison.OrdinalIgnoreCase)
                 || xmlText.Contains("<MigratedV7>true</MigratedV7>", StringComparison.OrdinalIgnoreCase))
             {
                 File.WriteAllText(XmlBackupFilePath, xmlText, Encoding.UTF8);
@@ -471,6 +473,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 OidcRequireAllowlist = BoolVal(root, nameof(PluginConfiguration.OidcRequireAllowlist), false),
                 EnableGuestPasses = BoolVal(root, nameof(PluginConfiguration.EnableGuestPasses), true),
                 EnableWatchTogether = BoolVal(root, nameof(PluginConfiguration.EnableWatchTogether), true),
+                EnableLiveTv = BoolVal(root, nameof(PluginConfiguration.EnableLiveTv), false),
                 EnableSeerr = BoolVal(root, nameof(PluginConfiguration.EnableSeerr), false),
                 SeerrUrl = Val(root, nameof(PluginConfiguration.SeerrUrl)) ?? string.Empty,
                 SeerrApiKey = Val(root, nameof(PluginConfiguration.SeerrApiKey)) ?? string.Empty,
@@ -582,6 +585,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         JellyfinUsername = Val(pEl, nameof(StreamFlixProfileConfig.JellyfinUsername)),
                         IsPluginCreatedJellyfinUser = BoolVal(pEl, nameof(StreamFlixProfileConfig.IsPluginCreatedJellyfinUser), false),
                         PermissionsInitialized = BoolVal(pEl, nameof(StreamFlixProfileConfig.PermissionsInitialized), false),
+                        LiveTvPermissionInitialized = BoolVal(pEl, nameof(StreamFlixProfileConfig.LiveTvPermissionInitialized), false),
                     });
                 }
             }

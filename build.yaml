@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.9.8.11"
+version: "0.9.8.12"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,4 +18,4 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - v0.9.8.11 Release Candidate (Dev Test Channel): Fix the mobile app Search Page header where phone subnav declutter CSS hid the Search input bar (.bfx-sp-bar) and result filter pills (.bfx-sp-filter-pills), keeping the full-width search bar always visible and focusable beside the Back button on Android and iOS phones.
+  - v0.9.8.12 Release Candidate (Dev Test Channel): Fix Live TV compatibility (#19) by preserving enableLiveTv in client PublicConfig hydration (applyConfigFromServerResponse), prefetching Live TV channels after Hub Bootstrap, and auto-initializing EnableLiveTvAccess on pre-existing plugin-managed adult household profiles when Live TV is enabled.
