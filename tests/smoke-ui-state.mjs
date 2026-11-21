@@ -514,13 +514,15 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     console.log('[PASS] Opt-In Live TV compatibility (#19) defaults & UI/EPG hooks verified');
 }
 
-// Verify Mobile App Search Page bar & filter pills are never hidden by phone subnav declutter CSS
+// Verify Mobile App Search Page bar & filter pills are never hidden by phone subnav declutter CSS, and mobile Recommended Search rows open the Detail Modal cleanly
 {
     const css08 = fs.readFileSync(path.join(cssDir, '08-user-settings-and-mobile-dock.css'), 'utf8');
     assert.match(css08, /\.streamflix-subnav:not\(\.bfx-sp-subnav\):not\(\.is-search-open\)\s+\.streamflix-search-box:not\(:focus-within\):not\(\.has-value\)/, 'Mobile dock subnav search hiding MUST exclude .bfx-sp-subnav');
     assert.match(css08, /\.bfx-search-page\s+\.bfx-sp-bar\s*\{[\s\S]*?display:\s*flex\s*!important;/, 'Mobile Search Page .bfx-sp-bar must enforce display: flex !important');
     assert.match(css05, /\.streamflix-subnav:not\(\.bfx-sp-subnav\):not\(\.is-search-open\)\s+\.streamflix-search-box/, '720px collapsed circle rule MUST exclude .bfx-sp-subnav');
-    console.log('[PASS] Mobile App Search Page input bar & filter pills visibility invariants verified');
+    assert.match(combinedJs, /var\s+openMediaDetailModal\s*=\s*openHeroDetailModal\s*;/, 'openMediaDetailModal alias must be defined for mobile detail callers');
+    assert.match(combinedJs, /var\s+openRecommendedDetail\s*=\s*function\s*\(\)\s*\{[\s\S]*?openHeroDetailModal\(itemObj\)[\s\S]*?openHeroDetailModalById\(rid\)/, 'Mobile Recommended Search rows ([data-sp-rec-id]) must route to openHeroDetailModal / openHeroDetailModalById');
+    console.log('[PASS] Mobile App Search Page input bar, filter pills & Recommended Search detail modal wiring verified');
 }
 
 // End-to-End VM Execution Test for Issue #19: PublicConfig hydration, Hub Bootstrap Live TV row, Nav Pill, Hub Click, Hot Toggle & Kids/Policy Isolation

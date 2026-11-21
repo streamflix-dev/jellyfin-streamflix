@@ -175,9 +175,12 @@ public partial class StreamFlixController
         }
 
         var importedProfilesCount = 0;
+        List<string>? guestPassIdsToDisconnect = null;
         await SyncLock.WaitAsync().ConfigureAwait(false);
         try
         {
+            var wasGuestPassesEnabled = config.EnableGuestPasses;
+
             if (request.EnableStreamFlixUi.HasValue)
             {
                 config.EnableStreamFlixUi = request.EnableStreamFlixUi.Value;
@@ -288,12 +291,7 @@ public partial class StreamFlixController
 
             if (request.NavHiddenBuiltIns != null)
             {
-                var allowedBuiltIns = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "series", "movies", "collections", "top10", "mylist", "hot" };
-                config.NavHiddenBuiltIns = request.NavHiddenBuiltIns
-                    .Where(id => !string.IsNullOrWhiteSpace(id) && allowedBuiltIns.Contains(id.Trim()))
-                    .Select(id => id.Trim().ToLowerInvariant())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                config.NavHiddenBuiltIns = NormalizeNavHiddenBuiltIns(request.NavHiddenBuiltIns);
             }
 
             if (request.NavLibraryIds != null)
@@ -363,6 +361,7 @@ public partial class StreamFlixController
             if (request.SeerrUrl != null)
             {
                 config.SeerrUrl = StreamFlixSeerrService.NormalizeBaseUrl(request.SeerrUrl);
+                StreamFlixSeerrService.ResetTransientCaches();
             }
 
             if (request.SeerrAllowKids.HasValue)
@@ -380,7 +379,9 @@ public partial class StreamFlixController
                 var nextProfiles = new List<StreamFlixProfileConfig>();
                 var existingById = (config.Profiles ?? new List<StreamFlixProfileConfig>())
                     .Where(p => !string.IsNullOrWhiteSpace(p.Id))
-                    .ToDictionary(p => p.Id, p => p, StringComparer.OrdinalIgnoreCase);
+                    .GroupBy(p => p.Id.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                var seenImportedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var src in request.Profiles.Take(MaxProfilesCount))
                 {
@@ -389,7 +390,9 @@ public partial class StreamFlixController
                         continue;
                     }
 
-                    var pid = !string.IsNullOrWhiteSpace(src.Id) ? src.Id.Trim() : $"streamflix_{Guid.NewGuid():N}";
+                    var candidateId = !string.IsNullOrWhiteSpace(src.Id) ? src.Id.Trim() : $"streamflix_{Guid.NewGuid():N}";
+                    var pid = seenImportedIds.Add(candidateId) ? candidateId : $"streamflix_{Guid.NewGuid():N}";
+                    seenImportedIds.Add(pid);
                     existingById.TryGetValue(pid, out var prevProf);
                     var cleanName = src.Name.Trim();
                     if (cleanName.Length > 40)
@@ -400,6 +403,27 @@ public partial class StreamFlixController
                     var cleanPin = !string.IsNullOrWhiteSpace(src.PinCode) && PinRegex.IsMatch(src.PinCode.Trim())
                         ? src.PinCode.Trim()
                         : prevProf?.PinCode;
+
+                    string? cleanLockEmail = null;
+                    string? cleanLockKind = null;
+                    if (!string.IsNullOrWhiteSpace(src.GoogleAccountEmail))
+                    {
+                        var trimmedLock = src.GoogleAccountEmail.Trim();
+                        if (trimmedLock.Length <= 128 && !trimmedLock.Any(char.IsControl))
+                        {
+                            var normKind = NormalizeAccountLockKind(src.AccountLockKind);
+                            if (EmailRegex.IsMatch(trimmedLock))
+                            {
+                                cleanLockEmail = trimmedLock.ToLowerInvariant();
+                                cleanLockKind = string.IsNullOrEmpty(normKind) ? null : normKind;
+                            }
+                            else if (normKind is "oidc" or "jellyfin")
+                            {
+                                cleanLockEmail = trimmedLock;
+                                cleanLockKind = normKind;
+                            }
+                        }
+                    }
 
                     nextProfiles.Add(new StreamFlixProfileConfig
                     {
@@ -413,8 +437,8 @@ public partial class StreamFlixController
                         KidsExitPinRequired = src.KidsExitPinRequired,
                         MaturityRating = string.IsNullOrWhiteSpace(src.MaturityRating) ? "TV-MA / R (All Maturity Levels)" : src.MaturityRating.Trim(),
                         PinCode = cleanPin,
-                        GoogleAccountEmail = string.IsNullOrWhiteSpace(src.GoogleAccountEmail) ? null : src.GoogleAccountEmail.Trim(),
-                        AccountLockKind = string.IsNullOrWhiteSpace(src.AccountLockKind) ? null : src.AccountLockKind.Trim().ToLowerInvariant(),
+                        GoogleAccountEmail = cleanLockEmail,
+                        AccountLockKind = cleanLockKind,
                         AutoplayNextEpisode = src.AutoplayNextEpisode,
                         AutoplayPreviews = src.AutoplayPreviews,
                         AllowedLibraryIds = (src.AllowedLibraryIds ?? new List<string>())
@@ -429,6 +453,7 @@ public partial class StreamFlixController
                         JellyfinUsername = !string.IsNullOrWhiteSpace(src.JellyfinUsername) ? src.JellyfinUsername.Trim() : prevProf?.JellyfinUsername,
                         IsPluginCreatedJellyfinUser = prevProf?.IsPluginCreatedJellyfinUser ?? false,
                         PermissionsInitialized = prevProf?.PermissionsInitialized ?? false,
+                        LiveTvPermissionInitialized = prevProf?.LiveTvPermissionInitialized ?? false,
                     });
                 }
 
@@ -454,12 +479,33 @@ public partial class StreamFlixController
             }
 
             Plugin.Instance?.SaveConfiguration();
+            if (StreamFlixOidcService.IsConfigured(config))
+            {
+                StreamFlixOidcService.WarmDiscoveryInBackground(config);
+            }
+
+            if (wasGuestPassesEnabled && !config.EnableGuestPasses && config.GuestPasses != null)
+            {
+                guestPassIdsToDisconnect = config.GuestPasses
+                    .Where(gp => !string.IsNullOrWhiteSpace(gp.Id))
+                    .Select(gp => gp.Id)
+                    .ToList();
+            }
         }
         finally
         {
             SyncLock.Release();
         }
 
+        if (guestPassIdsToDisconnect != null)
+        {
+            foreach (var gpId in guestPassIdsToDisconnect)
+            {
+                await RevokeGuestJellyfinSessionsAsync(gpId).ConfigureAwait(false);
+            }
+        }
+
+        Plugin.Instance?.InjectScriptIntoDiskIndexIfWritable();
         await SyncProfilesAsync(config, force: true).ConfigureAwait(false);
         return Ok(new
         {

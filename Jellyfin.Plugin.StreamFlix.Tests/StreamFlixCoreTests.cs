@@ -208,4 +208,13 @@ public class StreamFlixCoreTests
         Assert.True(StreamFlixStartupTask.TrySetUserPermissionCompat(deniedUser, "EnableLiveTvAccess", false));
         Assert.False(StreamFlixStartupTask.HasLiveTvAccessCompat(deniedUser));
     }
+
+    [Fact]
+    public void NormalizeNavHiddenBuiltIns_PreservesLiveTvAndStripsInvalidEntries()
+    {
+        var normalized = StreamFlixController.NormalizeNavHiddenBuiltIns(
+            new[] { "Series", " livetv ", "MOVIES", "unknown_tab", string.Empty, null, "LIVETV", "hot" });
+        Assert.Equal(new[] { "series", "livetv", "movies", "hot" }, normalized);
+        Assert.Empty(StreamFlixController.NormalizeNavHiddenBuiltIns(null));
+    }
 }

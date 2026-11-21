@@ -2,6 +2,7 @@
     /* ----------------------------------------------------------------------
        7. Rich Netflix Media Detail Modal ('The Devil Wears Prada 2' Style Everywhere)
        ---------------------------------------------------------------------- */
+    var openMediaDetailModal = openHeroDetailModal;
     function openHeroDetailModal(item, options) {
         if (!item) {
             return;

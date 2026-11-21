@@ -2820,21 +2820,29 @@
             if (row.__bfxBound) { return; }
             row.__bfxBound = true;
             var rid = row.getAttribute('data-sp-rec-id') || '';
-            var itemObj = findCachedItemById(rid);
+            var openRecommendedDetail = function () {
+                var itemObj = findCachedItemById(rid);
+                if (itemObj && itemObj.Id && itemObj.Name) {
+                    openHeroDetailModal(itemObj);
+                } else {
+                    openHeroDetailModalById(rid);
+                }
+            };
             row.addEventListener('click', function (ev) {
                 var playBtn = ev.target && ev.target.closest ? ev.target.closest('[data-sp-rec-play]') : null;
                 if (playBtn) {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    playItemImmediately(itemObj || rid);
+                    var cachedForPlay = findCachedItemById(rid);
+                    playItemImmediately(cachedForPlay || rid);
                     return;
                 }
-                openMediaDetailModal(itemObj || { Id: rid });
+                openRecommendedDetail();
             });
             row.addEventListener('keydown', function (ev) {
                 if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === row) {
                     ev.preventDefault();
-                    openMediaDetailModal(itemObj || { Id: rid });
+                    openRecommendedDetail();
                 }
             });
         });
