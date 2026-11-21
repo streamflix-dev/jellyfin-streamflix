@@ -702,7 +702,7 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         enableLiveTv,
         profile,
         staleCachedConfig = false,
-        enableHeroTrailerPreview = false,
+        enableHeroTrailerPreview = true,
         homeRowOrder = [],
         homeHiddenRows = [],
     }) => {
@@ -784,7 +784,7 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
             Image: class { set src(_) { if (this.onload) this.onload(); } },
             matchMedia: () => ({ matches: false, addEventListener() {} }),
             requestAnimationFrame: (fn) => { fn(); return 1; },
-            setTimeout: (fn, ms) => (!ms || ms <= 400 ? setTimeout(() => { try { fn(); } catch {} }, Math.min(Number(ms) || 0, 15)) : 1),
+            setTimeout: (fn, ms) => (!ms || ms <= 1600 ? setTimeout(() => { try { fn(); } catch {} }, Math.min(Number(ms) || 0, 18)) : 1),
             clearTimeout() {},
             setInterval: () => 1,
             clearInterval() {},
@@ -871,6 +871,16 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
                         }],
                     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
                 }
+                if (u.includes('/StreamFlix/Trailers/Resolve')) {
+                    return new Response(JSON.stringify({
+                        ok: true,
+                        kind: 'youtube',
+                        youtubeId: 'zSWdZVtXT7E',
+                        title: 'Interstellar Official Trailer',
+                        source: 'jellyfin_remote_trailer',
+                        embedPath: '/StreamFlix/Trailers/Embed/zSWdZVtXT7E',
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
                 if (u.includes('/LiveTv/Recordings')) {
                     return new Response(JSON.stringify({ Items: [{ Id: 'rec_1', Name: 'Recorded Match', Type: 'Recording' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
                 }
@@ -936,15 +946,21 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.doesNotMatch(ltvDenied.hub.innerHTML, /data-cat-id="livetv"/, 'Profile with allowLiveTv: false must not render Live TV pill');
     assert.equal(ltvDenied.fetchedUrls.some((u) => u.includes('/LiveTv/')), false, 'Profile with allowLiveTv: false must not query /LiveTv/*');
 
-    // 4. v0.9.3 Inline 3-Hour EPG Grid + Timer REC Badge + Custom Home Row Order + New & Popular Sub-Tabs + Opt-In Hero Previews
+    // 4. v0.9.3.1 YouTube Hero Trailer Previews + Detail Modal YouTube Trailer + Inline EPG + Custom Home Rows + New & Popular Hub
     const v93 = await runLiveTvVmScenario({
         enableLiveTv: true,
-        enableHeroTrailerPreview: false,
+        enableHeroTrailerPreview: true,
+        staleCachedConfig: true,
         homeRowOrder: ['movies', 'top10'],
         homeHiddenRows: ['series'],
         profile: { id: 'streamflix_owner', name: 'Owner', isAdmin: true, isOwner: true, allowLiveTv: true, jellyfinUserId: '11111111111111111111111111111111' },
     });
-    assert.equal(v93.cachedCfg.enableHeroTrailerPreview, false, 'enableHeroTrailerPreview must default to false (opt-in)');
+    assert.equal(v93.cachedCfg.enableHeroTrailerPreview, true, 'enableHeroTrailerPreview must default to true');
+    assert.ok(v93.fetchedUrls.some((u) => u.includes('/StreamFlix/Trailers/Resolve?itemId=')), 'Hero Billboard must resolve YouTube trailer via /StreamFlix/Trailers/Resolve');
+    const heroEl = v93.hub.querySelector('#streamflix-hero-billboard') || v93.win.document.getElementById('streamflix-hero-billboard');
+    const heroBgStack = heroEl && heroEl.querySelector('.streamflix-hero-bg-stack');
+    assert.ok(heroBgStack && heroBgStack.children.some((w) => w.className.includes('bfx-hero-yt-wrap') && w.children.some((f) => String(f.src || '').includes('/StreamFlix/Trailers/Embed/zSWdZVtXT7E?autoplay=1&mute=1&controls=0'))), 'Hero Billboard must mount Error-153-safe YouTube relay iframe');
+
     const moviesIdx = v93.hub.innerHTML.indexOf('data-row-id="movies"');
     const top10Idx = v93.hub.innerHTML.indexOf('data-row-id="top10"');
     assert.ok(moviesIdx > -1 && top10Idx > -1 && moviesIdx < top10Idx, 'Custom homeRowOrder must render New Movies before Top 10 Today');
@@ -973,13 +989,15 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.match(v93.hub.innerHTML, /data-row-id="hot-upcoming"/, 'Coming Soon sub-tab must render Upcoming TV Episodes row');
     assert.match(v93.hub.innerHTML, /Cold Harbor/, 'Coming Soon sub-tab must render upcoming episode title');
 
-    // Verify 1-Click DVR Record modal controls & Admin Config controls
+    // Verify Detail Modal YouTube Trailer button, 1-Click DVR Record & Admin Config controls
+    assert.match(combinedJs, /streamflix-modal-trailer-btn/, 'Detail modal YouTube Trailer button must be wired');
+    assert.match(combinedJs, /\/StreamFlix\/Trailers\/Embed\//, 'YouTube Error-153-safe embed relay endpoint must be wired');
     assert.match(combinedJs, /streamflix-modal-record-btn/, 'Detail modal 1-Click DVR Record button must be wired');
     assert.match(combinedJs, /\/LiveTv\/Timers\/Defaults\?programId=/, 'DVR recording must fetch Jellyfin /LiveTv/Timers/Defaults');
-    assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose opt-in EnableHeroTrailerPreview toggle');
+    assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose EnableHeroTrailerPreview toggle');
     assert.match(configHtml, /id="StreamFlixHomeRowsEditor"/, 'configPage.html must expose Home Page Row Order & Visibility editor');
 
-    console.log('[PASS] End-to-End VM Live TV EPG Timeline, DVR Record, Home Row Customizer, New & Popular Hub & Opt-In Hero Previews verified');
+    console.log('[PASS] End-to-End VM YouTube Hero & Modal Trailers, Live TV EPG Timeline, DVR Record, Home Row Customizer & New & Popular Hub verified');
 }
 
 console.log('ALL STREAMFLIX SMOKE CHECKS PASSED!');

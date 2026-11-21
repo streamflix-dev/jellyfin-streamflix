@@ -213,6 +213,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         incoming.MigratedV7 = true;
                     }
 
+                    if (!incoming.MigratedHeroYouTubeTrailers && existing.MigratedHeroYouTubeTrailers)
+                    {
+                        incoming.MigratedHeroYouTubeTrailers = true;
+                    }
+
                     if (!incoming.FirstGoogleAccountClaimed && (existing.FirstGoogleAccountClaimed || (incoming.ApprovedGoogleAccounts != null && incoming.ApprovedGoogleAccounts.Count > 0)))
                     {
                         incoming.FirstGoogleAccountClaimed = true;
@@ -281,7 +286,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !cfg.EnableGuestPasses
             || !cfg.EnableWatchTogether
             || cfg.EnableLiveTv
-            || cfg.EnableHeroTrailerPreview
+            || !cfg.EnableHeroTrailerPreview
             || !cfg.EnableStreamFlixUi
             || !cfg.ShowLibrariesInNav
             || !string.Equals((cfg.CustomAccentColor ?? "#E50914").Trim(), "#E50914", StringComparison.OrdinalIgnoreCase)
@@ -467,7 +472,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 HeroSlideCount = IntVal(root, nameof(PluginConfiguration.HeroSlideCount), 8),
                 HeroSelectionMode = Val(root, nameof(PluginConfiguration.HeroSelectionMode)) ?? "recent",
                 HeroContentType = Val(root, nameof(PluginConfiguration.HeroContentType)) ?? "all",
-                EnableHeroTrailerPreview = BoolVal(root, nameof(PluginConfiguration.EnableHeroTrailerPreview), false),
+                EnableHeroTrailerPreview = BoolVal(root, nameof(PluginConfiguration.EnableHeroTrailerPreview), true),
+                MigratedHeroYouTubeTrailers = BoolVal(root, nameof(PluginConfiguration.MigratedHeroYouTubeTrailers), false),
                 ShowLibrariesInNav = BoolVal(root, nameof(PluginConfiguration.ShowLibrariesInNav), true),
                 EnableCustomOidc = BoolVal(root, nameof(PluginConfiguration.EnableCustomOidc), false),
                 OidcProviderName = Val(root, nameof(PluginConfiguration.OidcProviderName)) ?? string.Empty,
@@ -714,6 +720,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             if (!cfg.MigratedV7)
             {
                 cfg.MigratedV7 = true;
+                dirty = true;
+            }
+
+            if (!cfg.MigratedHeroYouTubeTrailers)
+            {
+                cfg.EnableHeroTrailerPreview = true;
+                cfg.MigratedHeroYouTubeTrailers = true;
                 dirty = true;
             }
 

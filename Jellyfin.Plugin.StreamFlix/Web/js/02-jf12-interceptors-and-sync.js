@@ -1256,8 +1256,8 @@
         var nextHeroSel = String(cfg.heroSelectionMode || 'recent').toLowerCase();
         var nextHeroType = String(cfg.heroContentType || 'all').toLowerCase();
 
-        var prevEnableHeroTrailer = Boolean(prevCfg.enableHeroTrailerPreview);
-        var nextEnableHeroTrailer = Boolean(cfg.enableHeroTrailerPreview);
+        var prevEnableHeroTrailer = prevCfg.enableHeroTrailerPreview !== false;
+        var nextEnableHeroTrailer = cfg.enableHeroTrailerPreview !== false;
         var nextHomeRowOrder = Array.isArray(cfg.homeRowOrder)
             ? cfg.homeRowOrder.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
             : [];

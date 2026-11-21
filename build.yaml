@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.9.8.13"
+version: "0.9.8.14"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,4 +18,4 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - v0.9.8.13 Release Candidate (Dev Test Channel / v0.9.3 Candidate): Add inline 3-hour Live TV EPG Timeline Grid + 1-Click DVR Recording, customizable Home page row order & visibility (server defaults + per-profile overrides), interactive 4-tab New & Popular hub (All, Trending, Coming Soon, Just Added), and opt-in Muted Hero Trailer Previews.
+  - v0.9.8.14 Release Candidate (Dev Test Channel): Switch Hero Billboard previews & Detail Modal trailers to official YouTube trailers (Jellyfin RemoteTrailers + automatic embeddable YouTube Official Trailer search + Error-153-safe /StreamFlix/Trailers/Embed relay), enabled by default with live Mute/Unmute and an on-demand Trailer button in every Detail Modal.

@@ -283,6 +283,7 @@ public partial class StreamFlixController : ControllerBase
             }
 
             config.EnableHeroTrailerPreview = request.EnableHeroTrailerPreview;
+            config.MigratedHeroYouTubeTrailers = true;
             if (request.HomeRowOrder != null)
             {
                 config.HomeRowOrder = NormalizeHomeRowIds(request.HomeRowOrder);

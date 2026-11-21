@@ -157,7 +157,8 @@ public class PluginConfiguration : BasePluginConfiguration
         HeroSelectionMode = "recent";
         HeroContentType = "all";
         HeroLibraryIds = new List<string>();
-        EnableHeroTrailerPreview = false;
+        EnableHeroTrailerPreview = true;
+        MigratedHeroYouTubeTrailers = false;
         HomeRowOrder = new List<string>();
         HomeHiddenRows = new List<string>();
         ShowLibrariesInNav = true;
@@ -304,10 +305,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public List<string> HeroLibraryIds { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether opt-in muted local trailer previews play on the Home Hero Billboard after resting on a slide.
-    /// Defaults to <c>false</c> so administrators must explicitly turn it on.
+    /// Gets or sets a value indicating whether muted official YouTube trailer previews play on the Home Hero Billboard after resting on a slide.
     /// </summary>
     public bool EnableHeroTrailerPreview { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the one-time v0.9.3.1 YouTube Hero Trailer default migration has been applied.
+    /// </summary>
+    public bool MigratedHeroYouTubeTrailers { get; set; }
 
     /// <summary>
     /// Gets or sets the server-default ordering of Home page rows (empty uses the built-in default order).

@@ -574,6 +574,11 @@ public static class JellyfinCompat
             ? Math.Clamp((double)posTicks / runTicks * 100.0, 1.0, 100.0)
             : null;
 
+        var remoteTrailers = (item.RemoteTrailers ?? Array.Empty<MediaUrl>())
+            .Where(rt => !string.IsNullOrWhiteSpace(rt?.Url))
+            .Select(rt => new { Url = rt.Url!, Name = rt.Name ?? string.Empty })
+            .ToArray();
+
         return new
         {
             Id = item.Id.ToString("N"),
@@ -589,6 +594,7 @@ public static class JellyfinCompat
             RunTimeTicks = item.RunTimeTicks,
             Genres = item.Genres ?? Array.Empty<string>(),
             Taglines = item.Tagline is { Length: > 0 } tl ? new[] { tl } : Array.Empty<string>(),
+            RemoteTrailers = remoteTrailers,
             Status = seriesStatus,
             ChildCount = childCount,
             SeriesId = seriesId,

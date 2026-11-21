@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.13)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.14)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.13';
+    var VERSION = '0.9.8.14';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -26,7 +26,7 @@
     var NAV_PROFILE_PREF_PREFIX = 'streamflix_nav_prefs_v1_';
     var HOME_ROW_PREF_PREFIX = 'streamflix_home_rows_v1_';
     var RECENT_SEARCHES_PREFIX = 'streamflix_recent_searches_v1_';
-    var HUB_SWR_CACHE_PREFIX = 'streamflix_hub_swr_v1_';
+    var HUB_SWR_CACHE_PREFIX = 'streamflix_hub_swr_v2_';
     var NOTIF_SEEN_PREFIX = 'streamflix_notif_seen_v1_';
     var BEDTIME_UNLOCK_PREFIX = 'streamflix_bedtime_unlock_v1_';
     var AUTH_BUS_CHANNEL = 'streamflix_auth_bus_v1';
@@ -122,7 +122,7 @@
         heroSelectionMode: 'recent',
         heroContentType: 'all',
         heroLibraryIds: [],
-        enableHeroTrailerPreview: false,
+        enableHeroTrailerPreview: true,
         homeRowOrder: [],
         homeHiddenRows: [],
         showLibrariesInNav: true,
@@ -159,6 +159,8 @@
         heroVideoActive: false,
         heroVideoItemId: '',
         heroTrailerCache: {},
+        heroTrailerInFlight: {},
+        heroTrailerAttemptedSlide: '',
         notificationsOpen: false,
         notificationsLoadedForUser: '',
         notificationsLoading: false,

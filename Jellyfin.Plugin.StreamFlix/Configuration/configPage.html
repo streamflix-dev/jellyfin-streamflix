@@ -692,15 +692,15 @@
 
                         <div class="bfx-subbox" style="margin:0 0 16px;">
                             <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                <div class="bfx-subbox-title" style="margin:0;">Muted Hero Trailer Previews</div>
-                                <span class="bfx-pill" id="HeroTrailerStatusPill">Off</span>
+                                <div class="bfx-subbox-title" style="margin:0;">YouTube Hero Trailer Previews</div>
+                                <span class="bfx-pill ok" id="HeroTrailerStatusPill">Active</span>
                             </div>
                             <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
                                 <label class="emby-checkbox-label">
-                                    <input id="EnableHeroTrailerPreview" name="EnableHeroTrailerPreview" type="checkbox" is="emby-checkbox" />
-                                    <span>Enable muted local trailer previews on Hero Billboard (off by default)</span>
+                                    <input id="EnableHeroTrailerPreview" name="EnableHeroTrailerPreview" type="checkbox" is="emby-checkbox" checked />
+                                    <span>Autoplay muted YouTube trailer previews on Hero Billboard</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">After resting on a featured billboard slide for ~3 seconds, smoothly crossfades into the title's local Jellyfin trailer with a Mute / Unmute button. Respects each profile's Autoplay Previews toggle, Data Saver, and Reduced Motion.</div>
+                                <div class="fieldDescription checkboxFieldDescription">After resting on a featured Hero Billboard slide (~1.5s), smoothly crossfades into the official YouTube trailer (resolved from Jellyfin <code>RemoteTrailers</code> or verified YouTube Official Trailer search) with a live Mute / Unmute button, plus an on-demand <strong>Trailer</strong> button inside every Detail Modal.</div>
                             </div>
                         </div>
 
@@ -2869,7 +2869,7 @@
                     renderGuestPassManagers();
                     $('#EnableWatchTogether').checked = cfg.enableWatchTogether !== false;
                     $('#EnableLiveTv').checked = Boolean(cfg.enableLiveTv);
-                    $('#EnableHeroTrailerPreview').checked = Boolean(cfg.enableHeroTrailerPreview);
+                    $('#EnableHeroTrailerPreview').checked = cfg.enableHeroTrailerPreview !== false;
                     normalizeAdminHomeRowState(cfg.homeRowOrder, cfg.homeHiddenRows);
                     renderHomeRowsEditor();
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;

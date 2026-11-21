@@ -3452,6 +3452,15 @@
                 muteHeroBtn.addEventListener('click', function (ev) {
                     ev.stopPropagation();
                     state.heroPreviewMuted = !Boolean(state.heroPreviewMuted !== false);
+                    var ytFrame = hero.querySelector('iframe.bfx-hero-yt-iframe');
+                    if (ytFrame) {
+                        if (state.heroPreviewMuted) {
+                            sendCommandToYouTubeRelay(ytFrame, 'mute', []);
+                        } else {
+                            sendCommandToYouTubeRelay(ytFrame, 'unMute', []);
+                            sendCommandToYouTubeRelay(ytFrame, 'setVolume', [100]);
+                        }
+                    }
                     var vidEl = hero.querySelector('video.bfx-hero-preview-video');
                     if (vidEl) {
                         vidEl.muted = Boolean(state.heroPreviewMuted);
@@ -3464,6 +3473,9 @@
         }
 
         if (itemChanged) {
+            state.heroTrailerAttemptedSlide = '';
+            scheduleHeroVideoPreview(item);
+        } else if (!state.heroVideoActive && !heroPreviewTimer && state.heroTrailerAttemptedSlide !== item.Id && canAutoplayHeroVideoPreview()) {
             scheduleHeroVideoPreview(item);
         }
 
@@ -3543,8 +3555,13 @@
             }
             heroEl.classList.remove('is-static-rotation');
             var paused = heroHardPaused() || state.heroPaused || state.heroVideoActive || curHero.length <= 1;
-            if (heroHardPaused() && state.heroVideoActive) {
-                stopHeroVideoPreview();
+            if (heroHardPaused() && (state.heroVideoActive || heroPreviewTimer)) {
+                stopHeroVideoPreview(false);
+            } else if (!heroHardPaused() && !state.heroVideoActive && !heroPreviewTimer && curHero.length > 0) {
+                var activeSlideItem = curHero[state.heroIndex % curHero.length];
+                if (activeSlideItem && activeSlideItem.Id && state.heroTrailerAttemptedSlide !== activeSlideItem.Id && canAutoplayHeroVideoPreview()) {
+                    scheduleHeroVideoPreview(activeSlideItem);
+                }
             }
             heroEl.classList.toggle('is-paused', Boolean(paused));
             if (paused) {
@@ -3678,12 +3695,188 @@
     }
 
     var heroPreviewTimer = null;
+    var heroYtWatchdogTimer = null;
+    var activeHeroYtIframe = null;
+    var heroYtMessageBound = false;
 
-    function stopHeroVideoPreview() {
+    function extractYouTubeVideoIdClient(rawUrl) {
+        if (!rawUrl || typeof rawUrl !== 'string') {
+            return '';
+        }
+        var trimmed = rawUrl.trim();
+        if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) {
+            return trimmed;
+        }
+        try {
+            var u = new URL(trimmed);
+            var host = String(u.hostname || '').toLowerCase().replace(/^(www\.|m\.)/, '');
+            var cand = '';
+            if (host === 'youtu.be') {
+                cand = String(u.pathname || '').replace(/^\/+/, '').split('/')[0] || '';
+            } else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+                var p = String(u.pathname || '').replace(/^\/+/, '');
+                if (p.toLowerCase() === 'watch') {
+                    cand = u.searchParams.get('v') || '';
+                } else {
+                    var segs = p.split('/');
+                    if (segs.length >= 2 && /^(embed|v|shorts|live)$/i.test(segs[0])) {
+                        cand = segs[1] || '';
+                    }
+                }
+            }
+            return /^[A-Za-z0-9_-]{11}$/.test(cand) ? cand : '';
+        } catch (eUrl) {
+            return '';
+        }
+    }
+
+    function extractClientRemoteYouTubeId(item) {
+        if (!item || !Array.isArray(item.RemoteTrailers)) {
+            return '';
+        }
+        for (var i = 0; i < item.RemoteTrailers.length; i++) {
+            var rt = item.RemoteTrailers[i];
+            var vid = extractYouTubeVideoIdClient(rt && (rt.Url || rt.url));
+            if (vid) {
+                return vid;
+            }
+        }
+        return '';
+    }
+
+    function buildYouTubeRelaySrc(youtubeId, opts) {
+        opts = opts || {};
+        return apiBase() + '/StreamFlix/Trailers/Embed/' + encodeURIComponent(youtubeId)
+            + '?autoplay=' + (opts.autoplay === false ? '0' : '1')
+            + '&mute=' + (opts.mute === false ? '0' : '1')
+            + '&controls=' + (opts.controls ? '1' : '0')
+            + (opts.loop ? '&loop=1' : '');
+    }
+
+    function sendCommandToYouTubeRelay(iframeEl, cmd, args) {
+        if (!iframeEl || !iframeEl.contentWindow) {
+            return;
+        }
+        try {
+            iframeEl.contentWindow.postMessage({
+                target: 'streamflix-yt',
+                cmd: cmd,
+                args: Array.isArray(args) ? args : []
+            }, '*');
+        } catch (ePost) {}
+    }
+
+    function resolveItemTrailerDescriptor(item) {
+        if (!item || !item.Id) {
+            return Promise.resolve(null);
+        }
+        var lookupId = (item.Type === 'Episode' && item.SeriesId && (!item.RemoteTrailers || !item.RemoteTrailers.length))
+            ? item.SeriesId
+            : item.Id;
+        var normKey = normalizeGuid(lookupId);
+        if (!state.heroTrailerCache) {
+            state.heroTrailerCache = {};
+        }
+        if (!state.heroTrailerInFlight) {
+            state.heroTrailerInFlight = {};
+        }
+        if (state.heroTrailerCache.hasOwnProperty(normKey)) {
+            return Promise.resolve(state.heroTrailerCache[normKey]);
+        }
+        if (state.heroTrailerInFlight[normKey]) {
+            return state.heroTrailerInFlight[normKey];
+        }
+
+        var clientRemoteYt = extractClientRemoteYouTubeId(item);
+        var p = apiFetch('/StreamFlix/Trailers/Resolve?itemId=' + encodeURIComponent(lookupId))
+            .then(function (res) {
+                var desc = null;
+                if (res && res.ok && res.kind === 'youtube' && res.youtubeId && /^[A-Za-z0-9_-]{11}$/.test(res.youtubeId)) {
+                    desc = { kind: 'youtube', youtubeId: res.youtubeId, title: res.title || '' };
+                } else if (clientRemoteYt) {
+                    desc = { kind: 'youtube', youtubeId: clientRemoteYt, title: item.Name || '' };
+                } else if (res && res.ok && res.kind === 'local' && res.localTrailerId) {
+                    desc = { kind: 'local', localTrailerId: res.localTrailerId, title: res.title || '' };
+                }
+                state.heroTrailerCache[normKey] = desc;
+                delete state.heroTrailerInFlight[normKey];
+                return desc;
+            })
+            .catch(function () {
+                var fallback = clientRemoteYt ? { kind: 'youtube', youtubeId: clientRemoteYt, title: item.Name || '' } : null;
+                state.heroTrailerCache[normKey] = fallback;
+                delete state.heroTrailerInFlight[normKey];
+                return fallback;
+            });
+
+        state.heroTrailerInFlight[normKey] = p;
+        return p;
+    }
+
+    function ensureHeroYouTubeMessageListener() {
+        if (heroYtMessageBound) {
+            return;
+        }
+        heroYtMessageBound = true;
+        window.addEventListener('message', function (ev) {
+            var d = ev && ev.data;
+            if (!d || d.source !== 'streamflix-yt' || !activeHeroYtIframe || ev.source !== activeHeroYtIframe.contentWindow) {
+                return;
+            }
+            var curHero = document.getElementById('streamflix-hero-billboard');
+            var targetId = activeHeroYtIframe.getAttribute('data-target-item') || '';
+            if (!curHero || !targetId || curHero.getAttribute('data-hero-item') !== targetId || heroHardPaused()) {
+                stopHeroVideoPreview(false);
+                return;
+            }
+            if (d.event === 'state') {
+                if (d.state === 1) {
+                    if (heroYtWatchdogTimer) {
+                        clearTimeout(heroYtWatchdogTimer);
+                        heroYtWatchdogTimer = null;
+                    }
+                    state.heroVideoActive = true;
+                    state.heroVideoItemId = targetId;
+                    var wrap = activeHeroYtIframe.parentNode;
+                    if (wrap && wrap.classList) {
+                        wrap.classList.add('is-playing');
+                    }
+                    curHero.classList.add('is-video-playing');
+                    var shouldMute = Boolean(state.heroPreviewMuted !== false);
+                    if (!shouldMute) {
+                        sendCommandToYouTubeRelay(activeHeroYtIframe, 'unMute', []);
+                        sendCommandToYouTubeRelay(activeHeroYtIframe, 'setVolume', [100]);
+                    }
+                    var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+                    if (muteBtn) {
+                        muteBtn.classList.remove('is-hidden');
+                        muteBtn.innerHTML = icon(shouldMute ? 'volumeOff' : 'volume');
+                        muteBtn.title = shouldMute ? 'Unmute preview' : 'Mute preview';
+                        muteBtn.setAttribute('aria-label', muteBtn.title);
+                    }
+                } else if (d.state === 0) {
+                    stopHeroVideoPreview(true);
+                    restartHeroTimer();
+                }
+            } else if (d.event === 'error') {
+                stopHeroVideoPreview(true);
+            }
+        });
+    }
+
+    function stopHeroVideoPreview(endedNaturally) {
         if (heroPreviewTimer) {
             clearTimeout(heroPreviewTimer);
             heroPreviewTimer = null;
         }
+        if (heroYtWatchdogTimer) {
+            clearTimeout(heroYtWatchdogTimer);
+            heroYtWatchdogTimer = null;
+        }
+        if (!endedNaturally) {
+            state.heroTrailerAttemptedSlide = '';
+        }
+        activeHeroYtIframe = null;
         state.heroVideoActive = false;
         state.heroVideoItemId = '';
         var hero = document.getElementById('streamflix-hero-billboard');
@@ -3695,6 +3888,16 @@
         if (muteBtn) {
             muteBtn.classList.add('is-hidden');
         }
+        var ytWraps = hero.querySelectorAll('.bfx-hero-yt-wrap');
+        Array.prototype.forEach.call(ytWraps, function (w) {
+            var ifr = w.querySelector('iframe');
+            if (ifr) {
+                try { ifr.src = 'about:blank'; } catch (eIfr) {}
+            }
+            if (w.parentNode) {
+                w.parentNode.removeChild(w);
+            }
+        });
         var vids = hero.querySelectorAll('video.bfx-hero-preview-video');
         Array.prototype.forEach.call(vids, function (v) {
             try {
@@ -3709,7 +3912,7 @@
     }
 
     function canAutoplayHeroVideoPreview() {
-        if (!state.config || state.config.enableHeroTrailerPreview !== true) {
+        if (!state.config || state.config.enableHeroTrailerPreview === false) {
             return false;
         }
         if (!state.activeProfile || state.activeProfile.autoplayPreviews === false) {
@@ -3730,14 +3933,22 @@
     }
 
     function scheduleHeroVideoPreview(item) {
-        stopHeroVideoPreview();
+        stopHeroVideoPreview(false);
         if (!item || !item.Id || !canAutoplayHeroVideoPreview()) {
             return;
         }
+        if (item.Type === 'TvChannel' || item.Type === 'Program' || item.Type === 'BoxSet') {
+            state.heroTrailerAttemptedSlide = item.Id;
+            return;
+        }
         var targetId = item.Id;
+        state.heroTrailerAttemptedSlide = targetId;
+        var descriptorPromise = resolveItemTrailerDescriptor(item);
+
         heroPreviewTimer = setTimeout(function () {
             heroPreviewTimer = null;
             if (!canAutoplayHeroVideoPreview()) {
+                state.heroTrailerAttemptedSlide = '';
                 return;
             }
             var hero = document.getElementById('streamflix-hero-billboard');
@@ -3748,24 +3959,9 @@
             if (!auth || !auth.userId || !auth.token) {
                 return;
             }
-            if (!state.heroTrailerCache) {
-                state.heroTrailerCache = {};
-            }
-            var resolveTrailer = state.heroTrailerCache.hasOwnProperty(targetId)
-                ? Promise.resolve(state.heroTrailerCache[targetId])
-                : apiFetch('/Users/' + encodeURIComponent(auth.userId) + '/Items/' + encodeURIComponent(targetId) + '/LocalTrailers')
-                    .then(function (list) {
-                        var hit = (Array.isArray(list) && list.length > 0 && list[0] && list[0].Id) ? list[0].Id : null;
-                        state.heroTrailerCache[targetId] = hit;
-                        return hit;
-                    })
-                    .catch(function () {
-                        state.heroTrailerCache[targetId] = null;
-                        return null;
-                    });
 
-            resolveTrailer.then(function (trailerId) {
-                if (!trailerId || !canAutoplayHeroVideoPreview()) {
+            descriptorPromise.then(function (desc) {
+                if (!desc || !canAutoplayHeroVideoPreview()) {
                     return;
                 }
                 var curHero = document.getElementById('streamflix-hero-billboard');
@@ -3773,49 +3969,77 @@
                 if (!curHero || !bgStack || curHero.getAttribute('data-hero-item') !== targetId) {
                     return;
                 }
-                var streamUrl = apiBase() + '/Videos/' + encodeURIComponent(trailerId) + '/stream?static=true&api_key=' + encodeURIComponent(auth.token);
-                var vid = document.createElement('video');
-                vid.className = 'bfx-hero-preview-video';
-                vid.muted = Boolean(state.heroPreviewMuted !== false);
-                vid.playsInline = true;
-                vid.setAttribute('playsinline', '');
-                vid.setAttribute('webkit-playsinline', '');
-                vid.preload = 'metadata';
-                vid.src = streamUrl;
 
-                var onCleanup = function () {
-                    if (state.heroVideoItemId === targetId) {
-                        stopHeroVideoPreview();
-                        restartHeroTimer();
-                    }
-                };
-                vid.addEventListener('playing', function () {
-                    if (curHero.getAttribute('data-hero-item') !== targetId || heroHardPaused()) {
-                        stopHeroVideoPreview();
-                        return;
-                    }
-                    state.heroVideoActive = true;
-                    state.heroVideoItemId = targetId;
-                    vid.classList.add('is-playing');
-                    curHero.classList.add('is-video-playing');
-                    var muteBtn = document.getElementById('streamflix-hero-mute-btn');
-                    if (muteBtn) {
-                        muteBtn.classList.remove('is-hidden');
-                        muteBtn.innerHTML = icon(vid.muted ? 'volumeOff' : 'volume');
-                    }
-                });
-                vid.addEventListener('ended', onCleanup);
-                vid.addEventListener('error', onCleanup);
+                if (desc.kind === 'youtube' && desc.youtubeId) {
+                    ensureHeroYouTubeMessageListener();
+                    var wrap = document.createElement('div');
+                    wrap.className = 'bfx-hero-yt-wrap';
+                    var ifr = document.createElement('iframe');
+                    ifr.className = 'bfx-hero-yt-iframe';
+                    ifr.setAttribute('data-target-item', targetId);
+                    ifr.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+                    ifr.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+                    ifr.setAttribute('tabindex', '-1');
+                    ifr.setAttribute('aria-hidden', 'true');
+                    ifr.setAttribute('title', (desc.title || item.Name || 'Trailer') + ' Preview');
+                    ifr.src = buildYouTubeRelaySrc(desc.youtubeId, { autoplay: true, mute: true, controls: false });
+                    activeHeroYtIframe = ifr;
+                    wrap.appendChild(ifr);
+                    bgStack.appendChild(wrap);
+                    heroYtWatchdogTimer = setTimeout(function () {
+                        heroYtWatchdogTimer = null;
+                        if (activeHeroYtIframe === ifr && !state.heroVideoActive) {
+                            stopHeroVideoPreview(true);
+                        }
+                    }, 9500);
+                    return;
+                }
 
-                bgStack.appendChild(vid);
-                var playPromise = vid.play();
-                if (playPromise && typeof playPromise.catch === 'function') {
-                    playPromise.catch(function () {
-                        stopHeroVideoPreview();
+                if (desc.kind === 'local' && desc.localTrailerId) {
+                    var streamUrl = apiBase() + '/Videos/' + encodeURIComponent(desc.localTrailerId) + '/stream?static=true&api_key=' + encodeURIComponent(auth.token);
+                    var vid = document.createElement('video');
+                    vid.className = 'bfx-hero-preview-video';
+                    vid.muted = Boolean(state.heroPreviewMuted !== false);
+                    vid.playsInline = true;
+                    vid.setAttribute('playsinline', '');
+                    vid.setAttribute('webkit-playsinline', '');
+                    vid.preload = 'metadata';
+                    vid.src = streamUrl;
+
+                    var onCleanup = function () {
+                        if (state.heroVideoItemId === targetId) {
+                            stopHeroVideoPreview(true);
+                            restartHeroTimer();
+                        }
+                    };
+                    vid.addEventListener('playing', function () {
+                        if (curHero.getAttribute('data-hero-item') !== targetId || heroHardPaused()) {
+                            stopHeroVideoPreview(false);
+                            return;
+                        }
+                        state.heroVideoActive = true;
+                        state.heroVideoItemId = targetId;
+                        vid.classList.add('is-playing');
+                        curHero.classList.add('is-video-playing');
+                        var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+                        if (muteBtn) {
+                            muteBtn.classList.remove('is-hidden');
+                            muteBtn.innerHTML = icon(vid.muted ? 'volumeOff' : 'volume');
+                        }
                     });
+                    vid.addEventListener('ended', onCleanup);
+                    vid.addEventListener('error', onCleanup);
+
+                    bgStack.appendChild(vid);
+                    var playPromise = vid.play();
+                    if (playPromise && typeof playPromise.catch === 'function') {
+                        playPromise.catch(function () {
+                            stopHeroVideoPreview(true);
+                        });
+                    }
                 }
             });
-        }, 2600);
+        }, 1500);
     }
 
     function applyHeroAmbient(url) {

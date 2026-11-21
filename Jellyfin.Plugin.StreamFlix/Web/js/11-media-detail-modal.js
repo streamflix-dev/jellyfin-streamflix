@@ -23,6 +23,9 @@
         }
 
         document.body.classList.add('streamflix-modal-open');
+        if (typeof stopHeroVideoPreview === 'function') {
+            stopHeroVideoPreview(false);
+        }
 
         var backdropUrl = safeCssUrl(getItemBackdropUrl(item, 1600));
         var year = item.ProductionYear ? String(item.ProductionYear) : '';
@@ -167,6 +170,9 @@
                 : '')
             + '        <div class="streamflix-hero-actions">'
             + '          <button type="button" class="streamflix-hero-play" id="streamflix-modal-play-btn">' + playBtnInitialLabel + '</button>'
+            + (!isLiveTvItem && item.Type !== 'BoxSet'
+                ? '          <button type="button" class="streamflix-hero-secondary bfx-modal-trailer-btn" id="streamflix-modal-trailer-btn" style="display:none;" title="Watch Official YouTube Trailer">' + iconLabel('film', 'Trailer') + '</button>'
+                : '')
             + (isLiveTvItem
                 ? '          <button type="button" class="streamflix-hero-secondary" id="streamflix-modal-tvguide-btn" title="Open TV Guide">' + iconLabel('calendar', 'TV Guide') + '</button>'
                 : '')
@@ -249,6 +255,9 @@
                 return;
             }
             modalClosed = true;
+            if (typeof stopModalTrailer === 'function') {
+                stopModalTrailer();
+            }
             document.removeEventListener('keydown', onEscKey);
             if (state.activeDetailModal && state.activeDetailModal.el === modalBackdrop) {
                 state.activeDetailModal = null;
@@ -391,6 +400,103 @@
             mainPlayBtn.addEventListener('click', function () {
                 closeModal(true);
                 playItemImmediately(firstPlayableTarget || resolvedItem || item, selectedAudioStreamIndex, selectedSubtitleStreamIndex);
+            });
+        }
+
+        var modalTrailerDesc = null;
+        var modalTrailerMsgHandler = null;
+        function stopModalTrailer() {
+            if (modalTrailerMsgHandler) {
+                window.removeEventListener('message', modalTrailerMsgHandler);
+                modalTrailerMsgHandler = null;
+            }
+            var heroBannerEl = qModal('#streamflix-modal-hero-banner');
+            if (!heroBannerEl) {
+                return;
+            }
+            heroBannerEl.classList.remove('is-trailer-open');
+            var existingStage = heroBannerEl.querySelector('.bfx-modal-trailer-stage');
+            if (existingStage) {
+                var ifr = existingStage.querySelector('iframe');
+                if (ifr) {
+                    try { ifr.src = 'about:blank'; } catch (eIfr) {}
+                }
+                var vid = existingStage.querySelector('video');
+                if (vid) {
+                    try { vid.pause(); vid.removeAttribute('src'); vid.load(); } catch (eVid) {}
+                }
+                if (existingStage.parentNode) {
+                    existingStage.parentNode.removeChild(existingStage);
+                }
+            }
+        }
+
+        var modalTrailerBtn = qModal('#streamflix-modal-trailer-btn');
+        if (modalTrailerBtn && typeof resolveItemTrailerDescriptor === 'function') {
+            resolveItemTrailerDescriptor(item).then(function (desc) {
+                if (modalClosed || !modalBackdrop.parentNode || !desc) {
+                    return;
+                }
+                modalTrailerDesc = desc;
+                modalTrailerBtn.style.display = '';
+            }).catch(function () {});
+
+            modalTrailerBtn.addEventListener('click', function () {
+                if (!modalTrailerDesc) {
+                    return;
+                }
+                var heroBannerEl = qModal('#streamflix-modal-hero-banner');
+                if (!heroBannerEl) {
+                    return;
+                }
+                stopModalTrailer();
+                heroBannerEl.classList.add('is-trailer-open');
+                var stage = document.createElement('div');
+                stage.className = 'bfx-modal-trailer-stage';
+                var backBtn = document.createElement('button');
+                backBtn.type = 'button';
+                backBtn.className = 'bfx-modal-trailer-back';
+                backBtn.innerHTML = icon('chevronLeft') + '<span>Back</span>';
+                backBtn.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    stopModalTrailer();
+                });
+                stage.appendChild(backBtn);
+
+                if (modalTrailerDesc.kind === 'youtube' && modalTrailerDesc.youtubeId) {
+                    var ytIfr = document.createElement('iframe');
+                    ytIfr.className = 'bfx-modal-trailer-iframe';
+                    ytIfr.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+                    ytIfr.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+                    ytIfr.setAttribute('allowfullscreen', '');
+                    ytIfr.setAttribute('title', (modalTrailerDesc.title || displayTitle || 'Official') + ' Trailer');
+                    ytIfr.src = (typeof buildYouTubeRelaySrc === 'function')
+                        ? buildYouTubeRelaySrc(modalTrailerDesc.youtubeId, { autoplay: true, mute: false, controls: true })
+                        : (apiBase() + '/StreamFlix/Trailers/Embed/' + encodeURIComponent(modalTrailerDesc.youtubeId) + '?autoplay=1&mute=0&controls=1');
+                    modalTrailerMsgHandler = function (ev) {
+                        var d = ev && ev.data;
+                        if (!d || d.source !== 'streamflix-yt' || ev.source !== ytIfr.contentWindow) {
+                            return;
+                        }
+                        if (d.event === 'state' && d.state === 0) {
+                            stopModalTrailer();
+                        }
+                    };
+                    window.addEventListener('message', modalTrailerMsgHandler);
+                    stage.appendChild(ytIfr);
+                } else if (modalTrailerDesc.kind === 'local' && modalTrailerDesc.localTrailerId) {
+                    var mAuth = getJellyfinAuthContext();
+                    var mVid = document.createElement('video');
+                    mVid.className = 'bfx-modal-trailer-video';
+                    mVid.controls = true;
+                    mVid.autoplay = true;
+                    mVid.playsInline = true;
+                    mVid.src = apiBase() + '/Videos/' + encodeURIComponent(modalTrailerDesc.localTrailerId) + '/stream?static=true&api_key=' + encodeURIComponent((mAuth && mAuth.token) || '');
+                    mVid.addEventListener('ended', stopModalTrailer);
+                    stage.appendChild(mVid);
+                }
+                heroBannerEl.appendChild(stage);
             });
         }
 

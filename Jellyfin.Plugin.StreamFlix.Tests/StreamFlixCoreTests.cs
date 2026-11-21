@@ -219,19 +219,46 @@ public class StreamFlixCoreTests
     }
 
     [Fact]
-    public void HeroTrailerPreviewAndHomeRows_DefaultOptInAndNormalizeCleanly()
+    public void HeroTrailerPreviewAndHomeRows_DefaultEnabledAndNormalizeCleanly()
     {
         var defaultCfg = new PluginConfiguration();
-        Assert.False(defaultCfg.EnableHeroTrailerPreview);
+        Assert.True(defaultCfg.EnableHeroTrailerPreview);
+        Assert.False(defaultCfg.MigratedHeroYouTubeTrailers);
         Assert.Empty(defaultCfg.HomeRowOrder);
         Assert.Empty(defaultCfg.HomeHiddenRows);
 
         var defaultReq = new SaveAdminConfigRequest();
-        Assert.False(defaultReq.EnableHeroTrailerPreview);
+        Assert.True(defaultReq.EnableHeroTrailerPreview);
 
         var normalizedOrder = StreamFlixController.NormalizeHomeRowIds(
             new[] { " Movies ", "TOP10", "resume", "invalid_row", "movies", "LIVETV", string.Empty, null, "watchagain" });
         Assert.Equal(new[] { "movies", "top10", "resume", "livetv", "watchagain" }, normalizedOrder);
         Assert.Empty(StreamFlixController.NormalizeHomeRowIds(null));
+    }
+
+    [Theory]
+    [InlineData("https://www.youtube.com/watch?v=zSWdZVtXT7E", "zSWdZVtXT7E")]
+    [InlineData("https://m.youtube.com/watch?list=PL123&v=zSWdZVtXT7E&t=12s", "zSWdZVtXT7E")]
+    [InlineData("https://youtu.be/zSWdZVtXT7E?si=abc123", "zSWdZVtXT7E")]
+    [InlineData("https://www.youtube-nocookie.com/embed/zSWdZVtXT7E?autoplay=1", "zSWdZVtXT7E")]
+    [InlineData("https://www.youtube.com/shorts/zSWdZVtXT7E", "zSWdZVtXT7E")]
+    [InlineData("zSWdZVtXT7E", "zSWdZVtXT7E")]
+    [InlineData("https://vimeo.com/123456789", null)]
+    [InlineData("not-a-valid-id", null)]
+    [InlineData("", null)]
+    public void ExtractYouTubeVideoId_ParsesAllYouTubeFormatsStrictly(string raw, string? expected)
+    {
+        Assert.Equal(expected, StreamFlixController.ExtractYouTubeVideoId(raw));
+    }
+
+    [Fact]
+    public void BuildYouTubeEmbedRelayHtml_IncludesError153ReferrerPolicyAndPostMessageBridge()
+    {
+        var html = StreamFlixController.BuildYouTubeEmbedRelayHtml("zSWdZVtXT7E", autoplay: true, mute: true, controls: false, loop: false);
+        Assert.Contains("meta name=\"referrer\" content=\"strict-origin-when-cross-origin\"", html);
+        Assert.Contains("referrerpolicy=\"strict-origin-when-cross-origin\"", html);
+        Assert.Contains("https://www.youtube-nocookie.com/embed/", html);
+        Assert.Contains("autoplay=1&mute=1&controls=0", html);
+        Assert.Contains("streamflix-yt", html);
     }
 }

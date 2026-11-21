@@ -309,6 +309,7 @@ public partial class StreamFlixController
             if (request.EnableHeroTrailerPreview.HasValue)
             {
                 config.EnableHeroTrailerPreview = request.EnableHeroTrailerPreview.Value;
+                config.MigratedHeroYouTubeTrailers = true;
             }
 
             if (request.HomeRowOrder != null)

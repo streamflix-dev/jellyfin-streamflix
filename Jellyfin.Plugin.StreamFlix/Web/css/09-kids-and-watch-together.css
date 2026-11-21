@@ -2527,7 +2527,8 @@ html.bfx-no-flex-gap .bfx-epg-window-label > * + *,
 html.bfx-no-flex-gap .bfx-epg-nav-btns > * + *,
 html.bfx-no-flex-gap .bfx-epg-step-btn > * + *,
 html.bfx-no-flex-gap .bfx-epg-prog-top > * + *,
-html.bfx-no-flex-gap .bfx-home-row-cust-btns > * + * {
+html.bfx-no-flex-gap .bfx-home-row-cust-btns > * + *,
+html.bfx-no-flex-gap .bfx-modal-trailer-back > * + * {
     margin-left: 6px;
 }
 html.bfx-no-flex-gap .bfx-ltv-head-left > * + *,

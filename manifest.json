@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.14",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.14 Release Candidate (Dev Test Channel): Switch Hero Billboard previews & Detail Modal trailers to official YouTube trailers (Jellyfin RemoteTrailers + automatic embeddable YouTube Official Trailer search + Error-153-safe /StreamFlix/Trailers/Embed relay), enabled by default with live Mute/Unmute and an on-demand Trailer button in every Detail Modal.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.14_12.0.0.zip",
+        "checksum": "002553d7fb3f4dd8ef6a779b5aa064ec",
+        "timestamp": "2026-11-21T07:45:17Z"
+      },
+      {
+        "version": "0.9.8.14",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.14 Release Candidate (Dev Test Channel): Switch Hero Billboard previews & Detail Modal trailers to official YouTube trailers (Jellyfin RemoteTrailers + automatic embeddable YouTube Official Trailer search + Error-153-safe /StreamFlix/Trailers/Embed relay), enabled by default with live Mute/Unmute and an on-demand Trailer button in every Detail Modal.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.14_10.11.0.zip",
+        "checksum": "60c0185099700755216f3c5282e0482f",
+        "timestamp": "2026-11-21T07:45:17Z"
+      },
+      {
+        "version": "0.9.8.14",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.14 Release Candidate (Dev Test Channel): Switch Hero Billboard previews & Detail Modal trailers to official YouTube trailers (Jellyfin RemoteTrailers + automatic embeddable YouTube Official Trailer search + Error-153-safe /StreamFlix/Trailers/Embed relay), enabled by default with live Mute/Unmute and an on-demand Trailer button in every Detail Modal.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.14_10.9.0.zip",
+        "checksum": "9f57991422012dd14dbd28f35451de38",
+        "timestamp": "2026-11-21T07:45:17Z"
+      },
+      {
         "version": "0.9.8.13",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.13 Release Candidate (Dev Test Channel / v0.9.3 Candidate): Add inline 3-hour Live TV EPG Timeline Grid + 1-Click DVR Recording, customizable Home page row order & visibility (server defaults + per-profile overrides), interactive 4-tab New & Popular hub (All, Trending, Coming Soon, Just Added), and opt-in Muted Hero Trailer Previews.",
         "targetAbi": "12.0.0.0",

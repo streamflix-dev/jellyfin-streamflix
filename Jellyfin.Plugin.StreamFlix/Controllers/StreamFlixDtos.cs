@@ -253,7 +253,7 @@ public class SaveAdminConfigRequest
 
     public List<string>? NavLibraryIds { get; set; }
 
-    public bool EnableHeroTrailerPreview { get; set; }
+    public bool EnableHeroTrailerPreview { get; set; } = true;
 
     public List<string>? HomeRowOrder { get; set; }
 
