@@ -135,6 +135,9 @@ public partial class StreamFlixController
             heroSelectionMode = NormalizeHeroSelectionMode(config.HeroSelectionMode),
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = (config.HeroLibraryIds ?? new List<string>()).ToList(),
+            enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
+            homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,
             navHiddenBuiltIns = (config.NavHiddenBuiltIns ?? new List<string>()).ToList(),
             navLibraryIds = (config.NavLibraryIds ?? new List<string>()).ToList(),
@@ -301,6 +304,21 @@ public partial class StreamFlixController
                     .Select(id => id.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
+            }
+
+            if (request.EnableHeroTrailerPreview.HasValue)
+            {
+                config.EnableHeroTrailerPreview = request.EnableHeroTrailerPreview.Value;
+            }
+
+            if (request.HomeRowOrder != null)
+            {
+                config.HomeRowOrder = NormalizeHomeRowIds(request.HomeRowOrder);
+            }
+
+            if (request.HomeHiddenRows != null)
+            {
+                config.HomeHiddenRows = NormalizeHomeRowIds(request.HomeHiddenRows);
             }
 
             if (request.EnableCustomOidc.HasValue)

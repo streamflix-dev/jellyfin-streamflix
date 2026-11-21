@@ -1,7 +1,7 @@
 ---
 name: "StreamFlix"
 guid: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
-version: "0.9.8.12"
+version: "0.9.8.13"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "StreamFlix"
@@ -18,4 +18,4 @@ imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - v0.9.8.12 Release Candidate (Dev Test Channel): Fix Live TV compatibility (#19) by preserving enableLiveTv in client PublicConfig hydration (applyConfigFromServerResponse), prefetching Live TV channels after Hub Bootstrap, and auto-initializing EnableLiveTvAccess on pre-existing plugin-managed adult household profiles when Live TV is enabled.
+  - v0.9.8.13 Release Candidate (Dev Test Channel / v0.9.3 Candidate): Add inline 3-hour Live TV EPG Timeline Grid + 1-Click DVR Recording, customizable Home page row order & visibility (server defaults + per-profile overrides), interactive 4-tab New & Popular hub (All, Trending, Coming Soon, Just Added), and opt-in Muted Hero Trailer Previews.

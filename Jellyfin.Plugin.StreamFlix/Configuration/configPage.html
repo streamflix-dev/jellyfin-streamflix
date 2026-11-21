@@ -686,8 +686,33 @@
                                     <input id="EnableLiveTv" name="EnableLiveTv" type="checkbox" is="emby-checkbox" />
                                     <span>Enable Live TV in StreamFlix (off by default)</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Live TV</strong> tab to the top navigation bar with live channels, On Now programs, DVR recordings, Live TV channel search, and 1-click access to Jellyfin's full EPG TV Guide. Respects each Jellyfin user's Live TV access permission and stays hidden in Kids mode.</div>
+                                <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Live TV</strong> tab to the top navigation bar with live channels, On Now programs, inline 3-hour TV Guide timeline, 1-click DVR recording, and Live TV channel search. Respects each Jellyfin user's Live TV access permission and stays hidden in Kids mode.</div>
                             </div>
+                        </div>
+
+                        <div class="bfx-subbox" style="margin:0 0 16px;">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <div class="bfx-subbox-title" style="margin:0;">Muted Hero Trailer Previews</div>
+                                <span class="bfx-pill" id="HeroTrailerStatusPill">Off</span>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableHeroTrailerPreview" name="EnableHeroTrailerPreview" type="checkbox" is="emby-checkbox" />
+                                    <span>Enable muted local trailer previews on Hero Billboard (off by default)</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">After resting on a featured billboard slide for ~3 seconds, smoothly crossfades into the title's local Jellyfin trailer with a Mute / Unmute button. Respects each profile's Autoplay Previews toggle, Data Saver, and Reduced Motion.</div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" style="margin:0 0 16px;">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <div>
+                                    <div class="bfx-subbox-title" style="margin:0;">Home Page Row Order &amp; Visibility</div>
+                                    <div class="fieldDescription">Reorder or hide sections on the StreamFlix Home screen across your server (profiles can also personalize their own order).</div>
+                                </div>
+                                <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixResetHomeRowsBtn">Reset Default Order</button>
+                            </div>
+                            <div id="StreamFlixHomeRowsEditor" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
                         </div>
 
                         <div class="bfx-grid-2">
@@ -1452,9 +1477,11 @@
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
                     var enableGuestPasses = $('#EnableGuestPasses').checked;
                     var enableLiveTv = $('#EnableLiveTv').checked;
+                    var enableHeroTrailer = $('#EnableHeroTrailerPreview').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
 
                     setPill('LiveTvStatusPill', enableLiveTv ? 'ok' : '', enableLiveTv ? 'Enabled' : 'Off');
+                    setPill('HeroTrailerStatusPill', enableHeroTrailer ? 'ok' : '', enableHeroTrailer ? 'Enabled' : 'Off');
 
                     var enableSeerr = $('#EnableSeerr').checked;
                     var seerrHasUrl = Boolean($('#SeerrUrl').value.trim());
@@ -2663,6 +2690,7 @@
                     '#TreatTailscaleAsLocalLan',
                     '#EnableGuestPasses',
                     '#EnableLiveTv',
+                    '#EnableHeroTrailerPreview',
                     '#ShowLibrariesInNav',
                     '#ShowHeroAdvanced',
                     '#EnableSeerr'
@@ -2689,6 +2717,117 @@
                             renderNavLibraries();
                         }
                     });
+                });
+
+                var CANONICAL_HOME_ROWS = [
+                    { id: 'resume', label: 'Continue Watching' },
+                    { id: 'nextup', label: 'Next Up' },
+                    { id: 'livetv', label: 'Live TV · On Now (when Live TV enabled)' },
+                    { id: 'personal', label: 'Top Picks & Because You Watched' },
+                    { id: 'top10', label: 'Top 10 Today' },
+                    { id: 'mylist', label: 'My List' },
+                    { id: 'acclaimed', label: 'Critically Acclaimed' },
+                    { id: 'movies', label: 'New Movies' },
+                    { id: 'series', label: 'New Shows' },
+                    { id: 'gems', label: 'Hidden Gems' },
+                    { id: 'collections', label: 'Collections' },
+                    { id: 'watchagain', label: 'Watch It Again' }
+                ];
+                var currentHomeRowOrder = CANONICAL_HOME_ROWS.map(function (r) { return r.id; });
+                var currentHomeHiddenMap = {};
+
+                function normalizeAdminHomeRowState(orderList, hiddenList) {
+                    var seen = {};
+                    var nextOrder = [];
+                    (Array.isArray(orderList) ? orderList : []).forEach(function (id) {
+                        var clean = String(id || '').trim().toLowerCase();
+                        if (!seen[clean] && CANONICAL_HOME_ROWS.some(function (r) { return r.id === clean; })) {
+                            seen[clean] = true;
+                            nextOrder.push(clean);
+                        }
+                    });
+                    CANONICAL_HOME_ROWS.forEach(function (r) {
+                        if (!seen[r.id]) {
+                            seen[r.id] = true;
+                            nextOrder.push(r.id);
+                        }
+                    });
+                    currentHomeRowOrder = nextOrder;
+                    currentHomeHiddenMap = {};
+                    (Array.isArray(hiddenList) ? hiddenList : []).forEach(function (id) {
+                        var clean = String(id || '').trim().toLowerCase();
+                        if (clean) {
+                            currentHomeHiddenMap[clean] = true;
+                        }
+                    });
+                }
+
+                function renderHomeRowsEditor() {
+                    var host = $('#StreamFlixHomeRowsEditor');
+                    if (!host) {
+                        return;
+                    }
+                    var labelMap = {};
+                    CANONICAL_HOME_ROWS.forEach(function (r) { labelMap[r.id] = r.label; });
+                    host.innerHTML = currentHomeRowOrder.map(function (id, idx) {
+                        var checked = !currentHomeHiddenMap[id];
+                        return ''
+                            + '<div class="bfx-row" data-home-row-id="' + esc(id) + '" style="justify-content:space-between; padding:7px 10px; border-radius:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">'
+                            + '  <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">'
+                            + '    <input type="checkbox" data-home-row-cb="' + esc(id) + '"' + (checked ? ' checked' : '') + ' />'
+                            + '    <span>' + esc(labelMap[id] || id) + '</span>'
+                            + '  </label>'
+                            + '  <div class="bfx-row" style="gap:4px;">'
+                            + '    <button type="button" class="bfx-btn bfx-btn-sm" data-home-row-move="-1" data-row-idx="' + idx + '"' + (idx === 0 ? ' disabled' : '') + ' title="Move up">▲</button>'
+                            + '    <button type="button" class="bfx-btn bfx-btn-sm" data-home-row-move="1" data-row-idx="' + idx + '"' + (idx === currentHomeRowOrder.length - 1 ? ' disabled' : '') + ' title="Move down">▼</button>'
+                            + '  </div>'
+                            + '</div>';
+                    }).join('');
+
+                    Array.prototype.forEach.call(host.querySelectorAll('input[data-home-row-cb]'), function (cb) {
+                        cb.addEventListener('change', function () {
+                            var rid = cb.getAttribute('data-home-row-cb');
+                            if (rid) {
+                                if (cb.checked) {
+                                    delete currentHomeHiddenMap[rid];
+                                } else {
+                                    currentHomeHiddenMap[rid] = true;
+                                }
+                            }
+                        });
+                    });
+                    Array.prototype.forEach.call(host.querySelectorAll('button[data-home-row-move]'), function (btn) {
+                        btn.addEventListener('click', function () {
+                            var idx = parseInt(btn.getAttribute('data-row-idx'), 10);
+                            var dir = parseInt(btn.getAttribute('data-home-row-move'), 10);
+                            var target = idx + dir;
+                            if (idx >= 0 && target >= 0 && target < currentHomeRowOrder.length) {
+                                var tmp = currentHomeRowOrder[idx];
+                                currentHomeRowOrder[idx] = currentHomeRowOrder[target];
+                                currentHomeRowOrder[target] = tmp;
+                                renderHomeRowsEditor();
+                            }
+                        });
+                    });
+                }
+
+                function getHomeRowOrderForSave() {
+                    var defOrder = CANONICAL_HOME_ROWS.map(function (r) { return r.id; });
+                    if (currentHomeRowOrder.join(',') === defOrder.join(',')) {
+                        return [];
+                    }
+                    return currentHomeRowOrder.slice();
+                }
+
+                function getHomeHiddenRowsForSave() {
+                    return CANONICAL_HOME_ROWS
+                        .map(function (r) { return r.id; })
+                        .filter(function (id) { return Boolean(currentHomeHiddenMap[id]); });
+                }
+
+                $('#StreamFlixResetHomeRowsBtn').addEventListener('click', function () {
+                    normalizeAdminHomeRowState([], []);
+                    renderHomeRowsEditor();
                 });
 
                 function renderRedirectUris() {
@@ -2730,6 +2869,9 @@
                     renderGuestPassManagers();
                     $('#EnableWatchTogether').checked = cfg.enableWatchTogether !== false;
                     $('#EnableLiveTv').checked = Boolean(cfg.enableLiveTv);
+                    $('#EnableHeroTrailerPreview').checked = Boolean(cfg.enableHeroTrailerPreview);
+                    normalizeAdminHomeRowState(cfg.homeRowOrder, cfg.homeHiddenRows);
+                    renderHomeRowsEditor();
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
                     $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
                     $('#HeroSelectionMode').value = cfg.heroSelectionMode || 'recent';
@@ -2865,6 +3007,9 @@
                         heroSelectionMode: $('#HeroSelectionMode').value || 'recent',
                         heroContentType: $('#HeroContentType').value || 'all',
                         heroLibraryIds: getCheckedHeroLibraryIds(),
+                        enableHeroTrailerPreview: $('#EnableHeroTrailerPreview').checked,
+                        homeRowOrder: getHomeRowOrderForSave(),
+                        homeHiddenRows: getHomeHiddenRowsForSave(),
                         showLibrariesInNav: $('#ShowLibrariesInNav').checked,
                         navHiddenBuiltIns: getUncheckedNavBuiltIns(),
                         navLibraryIds: getConfiguredNavLibraryIdsForSave(),

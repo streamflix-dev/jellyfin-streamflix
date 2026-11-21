@@ -164,6 +164,8 @@
             (state.liveTvData && state.liveTvData.channels) || [],
             (state.liveTvData && state.liveTvData.onNow) || [],
             (state.liveTvData && state.liveTvData.recordings) || [],
+            (state.liveTvEpg && state.liveTvEpg.programs) || [],
+            (state.hotTabExtra && state.hotTabExtra.upcomingEpisodes) || [],
             personalRowItems(), extraItemsList || []
         ].forEach(function (arr) {
             (arr || []).forEach(function (it) {
@@ -479,6 +481,95 @@
         return map;
     }
 
+    var CANONICAL_HOME_ROW_SPECS = [
+        { id: 'resume', label: 'Continue Watching' },
+        { id: 'nextup', label: 'Next Up' },
+        { id: 'livetv', label: 'Live TV · On Now' },
+        { id: 'personal', label: 'Top Picks & Because You Watched' },
+        { id: 'top10', label: 'Top 10 Today' },
+        { id: 'mylist', label: 'My List' },
+        { id: 'acclaimed', label: 'Critically Acclaimed' },
+        { id: 'movies', label: 'New Movies' },
+        { id: 'series', label: 'New Shows' },
+        { id: 'gems', label: 'Hidden Gems' },
+        { id: 'collections', label: 'Collections' },
+        { id: 'watchagain', label: 'Watch It Again' }
+    ];
+
+    function getCurrentServerHomeRowsSig() {
+        var cfg = state.config || {};
+        var ord = Array.isArray(cfg.homeRowOrder) ? cfg.homeRowOrder.join(',') : '';
+        var hid = Array.isArray(cfg.homeHiddenRows) ? cfg.homeHiddenRows.join(',') : '';
+        return ord + '|' + hid;
+    }
+
+    function getProfileHomeRowPrefs() {
+        var pid = state.activeProfile && state.activeProfile.id;
+        if (!pid) {
+            return null;
+        }
+        var stored = loadJson(HOME_ROW_PREF_PREFIX + pid, null);
+        if (!stored || typeof stored !== 'object' || !stored.customized) {
+            return null;
+        }
+        if (stored.serverHomeSig !== getCurrentServerHomeRowsSig()) {
+            return null;
+        }
+        return stored;
+    }
+
+    function saveProfileHomeRowPrefs(prefs) {
+        var pid = state.activeProfile && state.activeProfile.id;
+        if (!pid) {
+            return;
+        }
+        if (prefs && typeof prefs === 'object') {
+            prefs.serverHomeSig = getCurrentServerHomeRowsSig();
+        }
+        saveJson(HOME_ROW_PREF_PREFIX + pid, prefs || null);
+    }
+
+    function getEffectiveHomeRowPlan() {
+        var prof = getProfileHomeRowPrefs();
+        var cfg = state.config || {};
+        var rawOrder = prof && Array.isArray(prof.order)
+            ? prof.order
+            : (Array.isArray(cfg.homeRowOrder) ? cfg.homeRowOrder : []);
+        var rawHidden = prof && Array.isArray(prof.hiddenRows)
+            ? prof.hiddenRows
+            : (Array.isArray(cfg.homeHiddenRows) ? cfg.homeHiddenRows : []);
+        var allowedMap = {};
+        CANONICAL_HOME_ROW_SPECS.forEach(function (r) { allowedMap[r.id] = true; });
+        var seen = {};
+        var order = [];
+        rawOrder.forEach(function (id) {
+            var clean = String(id || '').trim().toLowerCase();
+            if (allowedMap[clean] && !seen[clean]) {
+                seen[clean] = true;
+                order.push(clean);
+            }
+        });
+        CANONICAL_HOME_ROW_SPECS.forEach(function (r) {
+            if (!seen[r.id]) {
+                seen[r.id] = true;
+                order.push(r.id);
+            }
+        });
+        var hiddenMap = {};
+        rawHidden.forEach(function (id) {
+            var clean = String(id || '').trim().toLowerCase();
+            if (allowedMap[clean]) {
+                hiddenMap[clean] = true;
+            }
+        });
+        var defSeq = CANONICAL_HOME_ROW_SPECS.map(function (r) { return r.id; }).join(',');
+        return {
+            order: order,
+            hiddenMap: hiddenMap,
+            isDefaultOrder: order.join(',') === defSeq
+        };
+    }
+
     function isNavBuiltInHidden(builtInId) {
         var map = getEffectiveHiddenBuiltInNavMap();
         return Boolean(map[String(builtInId || '').toLowerCase()]);
@@ -703,13 +794,19 @@
             }).join('')
             : '<div class="streamflix-modal-text" style="margin:4px 0 0;">No accessible media libraries loaded yet.</div>';
 
+        var profRowPrefs = getProfileHomeRowPrefs();
+        var effRowPlan = getEffectiveHomeRowPlan();
+        var draftRowOrder = effRowPlan.order.slice();
+        var draftRowHidden = {};
+        Object.keys(effRowPlan.hiddenMap).forEach(function (k) { draftRowHidden[k] = true; });
+
         var profName = (state.activeProfile && state.activeProfile.name) || 'this profile';
         var m = openModal(''
             + '<div class="bfx-cs-head">'
             + '  <div class="bfx-cs-head-ico">' + icon('sliders') + '</div>'
             + '  <div class="bfx-cs-head-copy">'
-            + '    <h2>Navigation Bar</h2>'
-            + '    <p class="streamflix-modal-text">Choose which built-in categories and Jellyfin libraries appear in the top bar for <strong>' + escapeHtml(profName) + '</strong>.</p>'
+            + '    <h2>Navigation &amp; Home Layout</h2>'
+            + '    <p class="streamflix-modal-text">Customize top-bar categories, Jellyfin libraries, and Home screen row order for <strong>' + escapeHtml(profName) + '</strong>.</p>'
             + '  </div>'
             + '</div>'
             + '<div class="bfx-nav-cust-section">'
@@ -720,8 +817,12 @@
             + '  <div class="bfx-nav-cust-label">Your Jellyfin Libraries</div>'
             + '  <div class="bfx-nav-cust-grid">' + libRowsHtml + '</div>'
             + '</div>'
+            + '<div class="bfx-nav-cust-section">'
+            + '  <div class="bfx-nav-cust-label">Home Screen Row Order</div>'
+            + '  <div class="bfx-home-rows-cust-list" id="bfx-prof-home-rows-list"></div>'
+            + '</div>'
             + '<div class="streamflix-modal-actions" style="justify-content:space-between;">'
-            + (profPrefs
+            + ((profPrefs || profRowPrefs)
                 ? '  <button type="button" class="streamflix-ghost-btn" data-nav-act="reset">Use Server Default</button>'
                 : '  <span></span>')
             + '  <div style="display:flex;gap:8px;">'
@@ -729,6 +830,60 @@
             + '    <button type="button" class="streamflix-btn-primary" data-nav-act="save">Save</button>'
             + '  </div>'
             + '</div>', { className: 'bfx-nav-customize-modal' });
+
+        var rowHostEl = m.modal.querySelector('#bfx-prof-home-rows-list');
+        var liveTvOnNowAllowed = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
+        var rowTitleMap = {};
+        CANONICAL_HOME_ROW_SPECS.forEach(function (r) { rowTitleMap[r.id] = r.label; });
+        var renderModalHomeRows = function () {
+            if (!rowHostEl) {
+                return;
+            }
+            var shownOrder = draftRowOrder.filter(function (rid) {
+                return rid !== 'livetv' || liveTvOnNowAllowed;
+            });
+            rowHostEl.innerHTML = shownOrder.map(function (rid, idx) {
+                var on = !draftRowHidden[rid];
+                return ''
+                    + '<div class="bfx-home-row-cust-item" data-cust-row="' + escapeHtml(rid) + '">'
+                    + '  <label class="bfx-home-row-cust-lbl">'
+                    + '    <input type="checkbox" data-cust-row-cb="' + escapeHtml(rid) + '"' + (on ? ' checked' : '') + ' />'
+                    + '    <span>' + escapeHtml(rowTitleMap[rid] || rid) + '</span>'
+                    + '  </label>'
+                    + '  <div class="bfx-home-row-cust-btns">'
+                    + '    <button type="button" class="streamflix-ghost-btn bfx-home-row-move-btn" data-cust-move="-1" data-cust-id="' + escapeHtml(rid) + '"' + (idx === 0 ? ' disabled' : '') + ' title="Move row up" aria-label="Move up">' + icon('arrowUp') + '</button>'
+                    + '    <button type="button" class="streamflix-ghost-btn bfx-home-row-move-btn" data-cust-move="1" data-cust-id="' + escapeHtml(rid) + '"' + (idx === shownOrder.length - 1 ? ' disabled' : '') + ' title="Move row down" aria-label="Move down">' + icon('arrowDown') + '</button>'
+                    + '  </div>'
+                    + '</div>';
+            }).join('');
+            Array.prototype.forEach.call(rowHostEl.querySelectorAll('input[data-cust-row-cb]'), function (cb) {
+                cb.addEventListener('change', function () {
+                    var rid = cb.getAttribute('data-cust-row-cb');
+                    if (rid) {
+                        if (cb.checked) { delete draftRowHidden[rid]; }
+                        else { draftRowHidden[rid] = true; }
+                    }
+                });
+            });
+            Array.prototype.forEach.call(rowHostEl.querySelectorAll('button[data-cust-move]'), function (btn) {
+                btn.addEventListener('click', function () {
+                    var rid = btn.getAttribute('data-cust-id');
+                    var dir = parseInt(btn.getAttribute('data-cust-move'), 10) || 0;
+                    var curIdx = draftRowOrder.indexOf(rid);
+                    var nextIdx = curIdx + dir;
+                    while (nextIdx >= 0 && nextIdx < draftRowOrder.length && !liveTvOnNowAllowed && draftRowOrder[nextIdx] === 'livetv') {
+                        nextIdx += dir;
+                    }
+                    if (curIdx !== -1 && nextIdx >= 0 && nextIdx < draftRowOrder.length) {
+                        var tmp = draftRowOrder[curIdx];
+                        draftRowOrder[curIdx] = draftRowOrder[nextIdx];
+                        draftRowOrder[nextIdx] = tmp;
+                        renderModalHomeRows();
+                    }
+                });
+            });
+        };
+        renderModalHomeRows();
 
         var cancelBtn = m.modal.querySelector('[data-nav-act="cancel"]');
         if (cancelBtn) {
@@ -738,11 +893,12 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
                 saveProfileNavPrefs(null);
+                saveProfileHomeRowPrefs(null);
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
                 }
-                showToast('Navigation bar reset to server defaults.', 'info');
+                showToast('Navigation & Home layout reset to server defaults.', 'info');
             });
         }
         var saveBtn = m.modal.querySelector('[data-nav-act="save"]');
@@ -766,11 +922,16 @@
                     hiddenBuiltIns: nextHidden,
                     libraryIds: nextLibs
                 });
+                saveProfileHomeRowPrefs({
+                    customized: true,
+                    order: draftRowOrder.slice(),
+                    hiddenRows: Object.keys(draftRowHidden).filter(function (k) { return Boolean(draftRowHidden[k]); })
+                });
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
                 }
-                showToast('Navigation bar updated.', 'success');
+                showToast('Navigation & Home layout updated.', 'success');
             });
         }
         return m;
@@ -1751,6 +1912,250 @@
         });
     }
 
+    var EPG_WINDOW_MINUTES = 180;
+
+    function getLiveTvEpgWindowBounds() {
+        var offsetMins = (state.liveTvUi && typeof state.liveTvUi.epgOffsetMins === 'number') ? state.liveTvUi.epgOffsetMins : 0;
+        var halfHourMs = 30 * 60000;
+        var baseStartMs = Math.floor(Date.now() / halfHourMs) * halfHourMs;
+        var startMs = baseStartMs + (offsetMins * 60000);
+        var endMs = startMs + (EPG_WINDOW_MINUTES * 60000);
+        return {
+            startMs: startMs,
+            endMs: endMs,
+            offsetMins: offsetMins
+        };
+    }
+
+    function ensureLiveTvEpgLoaded(forceRefresh) {
+        if (!(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile())) {
+            return null;
+        }
+        var auth = getJellyfinAuthContext();
+        if (!auth || !auth.userId || !auth.token) {
+            return null;
+        }
+        var bounds = getLiveTvEpgWindowBounds();
+        var winKey = normalizeGuid(auth.userId) + ':' + bounds.startMs + ':' + bounds.endMs;
+        var existing = state.liveTvEpg;
+        if (existing && existing.winKey === winKey && !forceRefresh) {
+            if (existing.loading) {
+                return existing;
+            }
+            if (existing.loaded && (Date.now() - (Number(existing.ts) || 0)) < 90000) {
+                return existing;
+            }
+        }
+
+        var entry = {
+            winKey: winKey,
+            userId: auth.userId,
+            startMs: bounds.startMs,
+            endMs: bounds.endMs,
+            loading: true,
+            loaded: false,
+            ts: 0,
+            programs: [],
+            byChannel: {},
+            timersByProgramId: {}
+        };
+        state.liveTvEpg = entry;
+
+        var uid = encodeURIComponent(auth.userId);
+        var startIso = encodeURIComponent(new Date(bounds.startMs).toISOString());
+        var endIso = encodeURIComponent(new Date(bounds.endMs).toISOString());
+        var pProgs = apiFetch('/LiveTv/Programs?userId=' + uid + '&MaxStartDate=' + endIso + '&MinEndDate=' + startIso + '&EnableImages=true&EnableUserData=true&Fields=Overview,ChannelInfo&Limit=1200')
+            .catch(function () { return { Items: [] }; });
+        var pTimers = apiFetch('/LiveTv/Timers')
+            .catch(function () { return { Items: [] }; });
+
+        Promise.all([pProgs, pTimers]).then(function (resArr) {
+            if (state.liveTvEpg !== entry) {
+                return;
+            }
+            var rawProgs = (resArr[0] && Array.isArray(resArr[0].Items)) ? resArr[0].Items : [];
+            var rawTimers = (resArr[1] && Array.isArray(resArr[1].Items)) ? resArr[1].Items : [];
+            var timerMap = {};
+            rawTimers.forEach(function (tm) {
+                if (tm && tm.Id && tm.ProgramId && String(tm.Status || '').toLowerCase() !== 'cancelled') {
+                    timerMap[normalizeGuid(tm.ProgramId)] = String(tm.Id);
+                }
+            });
+            var byCh = {};
+            rawProgs.forEach(function (pr) {
+                if (!pr || !pr.Id || !pr.ChannelId) {
+                    return;
+                }
+                var normPid = normalizeGuid(pr.Id);
+                if (!pr.TimerId && timerMap[normPid]) {
+                    pr.TimerId = timerMap[normPid];
+                }
+                var chKey = normalizeGuid(pr.ChannelId);
+                if (!byCh[chKey]) {
+                    byCh[chKey] = [];
+                }
+                byCh[chKey].push(pr);
+            });
+            Object.keys(byCh).forEach(function (ck) {
+                byCh[ck].sort(function (a, b) {
+                    return (Date.parse(a.StartDate || '') || 0) - (Date.parse(b.StartDate || '') || 0);
+                });
+            });
+
+            entry.programs = rawProgs;
+            entry.byChannel = byCh;
+            entry.timersByProgramId = timerMap;
+            entry.loading = false;
+            entry.loaded = true;
+            entry.ts = Date.now();
+
+            if (document.getElementById('streamflix-cinema-hub') && state.activeCategory === 'livetv' && state.liveTvUi && state.liveTvUi.tab === 'guide') {
+                renderCinemaHubContents();
+            }
+        }).catch(function () {
+            if (state.liveTvEpg === entry) {
+                entry.loading = false;
+                entry.loaded = true;
+                entry.ts = Date.now();
+                if (document.getElementById('streamflix-cinema-hub') && state.activeCategory === 'livetv' && state.liveTvUi && state.liveTvUi.tab === 'guide') {
+                    renderCinemaHubContents();
+                }
+            }
+        });
+
+        return entry;
+    }
+
+    function buildLiveTvEpgGridHtml(channels, filterQ) {
+        var epg = ensureLiveTvEpgLoaded(false);
+        var bounds = getLiveTvEpgWindowBounds();
+        var startMs = bounds.startMs;
+        var endMs = bounds.endMs;
+        var spanMs = Math.max(1, endMs - startMs);
+        var nowMs = Date.now();
+        var nowInWindow = nowMs >= startMs && nowMs <= endMs;
+        var nowPct = nowInWindow ? Math.min(100, Math.max(0, ((nowMs - startMs) / spanMs) * 100)) : -1;
+
+        var fmtSlot = function (ms) {
+            try {
+                return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            } catch (eT) {
+                return '';
+            }
+        };
+        var dateLabel = '';
+        try {
+            dateLabel = new Date(startMs).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        } catch (eD) {}
+
+        var slotsHtml = '';
+        var slotCount = EPG_WINDOW_MINUTES / 30;
+        for (var si = 0; si < slotCount; si++) {
+            var slotMs = startMs + (si * 30 * 60000);
+            slotsHtml += '<div class="bfx-epg-slot-lbl" style="width:' + (100 / slotCount).toFixed(4) + '%;">' + escapeHtml(fmtSlot(slotMs)) + '</div>';
+        }
+
+        var visibleChannels = getFilteredLiveTvChannels(channels, filterQ).slice(0, 80);
+        if (!visibleChannels.length) {
+            return buildEmptyStateHtml('search', 'No channels matching “' + filterQ + '”', 'Clear the channel filter above to view the full TV Guide timeline.');
+        }
+
+        var bodyRowsHtml = '';
+        if (!epg || (epg.loading && !epg.loaded)) {
+            bodyRowsHtml = '<div class="streamflix-filter-loading"><div class="streamflix-spinner-ring"></div><span>Loading 3-hour TV Guide lineup…</span></div>';
+        } else {
+            bodyRowsHtml = visibleChannels.map(function (ch) {
+                var chKey = normalizeGuid(ch.Id);
+                var chNum = String(ch.Number || ch.ChannelNumber || '').trim();
+                var chName = String(ch.Name || 'Channel');
+                var logoUrl = (ch.ImageTags && ch.ImageTags.Primary)
+                    ? (apiBase() + '/Items/' + encodeURIComponent(ch.Id) + '/Images/Primary?maxWidth=120&quality=88')
+                    : '';
+                var progs = (epg.byChannel && epg.byChannel[chKey]) ? epg.byChannel[chKey] : [];
+                if (!progs.length && ch.CurrentProgram && ch.CurrentProgram.Id) {
+                    progs = [ch.CurrentProgram];
+                }
+
+                var blocksHtml = '';
+                if (!progs.length) {
+                    blocksHtml = '<div class="bfx-epg-prog is-empty" data-epg-tune-ch="' + escapeHtml(ch.Id) + '" style="left:0%;width:100%;" role="button" tabindex="0" title="Watch ' + escapeHtml(chName) + ' Live">'
+                        + '<span class="bfx-epg-prog-title">' + escapeHtml(chName) + ' · Live Stream</span>'
+                        + '<span class="bfx-epg-prog-sub">No EPG program data in this window — click to watch live</span>'
+                        + '</div>';
+                } else {
+                    blocksHtml = progs.map(function (pr) {
+                        var pStart = Date.parse(pr.StartDate || '');
+                        var pEnd = Date.parse(pr.EndDate || '');
+                        if (isNaN(pStart) || isNaN(pEnd) || pEnd <= startMs || pStart >= endMs || pEnd <= pStart) {
+                            return '';
+                        }
+                        var clampedStart = Math.max(startMs, pStart);
+                        var clampedEnd = Math.min(endMs, pEnd);
+                        var leftPct = ((clampedStart - startMs) / spanMs) * 100;
+                        var widthPct = Math.max(2.2, ((clampedEnd - clampedStart) / spanMs) * 100);
+                        if (leftPct + widthPct > 100) {
+                            widthPct = Math.max(1.5, 100 - leftPct);
+                        }
+                        var airing = nowMs >= pStart && nowMs < pEnd;
+                        var hasTimer = Boolean(pr.TimerId || (epg.timersByProgramId && epg.timersByProgramId[normalizeGuid(pr.Id)]));
+                        var timeStr = fmtSlot(pStart) + ' – ' + fmtSlot(pEnd);
+                        var subParts = [pr.EpisodeTitle || '', timeStr].filter(Boolean).join(' · ');
+                        return ''
+                            + '<div class="bfx-epg-prog' + (airing ? ' is-airing' : '') + (hasTimer ? ' has-timer' : '') + '" data-item-id="' + escapeHtml(pr.Id) + '" style="left:' + leftPct.toFixed(3) + '%;width:' + widthPct.toFixed(3) + '%;" role="button" tabindex="0" title="' + escapeHtml((pr.Name || 'Program') + ' (' + timeStr + ')') + '">'
+                            + '  <div class="bfx-epg-prog-top">'
+                            + (airing ? '<span class="bfx-ltv-live-dot"></span>' : '')
+                            + (hasTimer ? '<span class="bfx-epg-rec-badge" title="Recording scheduled">REC</span>' : '')
+                            + '    <span class="bfx-epg-prog-title">' + escapeHtml(pr.Name || 'Program') + '</span>'
+                            + '  </div>'
+                            + '  <div class="bfx-epg-prog-sub">' + escapeHtml(subParts) + '</div>'
+                            + '</div>';
+                    }).join('');
+                }
+
+                return ''
+                    + '<div class="bfx-epg-row">'
+                    + '  <button type="button" class="bfx-epg-ch-cell" data-epg-tune-ch="' + escapeHtml(ch.Id) + '" title="Watch ' + escapeHtml((chNum ? 'CH ' + chNum + ' ' : '') + chName) + ' Live">'
+                    + (logoUrl
+                        ? '    <img class="bfx-epg-ch-logo" loading="lazy" src="' + escapeHtml(logoUrl) + '" alt="" />'
+                        : '    <span class="bfx-epg-ch-fallback">' + icon('tv') + '</span>')
+                    + '    <span class="bfx-epg-ch-meta">'
+                    + (chNum ? '      <span class="bfx-epg-ch-num">CH ' + escapeHtml(chNum) + '</span>' : '')
+                    + '      <span class="bfx-epg-ch-name">' + escapeHtml(chName) + '</span>'
+                    + '    </span>'
+                    + '  </button>'
+                    + '  <div class="bfx-epg-track">'
+                    + (nowPct >= 0 ? '    <div class="bfx-epg-now-line" style="left:' + nowPct.toFixed(3) + '%;" aria-hidden="true"></div>' : '')
+                    + blocksHtml
+                    + '  </div>'
+                    + '</div>';
+            }).join('');
+        }
+
+        return ''
+            + '<div class="bfx-epg-wrap" id="bfx-ltv-epg-wrap">'
+            + '  <div class="bfx-epg-toolbar">'
+            + '    <div class="bfx-epg-window-label">' + icon('calendar') + '<span>' + escapeHtml((dateLabel ? dateLabel + ' · ' : '') + fmtSlot(startMs) + ' – ' + fmtSlot(endMs)) + '</span></div>'
+            + '    <div class="bfx-epg-nav-btns">'
+            + '      <button type="button" class="streamflix-ghost-btn bfx-epg-step-btn" data-epg-step="-120">' + icon('chevronLeft') + '<span>Earlier</span></button>'
+            + '      <button type="button" class="streamflix-ghost-btn bfx-epg-step-btn' + (bounds.offsetMins === 0 ? ' is-now' : '') + '" data-epg-now="1"><span>Now</span></button>'
+            + '      <button type="button" class="streamflix-ghost-btn bfx-epg-step-btn" data-epg-step="120"><span>Later</span>' + icon('chevronRight') + '</button>'
+            + '    </div>'
+            + '  </div>'
+            + '  <div class="bfx-epg-scroll">'
+            + '    <div class="bfx-epg-table">'
+            + '      <div class="bfx-epg-header-row">'
+            + '        <div class="bfx-epg-corner">Channel</div>'
+            + '        <div class="bfx-epg-ruler">'
+            + slotsHtml
+            + (nowPct >= 0 ? '<div class="bfx-epg-now-head" style="left:' + nowPct.toFixed(3) + '%;"><span>NOW</span></div>' : '')
+            + '        </div>'
+            + '      </div>'
+            + bodyRowsHtml
+            + '    </div>'
+            + '  </div>'
+            + '</div>';
+    }
+
     function buildLiveTvContentSlotHtml(ltv) {
         var ui = state.liveTvUi || { tab: 'all', filter: '' };
         var tab = ui.tab || 'all';
@@ -1774,6 +2179,10 @@
                     ? '<div class="bfx-ltv-empty-actions"><button type="button" class="streamflix-btn-primary" data-ltv-admin-setup="1">' + iconLabel('gear', 'Open Live TV Setup') + '</button></div>'
                     : '')
                 + '</div>';
+        }
+
+        if (tab === 'guide') {
+            return buildLiveTvEpgGridHtml(channels, filterQ);
         }
 
         if (tab === 'recordings') {
@@ -1848,6 +2257,7 @@
         var tabs = [
             { id: 'all', label: 'All Channels', count: channels.length, show: true },
             { id: 'onnow', label: 'On Now', count: airingCount, show: airingCount > 0 || state.liveTvUi.tab === 'onnow' },
+            { id: 'guide', label: 'TV Guide', count: 0, show: channels.length > 0 || state.liveTvUi.tab === 'guide' },
             { id: 'favorites', label: 'Favorites', count: favCount, show: favCount > 0 || state.liveTvUi.tab === 'favorites' },
             { id: 'recordings', label: 'Recordings', count: recordings.length, show: recordings.length > 0 || state.liveTvUi.tab === 'recordings' }
         ];
@@ -1883,7 +2293,7 @@
                     + '      </div>')
                 : '')
             + '      <div class="bfx-ltv-guide-btns">'
-            + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-guide-btn" data-ltv-route="#/livetv?tab=1" title="Open Jellyfin Timeline EPG Guide">' + icon('calendar') + '<span>TV Guide</span></button>'
+            + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-guide-btn" data-ltv-route="#/livetv?tab=1" title="Open Jellyfin Full Multi-Day EPG Guide">' + icon('calendar') + '<span>Full EPG</span></button>'
             + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-guide-btn" data-ltv-route="#/livetv?tab=4" title="Open DVR Schedule &amp; Timers">' + icon('clock') + '<span>Schedule</span></button>'
             + '        <button type="button" class="streamflix-ghost-btn bfx-ltv-refresh-btn" data-ltv-refresh="1" title="Refresh Live TV program guide" aria-label="Refresh Live TV">' + icon('refresh') + '</button>'
             + '      </div>'
@@ -1926,6 +2336,9 @@
             refreshBtn.__bfxBound = true;
             refreshBtn.addEventListener('click', function () {
                 ensureLiveTvHubDataLoaded(true);
+                if (state.liveTvUi && state.liveTvUi.tab === 'guide') {
+                    ensureLiveTvEpgLoaded(true);
+                }
                 renderCinemaHubContents();
             });
         }
@@ -1943,6 +2356,43 @@
                     }
                 });
             }
+            Array.prototype.forEach.call(slotEl.querySelectorAll('[data-epg-step]'), function (sBtn) {
+                if (sBtn.__bfxBound) { return; }
+                sBtn.__bfxBound = true;
+                sBtn.addEventListener('click', function () {
+                    if (!state.liveTvUi) { state.liveTvUi = { tab: 'guide', filter: '', epgOffsetMins: 0 }; }
+                    var delta = parseInt(sBtn.getAttribute('data-epg-step'), 10) || 0;
+                    var nextOff = Math.max(-720, Math.min(2880, (Number(state.liveTvUi.epgOffsetMins) || 0) + delta));
+                    state.liveTvUi.epgOffsetMins = nextOff;
+                    renderCinemaHubContents();
+                });
+            });
+            var nowBtn = slotEl.querySelector('[data-epg-now]');
+            if (nowBtn && !nowBtn.__bfxBound) {
+                nowBtn.__bfxBound = true;
+                nowBtn.addEventListener('click', function () {
+                    if (!state.liveTvUi) { state.liveTvUi = { tab: 'guide', filter: '', epgOffsetMins: 0 }; }
+                    state.liveTvUi.epgOffsetMins = 0;
+                    renderCinemaHubContents();
+                });
+            }
+            Array.prototype.forEach.call(slotEl.querySelectorAll('[data-epg-tune-ch]'), function (chEl) {
+                if (chEl.__bfxBound) { return; }
+                chEl.__bfxBound = true;
+                var tuneNow = function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    var cid = chEl.getAttribute('data-epg-tune-ch');
+                    var chItem = findCachedItemById(cid) || { Id: cid, Type: 'TvChannel' };
+                    navigateOrPlayItem(chItem);
+                };
+                chEl.addEventListener('click', tuneNow);
+                chEl.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                        tuneNow(ev);
+                    }
+                });
+            });
         };
 
         var slotEl = hubSec.querySelector('#bfx-ltv-content-slot');
@@ -2308,30 +2758,98 @@
         } else if (cat === 'hot') {
             ensureHotTabExtraLoaded();
             var hotEx = state.hotTabExtra || { upcomingEpisodes: [], seerrComingSoon: [] };
+            var hotTab = state.hotSubTab || 'all';
+            if (hotTab !== 'all' && hotTab !== 'trending' && hotTab !== 'comingsoon' && hotTab !== 'new') {
+                hotTab = 'all';
+                state.hotSubTab = 'all';
+            }
             var sevenDaysAgo = Date.now() - (7 * 24 * 3600 * 1000);
             var addedThisWeek = dedupeMediaItems([].concat(d.recentMovies || [], d.recentSeries || [])).filter(function (it) {
                 var c = it && it.DateCreated ? Date.parse(it.DateCreated) : 0;
                 return c >= sevenDaysAgo;
             }).slice(0, 20);
-            if (d.top10Items.length > 0) {
-                rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10' });
+            var upcomingCount = (Array.isArray(hotEx.upcomingEpisodes) ? hotEx.upcomingEpisodes.length : 0)
+                + (Array.isArray(hotEx.seerrComingSoon) ? hotEx.seerrComingSoon.length : 0);
+            var justAddedCount = (d.recentMovies ? d.recentMovies.length : 0) + (d.recentSeries ? d.recentSeries.length : 0);
+            var hotSubTabs = [
+                { id: 'all', label: 'All', count: 0 },
+                { id: 'trending', label: 'Trending', count: d.top10Items ? d.top10Items.length : 0 },
+                { id: 'comingsoon', label: 'Coming Soon', count: upcomingCount },
+                { id: 'new', label: 'Just Added', count: justAddedCount }
+            ];
+            var hotHeaderHtml = ''
+                + '<section class="streamflix-row bfx-hot-header-sec" data-row-id="hot-subnav">'
+                + '  <div class="bfx-ltv-header">'
+                + '    <div class="bfx-ltv-head-left">'
+                + '      <div class="bfx-ltv-title-row">'
+                + '        <span class="bfx-ltv-live-pill is-lg bfx-hot-pill">' + icon('flame') + '<span>NEW &amp; POPULAR</span></span>'
+                + '        <h2 class="streamflix-row-title">Trending, Coming Soon &amp; Fresh Arrivals</h2>'
+                + '      </div>'
+                + '      <div class="streamflix-FilterPills bfx-ltv-subpills" role="tablist" aria-label="New &amp; Popular views">'
+                + hotSubTabs.map(function (ht) {
+                    var isAct = hotTab === ht.id;
+                    return '<button type="button" class="streamflix-pill' + (isAct ? ' active' : '') + '" data-hot-subtab="' + ht.id + '">'
+                        + escapeHtml(ht.label)
+                        + (ht.count > 0 ? (' <span class="bfx-sp-pill-cnt">' + ht.count + '</span>') : '')
+                        + '</button>';
+                }).join('')
+                + '      </div>'
+                + '    </div>'
+                + '  </div>'
+                + '</section>';
+            rowsHtml += hotHeaderHtml;
+
+            if (hotTab === 'comingsoon') {
+                var sortedUpcoming = (Array.isArray(hotEx.upcomingEpisodes) ? hotEx.upcomingEpisodes.slice() : []).sort(function (a, b) {
+                    return (Date.parse(a.PremiereDate || '') || Number.MAX_SAFE_INTEGER) - (Date.parse(b.PremiereDate || '') || Number.MAX_SAFE_INTEGER);
+                });
+                if (sortedUpcoming.length > 0) {
+                    rowsHtml += buildRowHtml('hot-upcoming', rowTitle('Upcoming TV Episodes', sortedUpcoming.length), sortedUpcoming.map(buildUpcomingEpisodeWideCardHtml).join(''), { className: 'streamflix-row-wide' });
+                }
+                if (Array.isArray(hotEx.seerrComingSoon) && hotEx.seerrComingSoon.length > 0) {
+                    rowsHtml += buildRowHtml('hot-seerr-soon', rowTitle('Coming Soon · Requested via Seerr', hotEx.seerrComingSoon.length), hotEx.seerrComingSoon.map(buildSeerrCardHtml).join(''));
+                }
+                if (sortedUpcoming.length === 0 && (!Array.isArray(hotEx.seerrComingSoon) || hotEx.seerrComingSoon.length === 0)) {
+                    rowsHtml += hotEx.loading
+                        ? '<div class="streamflix-filter-loading"><div class="streamflix-spinner-ring"></div><span>Checking upcoming releases…</span></div>'
+                        : buildEmptyStateHtml('calendar', 'No scheduled upcoming airings right now', 'Upcoming episodes for ongoing series in your library (and requested Seerr titles) appear here automatically.');
+                }
+            } else if (hotTab === 'trending') {
+                if (d.top10Items.length > 0) {
+                    rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10' });
+                }
+                rowsHtml += smartRowsHtml(['smart-acclaimed', 'smart-gems', 'smart-binge']);
+            } else if (hotTab === 'new') {
+                if (addedThisWeek.length > 0) {
+                    rowsHtml += buildRowHtml('hot-week', rowTitle('Added in the Last 7 Days', addedThisWeek.length), addedThisWeek.map(buildPosterCardHtml).join(''));
+                }
+                if (d.recentMovies.length > 0) {
+                    rowsHtml += buildRowHtml('hot-movies', rowTitle('New Movies on ' + getBrandName()), d.recentMovies.map(buildPosterCardHtml).join(''));
+                }
+                if (d.recentSeries.length > 0) {
+                    rowsHtml += buildRowHtml('hot-series', rowTitle('New Episodes & Series'), d.recentSeries.map(buildPosterCardHtml).join(''));
+                }
+            } else {
+                if (d.top10Items.length > 0) {
+                    rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10' });
+                }
+                if (Array.isArray(hotEx.upcomingEpisodes) && hotEx.upcomingEpisodes.length > 0) {
+                    rowsHtml += buildRowHtml('hot-upcoming', rowTitle('Coming Soon · Upcoming Episodes', hotEx.upcomingEpisodes.length), hotEx.upcomingEpisodes.map(buildUpcomingEpisodeWideCardHtml).join(''), { className: 'streamflix-row-wide' });
+                }
+                if (Array.isArray(hotEx.seerrComingSoon) && hotEx.seerrComingSoon.length > 0) {
+                    rowsHtml += buildRowHtml('hot-seerr-soon', rowTitle('Coming Soon via Seerr', hotEx.seerrComingSoon.length), hotEx.seerrComingSoon.map(buildSeerrCardHtml).join(''));
+                }
+                if (addedThisWeek.length >= 3) {
+                    rowsHtml += buildRowHtml('hot-week', rowTitle('Worth the Wait · Added This Week', addedThisWeek.length), addedThisWeek.map(buildPosterCardHtml).join(''));
+                }
+                if (d.recentMovies.length > 0) {
+                    rowsHtml += buildRowHtml('hot-movies', rowTitle('New Movies on ' + getBrandName()), d.recentMovies.map(buildPosterCardHtml).join(''));
+                }
+                if (d.recentSeries.length > 0) {
+                    rowsHtml += buildRowHtml('hot-series', rowTitle('New Episodes & Series'), d.recentSeries.map(buildPosterCardHtml).join(''));
+                }
+                rowsHtml += smartRowsHtml(['smart-acclaimed', 'smart-gems']);
             }
-            if (Array.isArray(hotEx.upcomingEpisodes) && hotEx.upcomingEpisodes.length > 0) {
-                rowsHtml += buildRowHtml('hot-upcoming', rowTitle('Upcoming Episodes', hotEx.upcomingEpisodes.length), hotEx.upcomingEpisodes.map(buildUpcomingEpisodeWideCardHtml).join(''), { className: 'streamflix-row-wide' });
-            }
-            if (Array.isArray(hotEx.seerrComingSoon) && hotEx.seerrComingSoon.length > 0) {
-                rowsHtml += buildRowHtml('hot-seerr-soon', rowTitle('Coming Soon via Seerr', hotEx.seerrComingSoon.length), hotEx.seerrComingSoon.map(buildSeerrCardHtml).join(''));
-            }
-            if (addedThisWeek.length >= 3) {
-                rowsHtml += buildRowHtml('hot-week', rowTitle('Worth the Wait · Added This Week', addedThisWeek.length), addedThisWeek.map(buildPosterCardHtml).join(''));
-            }
-            if (d.recentMovies.length > 0) {
-                rowsHtml += buildRowHtml('hot-movies', rowTitle('New Movies on ' + getBrandName()), d.recentMovies.map(buildPosterCardHtml).join(''));
-            }
-            if (d.recentSeries.length > 0) {
-                rowsHtml += buildRowHtml('hot-series', rowTitle('New Episodes & Series'), d.recentSeries.map(buildPosterCardHtml).join(''));
-            }
-            rowsHtml += smartRowsHtml(['smart-acclaimed', 'smart-gems']);
         } else if (typeof isKidsProfileActive === 'function' && isKidsProfileActive() && state.kidsWorld && state.kidsWorld !== 'all' && typeof filterItemsByKidsWorld === 'function') {
             var kwMeta = typeof getKidsWorldMeta === 'function' ? getKidsWorldMeta(state.kidsWorld) : { emoji: '🌟', label: 'Kids' };
             var kwPool = dedupeMediaItems(d.allMovies.concat(d.allSeries));
@@ -2342,59 +2860,101 @@
                 rowsHtml += buildEmptyStateHtml('film', 'No titles in ' + kwMeta.label + ' yet', 'Tap another Kids World bubble above to keep exploring.');
             }
         } else {
-            if (d.resumeItems.length > 0) {
-                rowsHtml += buildRowHtml('resume', rowTitle('Continue Watching for ' + profileName), d.resumeItems.map(function (it) { return buildWideCardHtml(it, { removable: true }); }).join(''), { className: 'streamflix-row-wide' });
-            }
-            if (d.nextUpItems.length > 0) {
-                rowsHtml += buildRowHtml('nextup', rowTitle('Next Up'), d.nextUpItems.map(buildWideCardHtml).join(''), { className: 'streamflix-row-wide', link: 'series' });
-            }
-            if (typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
-                && !isNavBuiltInHidden('livetv')
-                && state.liveTvData && state.liveTvData.loaded && Array.isArray(state.liveTvData.channels) && state.liveTvData.channels.length > 0) {
-                var homeLtvPool = state.liveTvData.channels.filter(function (c) { return c && c.UserData && c.UserData.IsFavorite; });
-                if (homeLtvPool.length < 16) {
-                    var seenLtv = {};
-                    homeLtvPool.forEach(function (c) { seenLtv[normalizeGuid(c.Id)] = true; });
-                    state.liveTvData.channels.forEach(function (c) {
-                        if (homeLtvPool.length < 16 && c && !seenLtv[normalizeGuid(c.Id)]) {
-                            seenLtv[normalizeGuid(c.Id)] = true;
-                            homeLtvPool.push(c);
-                        }
-                    });
-                }
-                if (homeLtvPool.length > 0) {
-                    rowsHtml += buildRowHtml('livetv-home', rowTitle('Live TV · On Now'), homeLtvPool.slice(0, 16).map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join(''), { className: 'streamflix-row-wide bfx-row-livetv', link: 'livetv' });
-                }
-            }
+            var rowPlan = getEffectiveHomeRowPlan();
             var pr = getPersonalRows() || { topPicks: [], because: [], watchAgain: [] };
             var becauseRow = function (b, idx) {
                 return b ? buildRowHtml('because-' + idx, 'Because you watched <span class="bfx-row-em">' + escapeHtml(b.seed.name) + '</span>', b.items.map(buildPosterCardHtml).join(''), { className: 'streamflix-row-personal' }) : '';
             };
-            if (pr.topPicks.length > 0) {
-                rowsHtml += buildRowHtml('toppicks', 'Top Picks for ' + escapeHtml(profileName), pr.topPicks.map(buildPosterCardHtml).join(''), { className: 'streamflix-row-personal' });
-            }
-            rowsHtml += becauseRow(pr.because[0], 0);
-            if (d.top10Items.length > 0) {
-                rowsHtml += buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10', link: 'top10' });
-            }
-            if (d.favoriteItems.length > 0) {
-                rowsHtml += buildRowHtml('mylist', rowTitle('My List'), d.favoriteItems.map(buildPosterCardHtml).join(''), { link: 'mylist' });
-            }
-            rowsHtml += smartRowsHtml(['smart-acclaimed']);
-            if (d.recentMovies.length > 0) {
-                rowsHtml += buildRowHtml('movies', rowTitle('New Movies'), d.recentMovies.map(buildPosterCardHtml).join(''), { link: 'movies' });
-            }
-            rowsHtml += becauseRow(pr.because[1], 1);
-            if (d.recentSeries.length > 0) {
-                rowsHtml += buildRowHtml('series', rowTitle('New Shows'), d.recentSeries.map(buildPosterCardHtml).join(''), { link: 'series' });
-            }
-            rowsHtml += smartRowsHtml(['smart-gems']);
-            if (d.collectionsItems.length > 0) {
-                rowsHtml += buildRowHtml('collections', rowTitle('Collections'), d.collectionsItems.map(buildPosterCardHtml).join(''), { link: 'collections' });
-            }
-            if (pr.watchAgain.length > 0) {
-                rowsHtml += buildRowHtml('watchagain', rowTitle('Watch It Again'), pr.watchAgain.map(buildPosterCardHtml).join(''));
-            }
+            var homeRowBuilders = {
+                resume: function () {
+                    return d.resumeItems.length > 0
+                        ? buildRowHtml('resume', rowTitle('Continue Watching for ' + profileName), d.resumeItems.map(function (it) { return buildWideCardHtml(it, { removable: true }); }).join(''), { className: 'streamflix-row-wide' })
+                        : '';
+                },
+                nextup: function () {
+                    return d.nextUpItems.length > 0
+                        ? buildRowHtml('nextup', rowTitle('Next Up'), d.nextUpItems.map(buildWideCardHtml).join(''), { className: 'streamflix-row-wide', link: 'series' })
+                        : '';
+                },
+                livetv: function () {
+                    if (!(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
+                        && !isNavBuiltInHidden('livetv')
+                        && state.liveTvData && state.liveTvData.loaded && Array.isArray(state.liveTvData.channels) && state.liveTvData.channels.length > 0)) {
+                        return '';
+                    }
+                    var homeLtvPool = state.liveTvData.channels.filter(function (c) { return c && c.UserData && c.UserData.IsFavorite; });
+                    if (homeLtvPool.length < 16) {
+                        var seenLtv = {};
+                        homeLtvPool.forEach(function (c) { seenLtv[normalizeGuid(c.Id)] = true; });
+                        state.liveTvData.channels.forEach(function (c) {
+                            if (homeLtvPool.length < 16 && c && !seenLtv[normalizeGuid(c.Id)]) {
+                                seenLtv[normalizeGuid(c.Id)] = true;
+                                homeLtvPool.push(c);
+                            }
+                        });
+                    }
+                    return homeLtvPool.length > 0
+                        ? buildRowHtml('livetv-home', rowTitle('Live TV · On Now'), homeLtvPool.slice(0, 16).map(function (c) { return buildLiveTvCardHtml(c, 'channel'); }).join(''), { className: 'streamflix-row-wide bfx-row-livetv', link: 'livetv' })
+                        : '';
+                },
+                personal: function () {
+                    var pOut = '';
+                    if (pr.topPicks.length > 0) {
+                        pOut += buildRowHtml('toppicks', 'Top Picks for ' + escapeHtml(profileName), pr.topPicks.map(buildPosterCardHtml).join(''), { className: 'streamflix-row-personal' });
+                    }
+                    pOut += becauseRow(pr.because[0], 0);
+                    if (!rowPlan.isDefaultOrder) {
+                        pOut += becauseRow(pr.because[1], 1);
+                    }
+                    return pOut;
+                },
+                top10: function () {
+                    return d.top10Items.length > 0
+                        ? buildRowHtml('top10', rowTitle(getTop10RowTitle()), top10Cards(), { className: 'streamflix-row-top10', link: 'top10' })
+                        : '';
+                },
+                mylist: function () {
+                    return d.favoriteItems.length > 0
+                        ? buildRowHtml('mylist', rowTitle('My List'), d.favoriteItems.map(buildPosterCardHtml).join(''), { link: 'mylist' })
+                        : '';
+                },
+                acclaimed: function () {
+                    return smartRowsHtml(['smart-acclaimed']);
+                },
+                movies: function () {
+                    var mOut = d.recentMovies.length > 0
+                        ? buildRowHtml('movies', rowTitle('New Movies'), d.recentMovies.map(buildPosterCardHtml).join(''), { link: 'movies' })
+                        : '';
+                    if (rowPlan.isDefaultOrder && !rowPlan.hiddenMap.personal) {
+                        mOut += becauseRow(pr.because[1], 1);
+                    }
+                    return mOut;
+                },
+                series: function () {
+                    return d.recentSeries.length > 0
+                        ? buildRowHtml('series', rowTitle('New Shows'), d.recentSeries.map(buildPosterCardHtml).join(''), { link: 'series' })
+                        : '';
+                },
+                gems: function () {
+                    return smartRowsHtml(['smart-gems']);
+                },
+                collections: function () {
+                    return d.collectionsItems.length > 0
+                        ? buildRowHtml('collections', rowTitle('Collections'), d.collectionsItems.map(buildPosterCardHtml).join(''), { link: 'collections' })
+                        : '';
+                },
+                watchagain: function () {
+                    return pr.watchAgain.length > 0
+                        ? buildRowHtml('watchagain', rowTitle('Watch It Again'), pr.watchAgain.map(buildPosterCardHtml).join(''))
+                        : '';
+                }
+            };
+
+            rowPlan.order.forEach(function (rowId) {
+                if (!rowPlan.hiddenMap[rowId] && typeof homeRowBuilders[rowId] === 'function') {
+                    rowsHtml += homeRowBuilders[rowId]();
+                }
+            });
         }
 
         if (!rowsHtml && d.loaded) {
@@ -2464,6 +3024,14 @@
                 bindLibraryBrowserInteractive(rowsScope);
             }
             bindLiveTvHubInteractive(rowsScope);
+            Array.prototype.forEach.call(rowsScope.querySelectorAll('[data-hot-subtab]'), function (hBtn) {
+                if (hBtn.__bfxBound) { return; }
+                hBtn.__bfxBound = true;
+                hBtn.addEventListener('click', function () {
+                    state.hotSubTab = hBtn.getAttribute('data-hot-subtab') || 'all';
+                    renderCinemaHubContents();
+                });
+            });
             if (typeof bindKidsWorldStrip === 'function') {
                 bindKidsWorldStrip(rowsScope);
             }
@@ -3141,6 +3709,9 @@
     }
 
     function canAutoplayHeroVideoPreview() {
+        if (!state.config || state.config.enableHeroTrailerPreview !== true) {
+            return false;
+        }
         if (!state.activeProfile || state.activeProfile.autoplayPreviews === false) {
             return false;
         }
@@ -3151,7 +3722,7 @@
             return false;
         }
         try {
-            if (navigator.connection && navigator.connection.saveData) {
+            if (navigator.connection && (navigator.connection.saveData || /2g|3g/i.test(String(navigator.connection.effectiveType || '')))) {
                 return false;
             }
         } catch (eConn) {}

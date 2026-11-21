@@ -44,6 +44,25 @@
         var modalLogoUrl = getItemLogoUrl(item, 720);
 
         var isLiveTvItem = item.Type === 'TvChannel' || item.Type === 'Program';
+        var recordableProgram = item.Type === 'Program'
+            ? item
+            : ((item.Type === 'TvChannel' && item.CurrentProgram && item.CurrentProgram.Id) ? item.CurrentProgram : null);
+        var resolveProgramTimerId = function (prog) {
+            if (!prog || !prog.Id) {
+                return '';
+            }
+            if (prog.TimerId) {
+                return String(prog.TimerId);
+            }
+            if (state.liveTvEpg && state.liveTvEpg.timersByProgramId) {
+                var hit = state.liveTvEpg.timersByProgramId[normalizeGuid(prog.Id)];
+                if (hit) {
+                    return String(hit);
+                }
+            }
+            return '';
+        };
+        var initialTimerId = resolveProgramTimerId(recordableProgram);
         var isChannelOnlyArt = item.Type === 'TvChannel'
             && !(item.BackdropImageTags && item.BackdropImageTags.length > 0)
             && !(item.CurrentProgram && ((item.CurrentProgram.BackdropImageTags && item.CurrentProgram.BackdropImageTags.length > 0) || (item.CurrentProgram.ImageTags && (item.CurrentProgram.ImageTags.Thumb || item.CurrentProgram.ImageTags.Primary))));
@@ -149,7 +168,10 @@
             + '        <div class="streamflix-hero-actions">'
             + '          <button type="button" class="streamflix-hero-play" id="streamflix-modal-play-btn">' + playBtnInitialLabel + '</button>'
             + (isLiveTvItem
-                ? '          <button type="button" class="streamflix-hero-secondary" id="streamflix-modal-tvguide-btn" title="Open Jellyfin Full TV Guide">' + iconLabel('calendar', 'TV Guide') + '</button>'
+                ? '          <button type="button" class="streamflix-hero-secondary" id="streamflix-modal-tvguide-btn" title="Open TV Guide">' + iconLabel('calendar', 'TV Guide') + '</button>'
+                : '')
+            + (recordableProgram
+                ? '          <button type="button" class="streamflix-hero-secondary bfx-dvr-record-btn' + (initialTimerId ? ' is-recording' : '') + '" id="streamflix-modal-record-btn" title="' + (initialTimerId ? 'Cancel scheduled DVR recording' : 'Record this broadcast') + '">' + iconLabel('recordDot', initialTimerId ? 'Scheduled' : 'Record') + '</button>'
                 : '')
             + (opts.fromSurprise
                 ? '          <button type="button" class="streamflix-hero-secondary streamflix-modal-reshuffle" id="streamflix-modal-reshuffle-btn" title="Pick another random title">' + iconLabel('shuffle', 'Shuffle Again') + '</button>'
@@ -266,12 +288,101 @@
             }
         });
 
+        var toggleProgramDvrTimer = function (progTarget, btnEl, compactMode) {
+            if (!progTarget || !progTarget.Id || !btnEl || btnEl.disabled) {
+                return;
+            }
+            var curTimerId = resolveProgramTimerId(progTarget);
+            btnEl.disabled = true;
+            var syncBtnState = function (hasTimer) {
+                btnEl.disabled = false;
+                btnEl.classList.toggle('is-recording', Boolean(hasTimer));
+                if (compactMode) {
+                    btnEl.innerHTML = icon('recordDot') + '<span>' + (hasTimer ? 'REC' : 'Record') + '</span>';
+                    btnEl.title = hasTimer ? 'Cancel scheduled recording' : 'Record this program';
+                } else {
+                    btnEl.innerHTML = iconLabel('recordDot', hasTimer ? 'Scheduled' : 'Record');
+                    btnEl.title = hasTimer ? 'Cancel scheduled DVR recording' : 'Record this broadcast';
+                }
+            };
+            if (curTimerId) {
+                apiFetch('/LiveTv/Timers/' + encodeURIComponent(curTimerId), { method: 'DELETE' })
+                    .then(function () {
+                        progTarget.TimerId = '';
+                        if (state.liveTvEpg && state.liveTvEpg.timersByProgramId) {
+                            delete state.liveTvEpg.timersByProgramId[normalizeGuid(progTarget.Id)];
+                        }
+                        if (state.liveTvData) { state.liveTvData.ts = 0; }
+                        syncBtnState(false);
+                        showToast('Cancelled recording for “' + (progTarget.Name || 'Program') + '”.', 'info');
+                    })
+                    .catch(function (err) {
+                        btnEl.disabled = false;
+                        showToast((err && err.status === 403) ? 'DVR recording management requires Live TV Management permission in Jellyfin.' : 'Could not cancel recording timer.', 'error');
+                    });
+                return;
+            }
+
+            apiFetch('/LiveTv/Timers/Defaults?programId=' + encodeURIComponent(progTarget.Id))
+                .then(function (defaults) {
+                    var payload = {};
+                    if (defaults && typeof defaults === 'object') {
+                        Object.keys(defaults).forEach(function (k) { payload[k] = defaults[k]; });
+                    }
+                    payload.ProgramId = progTarget.Id;
+                    return apiFetch('/LiveTv/Timers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                })
+                .then(function () {
+                    return apiFetch('/LiveTv/Timers').catch(function () { return { Items: [] }; });
+                })
+                .then(function (tRes) {
+                    var createdId = 'scheduled';
+                    var items = (tRes && Array.isArray(tRes.Items)) ? tRes.Items : [];
+                    var normPid = normalizeGuid(progTarget.Id);
+                    for (var ti = 0; ti < items.length; ti++) {
+                        if (items[ti] && items[ti].Id && normalizeGuid(items[ti].ProgramId) === normPid && String(items[ti].Status || '').toLowerCase() !== 'cancelled') {
+                            createdId = String(items[ti].Id);
+                            break;
+                        }
+                    }
+                    progTarget.TimerId = createdId;
+                    if (state.liveTvEpg && state.liveTvEpg.timersByProgramId) {
+                        state.liveTvEpg.timersByProgramId[normPid] = createdId;
+                    }
+                    if (state.liveTvData) { state.liveTvData.ts = 0; }
+                    syncBtnState(true);
+                    showToast('Recording scheduled for “' + (progTarget.Name || 'Program') + '”.', 'success');
+                })
+                .catch(function (err) {
+                    btnEl.disabled = false;
+                    showToast((err && err.status === 403) ? 'DVR recording management requires Live TV Management permission in Jellyfin.' : 'Could not schedule DVR recording.', 'error');
+                });
+        };
+
         var tvGuideBtn = qModal('#streamflix-modal-tvguide-btn');
         if (tvGuideBtn) {
             tvGuideBtn.addEventListener('click', function () {
                 closeModal(true);
+                if (state.cinemaHubEnabled !== false && isOnHomeRoute() && typeof renderCinemaHubContents === 'function') {
+                    state.activeCategory = 'livetv';
+                    if (!state.liveTvUi) { state.liveTvUi = { tab: 'guide', filter: '', epgOffsetMins: 0 }; }
+                    state.liveTvUi.tab = 'guide';
+                    renderCinemaHubContents();
+                    return;
+                }
                 var sid = resolveKnownServerId();
                 window.location.hash = '#/livetv?tab=1' + (sid ? ('&serverId=' + encodeURIComponent(sid)) : '');
+            });
+        }
+
+        var recordModalBtn = qModal('#streamflix-modal-record-btn');
+        if (recordModalBtn && recordableProgram) {
+            recordModalBtn.addEventListener('click', function () {
+                toggleProgramDvrTimer(recordableProgram, recordModalBtn, false);
             });
         }
 
@@ -857,22 +968,49 @@
             }
         }
 
-        // If Live TV Channel or airing Program, load upcoming EPG schedule for this channel
+        // If Live TV Channel or airing Program, load upcoming EPG schedule + active DVR timers for this channel
         var schedChannelId = item.Type === 'TvChannel' ? item.Id : (item.Type === 'Program' ? item.ChannelId : '');
         if (schedChannelId && auth.userId) {
             var schedContainer = qModal('#streamflix-detail-episodes-section');
             if (schedContainer) {
-                apiFetch('/LiveTv/Programs?ChannelIds=' + encodeURIComponent(schedChannelId) + '&userId=' + encodeURIComponent(auth.userId) + '&HasAired=false&Limit=8&Fields=Overview')
-                    .then(function (res) {
-                        var progs = (res && Array.isArray(res.Items)) ? res.Items : [];
-                        if (!progs.length || !modalBackdrop.parentNode || modalClosed) {
+                var pSchedProgs = apiFetch('/LiveTv/Programs?ChannelIds=' + encodeURIComponent(schedChannelId) + '&userId=' + encodeURIComponent(auth.userId) + '&HasAired=false&Limit=8&Fields=Overview')
+                    .catch(function () { return { Items: [] }; });
+                var pSchedTimers = apiFetch('/LiveTv/Timers')
+                    .catch(function () { return { Items: [] }; });
+
+                Promise.all([pSchedProgs, pSchedTimers])
+                    .then(function (sArr) {
+                        var progs = (sArr[0] && Array.isArray(sArr[0].Items)) ? sArr[0].Items : [];
+                        var timers = (sArr[1] && Array.isArray(sArr[1].Items)) ? sArr[1].Items : [];
+                        if (!modalBackdrop.parentNode || modalClosed) {
+                            return;
+                        }
+                        var timerByProg = {};
+                        timers.forEach(function (tm) {
+                            if (tm && tm.Id && tm.ProgramId && String(tm.Status || '').toLowerCase() !== 'cancelled') {
+                                timerByProg[normalizeGuid(tm.ProgramId)] = String(tm.Id);
+                            }
+                        });
+                        if (recordableProgram && recordableProgram.Id && timerByProg[normalizeGuid(recordableProgram.Id)] && !recordableProgram.TimerId) {
+                            recordableProgram.TimerId = timerByProg[normalizeGuid(recordableProgram.Id)];
+                            if (recordModalBtn) {
+                                recordModalBtn.classList.add('is-recording');
+                                recordModalBtn.innerHTML = iconLabel('recordDot', 'Scheduled');
+                                recordModalBtn.title = 'Cancel scheduled DVR recording';
+                            }
+                        }
+                        if (!progs.length) {
                             return;
                         }
                         var nowMs = Date.now();
-                        var rows = progs.map(function (pr) {
+                        var rows = progs.map(function (pr, pIdx) {
+                            if (pr && pr.Id && !pr.TimerId && timerByProg[normalizeGuid(pr.Id)]) {
+                                pr.TimerId = timerByProg[normalizeGuid(pr.Id)];
+                            }
                             var sMs = pr.StartDate ? Date.parse(pr.StartDate) : NaN;
                             var eMs = pr.EndDate ? Date.parse(pr.EndDate) : NaN;
                             var airing = !isNaN(sMs) && !isNaN(eMs) && nowMs >= sMs && nowMs < eMs;
+                            var hasRec = Boolean(resolveProgramTimerId(pr));
                             var tWin = formatShortProgTime(pr);
                             return ''
                                 + '<div class="bfx-ltv-sched-row' + (airing ? ' is-airing' : '') + '">'
@@ -884,11 +1022,24 @@
                                 + (airing && tWin ? ('    <div class="bfx-ltv-sched-sub">' + escapeHtml(tWin) + '</div>') : '')
                                 + (pr.Overview ? ('    <div class="bfx-ltv-sched-desc">' + escapeHtml(pr.Overview) + '</div>') : '')
                                 + '  </div>'
+                                + (pr && pr.Id
+                                    ? ('  <button type="button" class="streamflix-ghost-btn bfx-sched-rec-btn bfx-dvr-record-btn' + (hasRec ? ' is-recording' : '') + '" data-sched-rec-idx="' + pIdx + '" title="' + (hasRec ? 'Cancel scheduled recording' : 'Record this program') + '">' + icon('recordDot') + '<span>' + (hasRec ? 'REC' : 'Record') + '</span></button>')
+                                    : '')
                                 + '</div>';
                         }).join('');
                         schedContainer.innerHTML = ''
                             + '<h3 class="streamflix-detail-h3" style="margin-bottom:12px;">Schedule</h3>'
                             + '<div class="bfx-ltv-sched-list">' + rows + '</div>';
+                        Array.prototype.forEach.call(schedContainer.querySelectorAll('button[data-sched-rec-idx]'), function (rBtn) {
+                            rBtn.addEventListener('click', function (ev) {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                var idx = parseInt(rBtn.getAttribute('data-sched-rec-idx'), 10);
+                                if (!isNaN(idx) && progs[idx]) {
+                                    toggleProgramDvrTimer(progs[idx], rBtn, true);
+                                }
+                            });
+                        });
                     })
                     .catch(function () {});
             }

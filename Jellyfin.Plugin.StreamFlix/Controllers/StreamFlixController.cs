@@ -282,6 +282,17 @@ public partial class StreamFlixController : ControllerBase
                     .ToList();
             }
 
+            config.EnableHeroTrailerPreview = request.EnableHeroTrailerPreview;
+            if (request.HomeRowOrder != null)
+            {
+                config.HomeRowOrder = NormalizeHomeRowIds(request.HomeRowOrder);
+            }
+
+            if (request.HomeHiddenRows != null)
+            {
+                config.HomeHiddenRows = NormalizeHomeRowIds(request.HomeHiddenRows);
+            }
+
             config.EnableCustomOidc = request.EnableCustomOidc;
             var oidcName = (request.OidcProviderName ?? string.Empty).Trim();
             config.OidcProviderName = oidcName.Length > 32 ? oidcName.Substring(0, 32).Trim() : oidcName;
@@ -767,6 +778,9 @@ public partial class StreamFlixController : ControllerBase
             heroSelectionMode = NormalizeHeroSelectionMode(config.HeroSelectionMode),
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = heroLibrariesSnapshot,
+            enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
+            homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,
             navHiddenBuiltIns = navHiddenBuiltInsSnapshot,
             navLibraryIds = navLibraryIdsSnapshot,
@@ -798,6 +812,35 @@ public partial class StreamFlixController : ControllerBase
         };
         return raw
             .Where(id => !string.IsNullOrWhiteSpace(id) && allowedBuiltIns.Contains(id!.Trim()))
+            .Select(id => id!.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static List<string> NormalizeHomeRowIds(IEnumerable<string?>? raw)
+    {
+        if (raw == null)
+        {
+            return new List<string>();
+        }
+
+        var allowedRowIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "resume",
+            "nextup",
+            "livetv",
+            "personal",
+            "top10",
+            "mylist",
+            "acclaimed",
+            "movies",
+            "series",
+            "gems",
+            "collections",
+            "watchagain",
+        };
+        return raw
+            .Where(id => !string.IsNullOrWhiteSpace(id) && allowedRowIds.Contains(id!.Trim()))
             .Select(id => id!.Trim().ToLowerInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -836,6 +879,9 @@ public partial class StreamFlixController : ControllerBase
             heroSelectionMode = NormalizeHeroSelectionMode(config.HeroSelectionMode),
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = (config.HeroLibraryIds ?? new List<string>()).ToList(),
+            enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
+            homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,
             navHiddenBuiltIns = (config.NavHiddenBuiltIns ?? new List<string>()).ToList(),
             navLibraryIds = (config.NavLibraryIds ?? new List<string>()).ToList(),

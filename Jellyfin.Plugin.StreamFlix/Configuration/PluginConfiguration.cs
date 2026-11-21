@@ -157,6 +157,9 @@ public class PluginConfiguration : BasePluginConfiguration
         HeroSelectionMode = "recent";
         HeroContentType = "all";
         HeroLibraryIds = new List<string>();
+        EnableHeroTrailerPreview = false;
+        HomeRowOrder = new List<string>();
+        HomeHiddenRows = new List<string>();
         ShowLibrariesInNav = true;
         NavHiddenBuiltIns = new List<string>();
         NavLibraryIds = new List<string>();
@@ -299,6 +302,22 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets optional Jellyfin Library/View IDs allowed in the hero billboard. Empty means all libraries.
     /// </summary>
     public List<string> HeroLibraryIds { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether opt-in muted local trailer previews play on the Home Hero Billboard after resting on a slide.
+    /// Defaults to <c>false</c> so administrators must explicitly turn it on.
+    /// </summary>
+    public bool EnableHeroTrailerPreview { get; set; }
+
+    /// <summary>
+    /// Gets or sets the server-default ordering of Home page rows (empty uses the built-in default order).
+    /// </summary>
+    public List<string> HomeRowOrder { get; set; }
+
+    /// <summary>
+    /// Gets or sets Home page row IDs hidden by default across the server.
+    /// </summary>
+    public List<string> HomeHiddenRows { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether configured Jellyfin media libraries appear as navigation pills in the top bar (respecting per-user library access).

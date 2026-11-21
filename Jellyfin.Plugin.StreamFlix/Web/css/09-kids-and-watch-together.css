@@ -2036,27 +2036,503 @@ body.bfx-phone-mode .bfx-livetv-return-btn {
     .bfx-ltv-sched-time {
         flex: none;
     }
+    .bfx-sched-rec-btn {
+        align-self: flex-start;
+        margin-top: 4px;
+    }
 }
 
-/* QtWebEngine 5.15 / Chromium 83 flex-gap fallbacks for Live TV UI */
+/* Inline 3-Hour Live TV EPG Timeline Grid */
+.bfx-epg-wrap {
+    margin-top: 6px;
+    border-radius: 14px;
+    background: #141417;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    overflow: hidden;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+}
+
+.bfx-epg-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 11px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bfx-epg-window-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 750;
+    color: #f1f5f9;
+}
+
+.bfx-epg-window-label svg {
+    width: 15px;
+    height: 15px;
+    color: #f87171;
+    flex-shrink: 0;
+}
+
+.bfx-epg-nav-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bfx-epg-step-btn {
+    height: 32px !important;
+    padding: 0 11px !important;
+    font-size: 12px !important;
+    font-weight: 750 !important;
+    border-radius: 8px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.bfx-epg-step-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.bfx-epg-step-btn.is-now {
+    background: rgba(229, 9, 20, 0.2) !important;
+    border-color: rgba(229, 9, 20, 0.52) !important;
+    color: #fecaca !important;
+}
+
+.bfx-epg-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 68vh;
+    position: relative;
+}
+
+.bfx-epg-table {
+    min-width: 820px;
+    display: flex;
+    flex-direction: column;
+}
+
+.bfx-epg-header-row {
+    display: flex;
+    align-items: stretch;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: #18181d;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bfx-epg-corner {
+    width: 196px;
+    flex: 0 0 196px;
+    position: sticky;
+    left: 0;
+    z-index: 7;
+    background: #18181d;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.bfx-epg-ruler {
+    flex: 1 1 auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+}
+
+.bfx-epg-slot-lbl {
+    box-sizing: border-box;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    font-weight: 750;
+    color: #cbd5e1;
+    border-left: 1px solid rgba(255, 255, 255, 0.07);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bfx-epg-now-head {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+}
+
+.bfx-epg-now-head span {
+    background: var(--streamflix-red, #e50914);
+    color: #ffffff;
+    font-size: 9.5px;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(229, 9, 20, 0.55);
+}
+
+.bfx-epg-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    min-height: 66px;
+    background: #141417;
+}
+
+.bfx-epg-row:last-child {
+    border-bottom: none;
+}
+
+.bfx-epg-ch-cell {
+    width: 196px;
+    flex: 0 0 196px;
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #18181c;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    color: #f8fafc;
+    font-family: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.15s ease;
+}
+
+.bfx-epg-ch-cell:hover,
+.bfx-epg-ch-cell:focus-visible {
+    background: #222228;
+    outline: none;
+}
+
+.bfx-epg-ch-logo {
+    width: 40px;
+    height: 28px;
+    flex: 0 0 40px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+.bfx-epg-ch-fallback {
+    width: 40px;
+    height: 28px;
+    flex: 0 0 40px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bfx-epg-ch-fallback svg {
+    width: 15px;
+    height: 15px;
+}
+
+.bfx-epg-ch-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bfx-epg-ch-num {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.04em;
+}
+
+.bfx-epg-ch-name {
+    font-size: 12.5px;
+    font-weight: 750;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bfx-epg-track {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 66px;
+    overflow: hidden;
+}
+
+.bfx-epg-now-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--streamflix-red, #e50914);
+    box-shadow: 0 0 8px rgba(229, 9, 20, 0.75);
+    z-index: 3;
+    pointer-events: none;
+}
+
+.bfx-epg-prog {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 2;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.bfx-epg-prog:hover,
+.bfx-epg-prog:focus-visible {
+    background: rgba(255, 255, 255, 0.11);
+    border-color: rgba(255, 255, 255, 0.25);
+    z-index: 4;
+    outline: none;
+}
+
+.bfx-epg-prog.is-airing {
+    background: linear-gradient(90deg, rgba(229, 9, 20, 0.22) 0%, rgba(255, 255, 255, 0.07) 100%);
+    border-color: rgba(229, 9, 20, 0.45);
+}
+
+.bfx-epg-prog.has-timer {
+    border-color: rgba(239, 68, 68, 0.65);
+    box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.bfx-epg-prog.is-empty {
+    background: rgba(255, 255, 255, 0.025);
+    border-style: dashed;
+    color: #94a3b8;
+}
+
+.bfx-epg-prog-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.bfx-epg-prog-title {
+    font-size: 12.5px;
+    font-weight: 750;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bfx-epg-prog-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bfx-epg-rec-badge {
+    flex-shrink: 0;
+    font-size: 9.5px;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.24);
+    border: 1px solid rgba(239, 68, 68, 0.55);
+    color: #fecaca;
+}
+
+/* 1-Click DVR Record Buttons */
+.bfx-dvr-record-btn svg {
+    color: #ef4444;
+    width: 14px;
+    height: 14px;
+}
+
+.bfx-dvr-record-btn.is-recording {
+    background: rgba(229, 9, 20, 0.2) !important;
+    border-color: rgba(239, 68, 68, 0.62) !important;
+    color: #fecaca !important;
+    box-shadow: 0 0 14px rgba(229, 9, 20, 0.24);
+}
+
+.bfx-sched-rec-btn {
+    flex-shrink: 0;
+    align-self: center;
+    height: 32px !important;
+    padding: 0 11px !important;
+    font-size: 12px !important;
+    font-weight: 750 !important;
+    border-radius: 999px !important;
+}
+
+/* Per-Profile Home Screen Row Order Customizer */
+.bfx-home-rows-cust-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.bfx-home-row-cust-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.bfx-home-row-cust-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #f1f5f9;
+    cursor: pointer;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bfx-home-row-cust-lbl input[type="checkbox"] {
+    accent-color: var(--streamflix-red, #e50914);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.bfx-home-row-cust-lbl span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bfx-home-row-cust-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.bfx-home-row-move-btn {
+    width: 30px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    border-radius: 7px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bfx-home-row-move-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* New & Popular Hub Header Pill */
+.bfx-hot-header-sec {
+    margin-bottom: 18px !important;
+}
+
+.bfx-hot-pill {
+    background: rgba(245, 158, 11, 0.16);
+    border-color: rgba(251, 191, 36, 0.44);
+    color: #fde68a;
+}
+
+.bfx-hot-pill svg {
+    width: 13px;
+    height: 13px;
+    color: #fbbf24;
+}
+
+@media (max-width: 720px) {
+    .bfx-epg-corner,
+    .bfx-epg-ch-cell {
+        width: 142px;
+        flex: 0 0 142px;
+        padding: 6px 8px;
+    }
+    .bfx-epg-ch-logo,
+    .bfx-epg-ch-fallback {
+        width: 30px;
+        height: 22px;
+        flex: 0 0 30px;
+    }
+}
+
+/* QtWebEngine 5.15 / Chromium 83 flex-gap fallbacks for Live TV & v0.9.3 UI */
 html.bfx-no-flex-gap .bfx-ltv-title-row > * + *,
-html.bfx-no-flex-gap .bfx-ltv-head-right > * + * {
+html.bfx-no-flex-gap .bfx-ltv-head-right > * + *,
+html.bfx-no-flex-gap .bfx-epg-toolbar > * + *,
+html.bfx-no-flex-gap .bfx-epg-ch-cell > * + *,
+html.bfx-no-flex-gap .bfx-home-row-cust-item > * + * {
     margin-left: 10px;
 }
 html.bfx-no-flex-gap .bfx-ltv-subpills > * + *,
 html.bfx-no-flex-gap .bfx-ltv-guide-btns > * + *,
-html.bfx-no-flex-gap .bfx-ltv-subtitle > * + * {
+html.bfx-no-flex-gap .bfx-ltv-subtitle > * + *,
+html.bfx-no-flex-gap .bfx-home-row-cust-lbl > * + * {
     margin-left: 8px;
 }
 html.bfx-no-flex-gap .bfx-ltv-top-badges > * + *,
 html.bfx-no-flex-gap .bfx-ltv-quick-actions > * + *,
 html.bfx-no-flex-gap .bfx-ltv-guide-btn > * + *,
 html.bfx-no-flex-gap .bfx-livetv-return-btn > * + *,
-html.bfx-no-flex-gap .bfx-ltv-sched-time > * + * {
+html.bfx-no-flex-gap .bfx-ltv-sched-time > * + *,
+html.bfx-no-flex-gap .bfx-epg-window-label > * + *,
+html.bfx-no-flex-gap .bfx-epg-nav-btns > * + *,
+html.bfx-no-flex-gap .bfx-epg-step-btn > * + *,
+html.bfx-no-flex-gap .bfx-epg-prog-top > * + *,
+html.bfx-no-flex-gap .bfx-home-row-cust-btns > * + * {
     margin-left: 6px;
 }
 html.bfx-no-flex-gap .bfx-ltv-head-left > * + *,
-html.bfx-no-flex-gap .bfx-ltv-sched-list > * + * {
+html.bfx-no-flex-gap .bfx-ltv-sched-list > * + *,
+html.bfx-no-flex-gap .bfx-home-rows-cust-list > * + * {
     margin-top: 8px;
 }
 html.bfx-no-flex-gap .bfx-ltv-sched-row > * + * {

@@ -336,6 +336,8 @@
             state.liveTvData && state.liveTvData.channels,
             state.liveTvData && state.liveTvData.onNow,
             state.liveTvData && state.liveTvData.recordings,
+            state.liveTvEpg && state.liveTvEpg.programs,
+            state.hotTabExtra && state.hotTabExtra.upcomingEpisodes,
             state.searchResults, state.browseFilter && state.browseFilter.items
         ];
         for (var i = 0; i < lists.length; i++) {

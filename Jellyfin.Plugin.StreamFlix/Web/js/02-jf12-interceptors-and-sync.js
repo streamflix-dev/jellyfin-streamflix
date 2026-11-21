@@ -1256,12 +1256,26 @@
         var nextHeroSel = String(cfg.heroSelectionMode || 'recent').toLowerCase();
         var nextHeroType = String(cfg.heroContentType || 'all').toLowerCase();
 
+        var prevEnableHeroTrailer = Boolean(prevCfg.enableHeroTrailerPreview);
+        var nextEnableHeroTrailer = Boolean(cfg.enableHeroTrailerPreview);
+        var nextHomeRowOrder = Array.isArray(cfg.homeRowOrder)
+            ? cfg.homeRowOrder.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
+            : [];
+        var nextHomeHiddenRows = Array.isArray(cfg.homeHiddenRows)
+            ? cfg.homeHiddenRows.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
+            : [];
+        var prevHomeRowsSig = (Array.isArray(prevCfg.homeRowOrder) ? prevCfg.homeRowOrder.join(',') : '') + '|'
+            + (Array.isArray(prevCfg.homeHiddenRows) ? prevCfg.homeHiddenRows.join(',') : '');
+        var nextHomeRowsSig = nextHomeRowOrder.join(',') + '|' + nextHomeHiddenRows.join(',');
+
         var hubSettingsChanged = prevCfg.top10SelectionMode !== nextTop10Mode
             || prevCfg.heroRotationSeconds !== nextHeroRot
             || prevCfg.heroSlideCount !== nextHeroCount
             || prevCfg.heroSelectionMode !== nextHeroSel
             || prevCfg.heroContentType !== nextHeroType
             || prevHeroLibsSig !== nextHeroLibsSig
+            || prevEnableHeroTrailer !== nextEnableHeroTrailer
+            || prevHomeRowsSig !== nextHomeRowsSig
             || prevNavSig !== nextNavSig;
 
         state.pluginDisabled = false;
@@ -1314,6 +1328,9 @@
             heroSelectionMode: nextHeroSel,
             heroContentType: nextHeroType,
             heroLibraryIds: nextHeroLibs,
+            enableHeroTrailerPreview: nextEnableHeroTrailer,
+            homeRowOrder: nextHomeRowOrder,
+            homeHiddenRows: nextHomeHiddenRows,
             showLibrariesInNav: nextShowLibsInNav,
             navHiddenBuiltIns: nextNavHiddenBuiltIns,
             navLibraryIds: nextNavLibraryIds,
@@ -1402,6 +1419,10 @@
         }
         replaceToolbarLogoInPlace();
         refreshNetflixBackdropWallInPlace();
+
+        if (prevEnableHeroTrailer && !nextEnableHeroTrailer && typeof stopHeroVideoPreview === 'function') {
+            stopHeroVideoPreview();
+        }
 
         if (prevEnableLiveTv !== nextEnableLiveTv) {
             if (!nextEnableLiveTv) {

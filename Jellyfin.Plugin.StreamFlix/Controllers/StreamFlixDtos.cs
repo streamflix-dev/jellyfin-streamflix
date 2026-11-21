@@ -253,6 +253,12 @@ public class SaveAdminConfigRequest
 
     public List<string>? NavLibraryIds { get; set; }
 
+    public bool EnableHeroTrailerPreview { get; set; }
+
+    public List<string>? HomeRowOrder { get; set; }
+
+    public List<string>? HomeHiddenRows { get; set; }
+
     public bool EnableCustomOidc { get; set; }
 
     public string? OidcProviderName { get; set; }
@@ -333,6 +339,12 @@ public class ImportConfigBackupRequest
     public List<string>? NavHiddenBuiltIns { get; set; }
 
     public List<string>? NavLibraryIds { get; set; }
+
+    public bool? EnableHeroTrailerPreview { get; set; }
+
+    public List<string>? HomeRowOrder { get; set; }
+
+    public List<string>? HomeHiddenRows { get; set; }
 
     public bool? EnableCustomOidc { get; set; }
 

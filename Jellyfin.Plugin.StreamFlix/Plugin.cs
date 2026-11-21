@@ -281,11 +281,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !cfg.EnableGuestPasses
             || !cfg.EnableWatchTogether
             || cfg.EnableLiveTv
+            || cfg.EnableHeroTrailerPreview
             || !cfg.EnableStreamFlixUi
             || !cfg.ShowLibrariesInNav
             || !string.Equals((cfg.CustomAccentColor ?? "#E50914").Trim(), "#E50914", StringComparison.OrdinalIgnoreCase)
             || (cfg.NavHiddenBuiltIns != null && cfg.NavHiddenBuiltIns.Count > 0)
-            || (cfg.NavLibraryIds != null && cfg.NavLibraryIds.Count > 0);
+            || (cfg.NavLibraryIds != null && cfg.NavLibraryIds.Count > 0)
+            || (cfg.HomeRowOrder != null && cfg.HomeRowOrder.Count > 0)
+            || (cfg.HomeHiddenRows != null && cfg.HomeHiddenRows.Count > 0);
     }
 
     private void SnapshotExistingXmlBeforeLoad()
@@ -464,6 +467,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 HeroSlideCount = IntVal(root, nameof(PluginConfiguration.HeroSlideCount), 8),
                 HeroSelectionMode = Val(root, nameof(PluginConfiguration.HeroSelectionMode)) ?? "recent",
                 HeroContentType = Val(root, nameof(PluginConfiguration.HeroContentType)) ?? "all",
+                EnableHeroTrailerPreview = BoolVal(root, nameof(PluginConfiguration.EnableHeroTrailerPreview), false),
                 ShowLibrariesInNav = BoolVal(root, nameof(PluginConfiguration.ShowLibrariesInNav), true),
                 EnableCustomOidc = BoolVal(root, nameof(PluginConfiguration.EnableCustomOidc), false),
                 OidcProviderName = Val(root, nameof(PluginConfiguration.OidcProviderName)) ?? string.Empty,
@@ -523,6 +527,24 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 cfg.NavLibraryIds = navLibsEl.Elements()
                     .Select(x => (x.Value ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
+            var homeRowOrderEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.HomeRowOrder), StringComparison.OrdinalIgnoreCase));
+            if (homeRowOrderEl != null)
+            {
+                cfg.HomeRowOrder = homeRowOrderEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim().ToLowerInvariant())
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+            }
+
+            var homeHiddenEl = root.Elements().FirstOrDefault(e => string.Equals(e.Name.LocalName, nameof(PluginConfiguration.HomeHiddenRows), StringComparison.OrdinalIgnoreCase));
+            if (homeHiddenEl != null)
+            {
+                cfg.HomeHiddenRows = homeHiddenEl.Elements()
+                    .Select(x => (x.Value ?? string.Empty).Trim().ToLowerInvariant())
                     .Where(x => !string.IsNullOrEmpty(x))
                     .ToList();
             }

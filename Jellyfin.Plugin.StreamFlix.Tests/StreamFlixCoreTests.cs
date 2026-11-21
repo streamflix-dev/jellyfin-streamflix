@@ -217,4 +217,21 @@ public class StreamFlixCoreTests
         Assert.Equal(new[] { "series", "livetv", "movies", "hot" }, normalized);
         Assert.Empty(StreamFlixController.NormalizeNavHiddenBuiltIns(null));
     }
+
+    [Fact]
+    public void HeroTrailerPreviewAndHomeRows_DefaultOptInAndNormalizeCleanly()
+    {
+        var defaultCfg = new PluginConfiguration();
+        Assert.False(defaultCfg.EnableHeroTrailerPreview);
+        Assert.Empty(defaultCfg.HomeRowOrder);
+        Assert.Empty(defaultCfg.HomeHiddenRows);
+
+        var defaultReq = new SaveAdminConfigRequest();
+        Assert.False(defaultReq.EnableHeroTrailerPreview);
+
+        var normalizedOrder = StreamFlixController.NormalizeHomeRowIds(
+            new[] { " Movies ", "TOP10", "resume", "invalid_row", "movies", "LIVETV", string.Empty, null, "watchagain" });
+        Assert.Equal(new[] { "movies", "top10", "resume", "livetv", "watchagain" }, normalizedOrder);
+        Assert.Empty(StreamFlixController.NormalizeHomeRowIds(null));
+    }
 }

@@ -653,6 +653,8 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
                 },
                 querySelectorAll(sel) {
                     if (sel === '[data-cat-id]') return parsedChildren.filter((c) => c.hasAttribute('data-cat-id'));
+                    if (sel === '[data-ltv-tab]') return parsedChildren.filter((c) => c.hasAttribute('data-ltv-tab'));
+                    if (sel === '[data-hot-subtab]') return parsedChildren.filter((c) => c.hasAttribute('data-hot-subtab'));
                     if (sel === '.bfx-ltv-hub' && rawHtml.includes('bfx-ltv-hub')) return [el];
                     if (sel === '.streamflix-rows' && rawHtml.includes('streamflix-rows')) return [el];
                     return [];
@@ -696,7 +698,14 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         return doc;
     };
 
-    const runLiveTvVmScenario = async ({ enableLiveTv, profile, staleCachedConfig = false }) => {
+    const runLiveTvVmScenario = async ({
+        enableLiveTv,
+        profile,
+        staleCachedConfig = false,
+        enableHeroTrailerPreview = false,
+        homeRowOrder = [],
+        homeHiddenRows = [],
+    }) => {
         let serverEnableLiveTv = enableLiveTv;
         const localStore = makeStorage();
         const sessionStore = makeStorage();
@@ -796,6 +805,9 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
                         hasAccess: true,
                         isAdmin: Boolean(profile.isAdmin),
                         enableLiveTv: serverEnableLiveTv,
+                        enableHeroTrailerPreview,
+                        homeRowOrder,
+                        homeHiddenRows,
                         session: { authKind: 'google', email: 'owner@example.com', expiresAt: new Date(Date.now() + 86400000).toISOString() },
                         showLibrariesInNav: true,
                         navHiddenBuiltIns: [],
@@ -827,6 +839,37 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
                 }
                 if (u.includes('/LiveTv/Programs/Recommended')) {
                     return new Response(JSON.stringify({ Items: [mockChannels[0].CurrentProgram] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Programs')) {
+                    return new Response(JSON.stringify({
+                        Items: [{
+                            Id: 'prog_1',
+                            ChannelId: 'ch_101',
+                            Name: 'Planet Earth III',
+                            EpisodeTitle: 'Coasts',
+                            StartDate: new Date(Date.now() - 10 * 60000).toISOString(),
+                            EndDate: new Date(Date.now() + 50 * 60000).toISOString(),
+                        }],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Timers')) {
+                    return new Response(JSON.stringify({
+                        Items: [{ Id: 'tmr_1', ProgramId: 'prog_1', Status: 'New' }],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/Shows/Upcoming')) {
+                    return new Response(JSON.stringify({
+                        Items: [{
+                            Id: 'ep_up_1',
+                            SeriesId: 'ser_1',
+                            SeriesName: 'Severance',
+                            Name: 'Cold Harbor',
+                            ParentIndexNumber: 2,
+                            IndexNumber: 10,
+                            PremiereDate: new Date(Date.now() + 3 * 86400000).toISOString(),
+                            Type: 'Episode',
+                        }],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
                 }
                 if (u.includes('/LiveTv/Recordings')) {
                     return new Response(JSON.stringify({ Items: [{ Id: 'rec_1', Name: 'Recorded Match', Type: 'Recording' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -893,7 +936,50 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.doesNotMatch(ltvDenied.hub.innerHTML, /data-cat-id="livetv"/, 'Profile with allowLiveTv: false must not render Live TV pill');
     assert.equal(ltvDenied.fetchedUrls.some((u) => u.includes('/LiveTv/')), false, 'Profile with allowLiveTv: false must not query /LiveTv/*');
 
-    console.log('[PASS] End-to-End VM Live TV hydration, Hub Bootstrap row, Nav Pill, Hub Click, Hot Toggle & Kids/Policy isolation verified (#19)');
+    // 4. v0.9.3 Inline 3-Hour EPG Grid + Timer REC Badge + Custom Home Row Order + New & Popular Sub-Tabs + Opt-In Hero Previews
+    const v93 = await runLiveTvVmScenario({
+        enableLiveTv: true,
+        enableHeroTrailerPreview: false,
+        homeRowOrder: ['movies', 'top10'],
+        homeHiddenRows: ['series'],
+        profile: { id: 'streamflix_owner', name: 'Owner', isAdmin: true, isOwner: true, allowLiveTv: true, jellyfinUserId: '11111111111111111111111111111111' },
+    });
+    assert.equal(v93.cachedCfg.enableHeroTrailerPreview, false, 'enableHeroTrailerPreview must default to false (opt-in)');
+    const moviesIdx = v93.hub.innerHTML.indexOf('data-row-id="movies"');
+    const top10Idx = v93.hub.innerHTML.indexOf('data-row-id="top10"');
+    assert.ok(moviesIdx > -1 && top10Idx > -1 && moviesIdx < top10Idx, 'Custom homeRowOrder must render New Movies before Top 10 Today');
+    assert.doesNotMatch(v93.hub.innerHTML, /data-row-id="series"/, 'homeHiddenRows must hide New Shows row on Home');
+
+    // Click Live TV -> click TV Guide sub-tab -> verify EPG timeline + REC badge
+    const v93LtvPill = v93.hub.querySelectorAll('[data-cat-id]').find((b) => b.getAttribute('data-cat-id') === 'livetv');
+    v93LtvPill.click();
+    const guideTabBtn = v93.hub.querySelectorAll('[data-ltv-tab]').find((b) => b.getAttribute('data-ltv-tab') === 'guide');
+    assert.ok(guideTabBtn, 'TV Guide sub-tab must render inside Live TV hub');
+    guideTabBtn.click();
+    await new Promise((r) => setTimeout(r, 45));
+    assert.ok(v93.fetchedUrls.some((u) => u.includes('/LiveTv/Programs?')), 'TV Guide sub-tab must fetch /LiveTv/Programs');
+    assert.ok(v93.fetchedUrls.some((u) => u.includes('/LiveTv/Timers')), 'TV Guide sub-tab must fetch /LiveTv/Timers');
+    assert.match(v93.hub.innerHTML, /class="bfx-epg-wrap"/, 'TV Guide sub-tab must render .bfx-epg-wrap timeline');
+    assert.match(v93.hub.innerHTML, /bfx-epg-rec-badge[^>]*>REC</, 'TV Guide sub-tab must display REC badge for scheduled timers');
+
+    // Click New & Popular -> click Coming Soon sub-tab -> verify Upcoming TV Episodes
+    const hotPill = v93.hub.querySelectorAll('[data-cat-id]').find((b) => b.getAttribute('data-cat-id') === 'hot');
+    assert.ok(hotPill, 'New & Popular pill must render');
+    hotPill.click();
+    await new Promise((r) => setTimeout(r, 45));
+    assert.match(v93.hub.innerHTML, /data-hot-subtab="comingsoon"/, 'New & Popular hub must render Coming Soon sub-tab');
+    const comingSoonBtn = v93.hub.querySelectorAll('[data-hot-subtab]').find((b) => b.getAttribute('data-hot-subtab') === 'comingsoon');
+    comingSoonBtn.click();
+    assert.match(v93.hub.innerHTML, /data-row-id="hot-upcoming"/, 'Coming Soon sub-tab must render Upcoming TV Episodes row');
+    assert.match(v93.hub.innerHTML, /Cold Harbor/, 'Coming Soon sub-tab must render upcoming episode title');
+
+    // Verify 1-Click DVR Record modal controls & Admin Config controls
+    assert.match(combinedJs, /streamflix-modal-record-btn/, 'Detail modal 1-Click DVR Record button must be wired');
+    assert.match(combinedJs, /\/LiveTv\/Timers\/Defaults\?programId=/, 'DVR recording must fetch Jellyfin /LiveTv/Timers/Defaults');
+    assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose opt-in EnableHeroTrailerPreview toggle');
+    assert.match(configHtml, /id="StreamFlixHomeRowsEditor"/, 'configPage.html must expose Home Page Row Order & Visibility editor');
+
+    console.log('[PASS] End-to-End VM Live TV EPG Timeline, DVR Record, Home Row Customizer, New & Popular Hub & Opt-In Hero Previews verified');
 }
 
-console.log('ALL STREAMFLIX v0.9.8.12 SMOKE CHECKS PASSED!');
+console.log('ALL STREAMFLIX SMOKE CHECKS PASSED!');

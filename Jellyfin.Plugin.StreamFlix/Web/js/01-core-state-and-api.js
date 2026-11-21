@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.12)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.13)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.12';
+    var VERSION = '0.9.8.13';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -24,6 +24,7 @@
     var CACHED_CONFIG_KEY = 'streamflix_cached_config_v7';
     var CINEMA_HUB_PREF_KEY = 'streamflix_cinema_hub_enabled_v1';
     var NAV_PROFILE_PREF_PREFIX = 'streamflix_nav_prefs_v1_';
+    var HOME_ROW_PREF_PREFIX = 'streamflix_home_rows_v1_';
     var RECENT_SEARCHES_PREFIX = 'streamflix_recent_searches_v1_';
     var HUB_SWR_CACHE_PREFIX = 'streamflix_hub_swr_v1_';
     var NOTIF_SEEN_PREFIX = 'streamflix_notif_seen_v1_';
@@ -121,6 +122,9 @@
         heroSelectionMode: 'recent',
         heroContentType: 'all',
         heroLibraryIds: [],
+        enableHeroTrailerPreview: false,
+        homeRowOrder: [],
+        homeHiddenRows: [],
         showLibrariesInNav: true,
         navHiddenBuiltIns: [],
         navLibraryIds: [],
@@ -207,7 +211,9 @@
         libraryBrowserSeq: 0,
         libraryViewData: {},
         liveTvData: null,
-        liveTvUi: { tab: 'all', filter: '' },
+        liveTvEpg: null,
+        liveTvUi: { tab: 'all', filter: '', epgOffsetMins: 0 },
+        hotSubTab: 'all',
         lastSurpriseId: '',
         activeDetailModal: null,
         itemCache: {},
@@ -838,6 +844,10 @@
         bell: '<path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.6 8.2-2.6 8.2h17.2S18 15 18 8.5z"/><path d="M13.8 20a2 2 0 0 1-3.6 0"/>',
         moon: '<path d="M20.4 14.6A8.5 8.5 0 0 1 9.4 3.6a8.5 8.5 0 1 0 11 11z"/>',
         calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M8 3.2v3.2M16 3.2v3.2M3.5 9.8h17M8 14h3M13 14h3"/>',
+        recordDot: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/>',
+        arrowUp: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+        arrowDown: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+        flame: '<path d="M12 2.8c1.4 2.8 4.8 4.7 5.8 8.3a6.2 6.2 0 1 1-11.6 0c.5-1.8 1.6-3.2 2.6-4.1.2 1.5 1 2.5 2.1 2.9-.3-2.5.3-5 1.1-7.1z"/>',
         seerrIcon: '<path d="M7.2 18.2h9.6a3.7 3.7 0 0 0 .55-7.36A5.2 5.2 0 0 0 7.1 9.4a3.5 3.5 0 0 0 .1 8.8z"/><path d="M12 10.6v5.2M9.4 13.2h5.2"/>'
     };
 
