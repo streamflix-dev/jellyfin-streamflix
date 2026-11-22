@@ -261,4 +261,64 @@ public class StreamFlixCoreTests
         Assert.Contains("autoplay=1&mute=1&controls=0", html);
         Assert.Contains("streamflix-yt", html);
     }
+
+    [Fact]
+    public void RemoteStandardJellyfinLogin_AutoProvisionsScopedProfileAndEnforcesRemoteAccessFlag()
+    {
+        var cfg = new PluginConfiguration
+        {
+            AllowStandardJellyfinLogin = true,
+            Profiles = new List<StreamFlixProfileConfig>
+            {
+                new()
+                {
+                    Id = "streamflix_owner",
+                    Name = "Owner",
+                    JellyfinUserId = Guid.NewGuid().ToString("N"),
+                    JellyfinUsername = "admin",
+                },
+            },
+        };
+
+        // 1. Remote user with EnableRemoteAccess = true (default) is allowed and auto-provisions a Jellyfin-locked profile (#22)
+        var remoteAllowedUser = new FakeUserEntity();
+        remoteAllowedUser.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = true });
+        Assert.True(StreamFlixStartupTask.HasRemoteAccessCompat(remoteAllowedUser));
+        Assert.True(StreamFlixController.IsJellyfinUserAllowedStandardLogin(remoteAllowedUser, isLocalLan: false));
+
+        var remoteUid = Guid.NewGuid();
+        var (autoProf, changed1) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, remoteUid, "RemoteFriend", isAdminUser: false);
+        Assert.True(changed1);
+        Assert.Equal(remoteUid.ToString("N"), autoProf.JellyfinUserId);
+        Assert.Equal("RemoteFriend", autoProf.JellyfinUsername);
+        Assert.False(autoProf.IsPluginCreatedJellyfinUser);
+        Assert.True(autoProf.AutoProvisionedFromJellyfinLogin);
+        Assert.Equal("jellyfin", autoProf.AccountLockKind);
+        Assert.Equal("RemoteFriend", autoProf.GoogleAccountEmail);
+
+        // Second login by same user reuses existing profile without creating duplicates
+        var (reusedProf, changed2) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, remoteUid, "RemoteFriend", isAdminUser: false);
+        Assert.False(changed2);
+        Assert.Same(autoProf, reusedProf);
+        Assert.Equal(2, cfg.Profiles.Count);
+
+        // Name collision with Owner appends (Jellyfin) cleanly without stealing streamflix_owner
+        var secondUid = Guid.NewGuid();
+        var (collisionProf, changed3) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, secondUid, "Owner", isAdminUser: false);
+        Assert.True(changed3);
+        Assert.Equal("Owner (Jellyfin)", collisionProf.Name);
+
+        // 2. Remote user with EnableRemoteAccess = false is blocked on WAN, allowed on LAN
+        var remoteBlockedUser = new FakeUserEntity();
+        remoteBlockedUser.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = false });
+        Assert.False(StreamFlixStartupTask.HasRemoteAccessCompat(remoteBlockedUser));
+        Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(remoteBlockedUser, isLocalLan: false));
+        Assert.True(StreamFlixController.IsJellyfinUserAllowedStandardLogin(remoteBlockedUser, isLocalLan: true));
+
+        // 3. Disabled user is blocked everywhere
+        var disabledUser = new FakeUserEntity();
+        disabledUser.Permissions.Add(new FakePerm { Kind = "IsDisabled", Value = true });
+        Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: true));
+        Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: false));
+    }
 }

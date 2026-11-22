@@ -594,6 +594,10 @@ public partial class StreamFlixController
 
             existing.GoogleAccountEmail = newLock;
             existing.AccountLockKind = newLock == null ? null : newLockKind;
+            if (effectiveAdmin && newLock == null)
+            {
+                existing.AutoProvisionedFromJellyfinLogin = false;
+            }
 
             if (cleanPin != null)
             {
@@ -990,6 +994,15 @@ public partial class StreamFlixController
         var s = caller.Session;
         if (s == null)
         {
+            if (config.AllowStandardJellyfinLogin
+                && caller.IsJellyfinAuthenticated
+                && caller.JellyfinUser != null
+                && !string.IsNullOrWhiteSpace(caller.JellyfinUser.Username)
+                && (normKind == "jellyfin" || (string.IsNullOrEmpty(normKind) && !config.EnableGoogleSignIn && !config.EnableCustomOidc)))
+            {
+                return string.Equals(caller.JellyfinUser.Username.Trim(), target, StringComparison.OrdinalIgnoreCase);
+            }
+
             return false;
         }
 
@@ -1227,6 +1240,147 @@ public partial class StreamFlixController
             {
                 await RevokeGuestJellyfinSessionsAsync(gpId).ConfigureAwait(false);
             }
+        }
+    }
+
+    private static readonly string[] AutoProfileColors =
+    {
+        "#1E88E5", "#43A047", "#8E24AA", "#FB8C00", "#00ACC1", "#3949AB", "#D81B60", "#E50914",
+    };
+
+    private static readonly string[] AutoProfileEmojis =
+    {
+        "🍿", "🎬", "🚀", "🎮", "⚡", "🔥", "🦊", "🎧",
+    };
+
+    internal static (StreamFlixProfileConfig Profile, bool Changed) EnsureProfileForJellyfinUserNoLock(
+        PluginConfiguration config,
+        Guid userId,
+        string? username,
+        bool isAdminUser)
+    {
+        config.Profiles ??= new List<StreamFlixProfileConfig>();
+        var existingLinked = config.Profiles.FirstOrDefault(p =>
+            !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+            && Guid.TryParse(p.JellyfinUserId, out var linkedUid)
+            && linkedUid == userId);
+        if (existingLinked != null)
+        {
+            return (existingLinked, false);
+        }
+
+        var cleanUsername = string.IsNullOrWhiteSpace(username) ? "Viewer" : username.Trim();
+        var unlinkedMatch = config.Profiles.FirstOrDefault(p =>
+            string.IsNullOrWhiteSpace(p.JellyfinUserId)
+            && (isAdminUser || !StreamFlixStartupTask.IsOwnerProfile(p))
+            && (string.Equals(p.JellyfinUsername?.Trim(), cleanUsername, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(p.Name?.Trim(), cleanUsername, StringComparison.OrdinalIgnoreCase)));
+        if (unlinkedMatch != null)
+        {
+            unlinkedMatch.JellyfinUserId = userId.ToString("N");
+            unlinkedMatch.JellyfinUsername = cleanUsername;
+            unlinkedMatch.IsPluginCreatedJellyfinUser = false;
+            return (unlinkedMatch, true);
+        }
+
+        var baseDisplayName = cleanUsername.Length > 40 ? cleanUsername.Substring(0, 40).TrimEnd() : cleanUsername;
+        var displayName = baseDisplayName;
+        if (config.Profiles.Any(p => string.Equals(p.Name?.Trim(), displayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            var suffix = " (Jellyfin)";
+            var trimmedBase = baseDisplayName.Length > (40 - suffix.Length)
+                ? baseDisplayName.Substring(0, 40 - suffix.Length).TrimEnd()
+                : baseDisplayName;
+            displayName = trimmedBase + suffix;
+        }
+
+        var idx = config.Profiles.Count;
+        var created = new StreamFlixProfileConfig
+        {
+            Id = $"streamflix_{Guid.NewGuid():N}",
+            Name = displayName,
+            AvatarColorIndex = idx % AutoProfileColors.Length,
+            AvatarIconIndex = idx % AutoProfileEmojis.Length,
+            AvatarColorHex = AutoProfileColors[idx % AutoProfileColors.Length],
+            AvatarEmoji = AutoProfileEmojis[idx % AutoProfileEmojis.Length],
+            IsKids = false,
+            MaturityRating = "TV-MA / R (All Maturity Levels)",
+            AccountLockKind = isAdminUser ? null : "jellyfin",
+            GoogleAccountEmail = isAdminUser ? null : cleanUsername,
+            AutoplayNextEpisode = true,
+            AutoplayPreviews = true,
+            JellyfinUserId = userId.ToString("N"),
+            JellyfinUsername = cleanUsername,
+            IsPluginCreatedJellyfinUser = false,
+            PermissionsInitialized = true,
+            AutoProvisionedFromJellyfinLogin = !isAdminUser,
+        };
+        config.Profiles.Add(created);
+        return (created, true);
+    }
+
+    private async Task<StreamFlixProfileConfig?> EnsureProfileForJellyfinUserAsync(PluginConfiguration config, JUser? user)
+    {
+        if (user == null || StreamFlixStartupTask.IsUserDisabledCompat(user))
+        {
+            return null;
+        }
+
+        var existing = (config.Profiles ?? new List<StreamFlixProfileConfig>()).FirstOrDefault(p =>
+            !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+            && Guid.TryParse(p.JellyfinUserId, out var uid)
+            && uid == user.Id);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        await SyncLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var isAdminUser = StreamFlixStartupTask.IsUserAdminCompat(user);
+            var (profile, changed) = EnsureProfileForJellyfinUserNoLock(config, user.Id, user.Username, isAdminUser);
+            if (changed)
+            {
+                Plugin.Instance?.SaveConfiguration();
+                _logger.LogInformation(
+                    "StreamFlix: linked StreamFlix profile '{ProfileName}' to Jellyfin user '{Username}' ({UserId}).",
+                    profile.Name,
+                    user.Username,
+                    user.Id.ToString("N"));
+            }
+
+            return profile;
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+    }
+
+    private async Task EnsureCallerJellyfinProfileIfNeededAsync(PluginConfiguration config, CallerContext caller)
+    {
+        if (!config.AllowStandardJellyfinLogin || IsGuestSession(caller))
+        {
+            return;
+        }
+
+        JUser? targetUser = null;
+        if (caller.Session != null
+            && (string.Equals(caller.Session.AuthKind, StreamFlixSessionService.AuthKindJellyfin, StringComparison.Ordinal)
+                || string.Equals(caller.Session.AuthKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal))
+            && Guid.TryParse(caller.Session.JellyfinUserId, out var sessUid))
+        {
+            targetUser = _userManager.GetUserById(sessUid);
+        }
+        else if (caller.Session == null && caller.IsJellyfinAuthenticated && caller.JellyfinUser != null)
+        {
+            targetUser = caller.JellyfinUser;
+        }
+
+        if (targetUser != null && !StreamFlixStartupTask.IsUserAdminCompat(targetUser))
+        {
+            await EnsureProfileForJellyfinUserAsync(config, targetUser).ConfigureAwait(false);
         }
     }
 

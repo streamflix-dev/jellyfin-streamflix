@@ -89,6 +89,12 @@ public class StreamFlixProfileConfig
     /// ensuring pre-existing plugin-managed household profiles receive Live TV access once when Live TV is enabled while preserving subsequent admin changes.
     /// </summary>
     public bool LiveTvPermissionInitialized { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this profile was automatically provisioned on demand when an existing Jellyfin user signed in,
+    /// keeping remote/personal Jellyfin accounts scoped to their own owner (and Administrators) without cluttering shared LAN-bypass household pickers.
+    /// </summary>
+    public bool AutoProvisionedFromJellyfinLogin { get; set; }
 }
 
 /// <summary>

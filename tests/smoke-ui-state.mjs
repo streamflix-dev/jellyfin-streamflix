@@ -998,6 +998,128 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.match(configHtml, /id="StreamFlixHomeRowsEditor"/, 'configPage.html must expose Home Page Row Order & Visibility editor');
 
     console.log('[PASS] End-to-End VM YouTube Hero & Modal Trailers, Live TV EPG Timeline, DVR Record, Home Row Customizer & New & Popular Hub verified');
+
+    // 5. Issue #22: Remote non-admin Jellyfin user auto-activates single scoped profile without household-linking block
+    {
+        const authControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.Auth.cs'), 'utf8');
+        assert.doesNotMatch(authControllerCs, /not_household_member/, 'StandardLogin must never block valid Jellyfin users with not_household_member (#22)');
+        assert.match(authControllerCs, /EnsureProfileForJellyfinUserAsync/, 'StandardLogin must auto-provision/link a StreamFlix profile for valid Jellyfin users (#22)');
+
+        const localStore = makeStorage();
+        const sessionStore = makeStorage();
+        const remoteProfile = {
+            id: 'streamflix_remote_friend',
+            name: 'RemoteFriend',
+            isAdmin: false,
+            isOwner: false,
+            canActivate: true,
+            hasPin: false,
+            googleLocked: true,
+            accountLockKind: 'jellyfin',
+            googleLockSatisfied: true,
+            jellyfinUserId: '44444444444444444444444444444444',
+            jellyfinUsername: 'RemoteFriend',
+        };
+        localStore.setItem('streamflix_session_v7', JSON.stringify({
+            token: 'signed.remote.jf.token',
+            authKind: 'jellyfin',
+            username: 'RemoteFriend',
+            userId: remoteProfile.jellyfinUserId,
+            name: 'RemoteFriend',
+            isAdmin: false,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        }));
+        const doc = createLiveTvHubDom();
+        const remoteFetches = [];
+        const win = {
+            location: { origin: 'https://jellyfin.example.com', pathname: '/web/index.html', hash: '#/home', search: '', assign() {}, reload() {}, replace() {} },
+            history: { length: 1, replaceState() {}, back() {} },
+            navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', clipboard: { writeText: async () => {} } },
+            document: doc,
+            localStorage: localStore,
+            sessionStorage: sessionStore,
+            BroadcastChannel: MockBroadcastChannel,
+            ApiClient: {
+                _serverInfo: { Id: 'srv_rem', UserId: '', AccessToken: '' },
+                accessToken: () => '',
+                getCurrentUserId: () => '',
+                serverId: () => 'srv_rem',
+            },
+            URL,
+            URLSearchParams,
+            Headers,
+            Response,
+            AbortController,
+            MutationObserver: class { observe() {} disconnect() {} },
+            CustomEvent: class { constructor(type) { this.type = type; } },
+            Image: class { set src(_) { if (this.onload) this.onload(); } },
+            matchMedia: () => ({ matches: false, addEventListener() {} }),
+            requestAnimationFrame: (fn) => { fn(); return 1; },
+            setTimeout: (fn, ms) => (!ms || ms <= 400 ? setTimeout(() => { try { fn(); } catch {} }, Math.min(Number(ms) || 0, 15)) : 1),
+            clearTimeout() {},
+            setInterval: () => 1,
+            clearInterval() {},
+            addEventListener() {},
+            scrollTo() {},
+            innerWidth: 430,
+            innerHeight: 932,
+            fetch: async (url) => {
+                const u = String(url);
+                remoteFetches.push(u);
+                if (u.includes('/StreamFlix/PublicConfig')) {
+                    return new Response(JSON.stringify({
+                        version: '0.9.3.2',
+                        assetVersion: '0.9.3.2',
+                        serverId: 'srv_rem',
+                        serverName: 'StreamFlix',
+                        enableStreamFlixUi: true,
+                        allowStandardJellyfinLogin: true,
+                        isLocalLan: false,
+                        hasAccess: true,
+                        isAdmin: false,
+                        session: { authKind: 'jellyfin', username: 'RemoteFriend', userId: remoteProfile.jellyfinUserId, expiresAt: new Date(Date.now() + 86400000).toISOString() },
+                        profiles: [remoteProfile],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/StreamFlix/Profiles/Activate')) {
+                    return new Response(JSON.stringify({
+                        userId: remoteProfile.jellyfinUserId,
+                        userName: 'RemoteFriend',
+                        jellyfinUsername: 'RemoteFriend',
+                        accessToken: 'tok_remote_friend',
+                        serverId: 'srv_rem',
+                        serverName: 'StreamFlix',
+                        profile: remoteProfile,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/StreamFlix/Hub/Bootstrap')) {
+                    return new Response(JSON.stringify({
+                        allMovies: [],
+                        allSeries: [],
+                        resumeItems: [],
+                        nextUpItems: [],
+                        favoriteItems: [],
+                        collectionsItems: [],
+                        filteredHeroPool: [],
+                        views: [],
+                        popularScores: {},
+                        totalMoviesCount: 0,
+                        totalSeriesCount: 0,
+                        totalCollectionsCount: 0,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ Items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            },
+        };
+        win.window = win;
+        win.self = win;
+        vm.runInContext(combinedJs, vm.createContext(win));
+        await new Promise((r) => setTimeout(r, 80));
+        assert.ok(remoteFetches.some((u) => u.includes('/StreamFlix/Profiles/Activate')), 'Remote Jellyfin user with 1 scoped profile must auto-activate seamlessly (#22)');
+        const activatedTabProf = JSON.parse(sessionStore.getItem('streamflix_tab_profile_v1') || '{}');
+        assert.equal(activatedTabProf.id, 'streamflix_remote_friend', 'Remote Jellyfin user profile must become active in sessionStorage (#22)');
+        console.log('[PASS] Issue #22 remote Jellyfin account auto-provisioning & single-profile auto-activation verified');
+    }
 }
 
 console.log('ALL STREAMFLIX SMOKE CHECKS PASSED!');

@@ -323,6 +323,31 @@
             }
         }
 
+        if ((!state.activeProfile || !state.activeProfile.id || !state.activeProfile.accessToken)
+            && state.configFresh
+            && !state.explicitPickerOpen
+            && !state.manageMode
+            && !state.activatingProfileId
+            && !(state.config && state.config.isAdmin)) {
+            var isScopedJfUser = Boolean(
+                (state.googleUser && state.googleUser.authKind === 'jellyfin' && !state.googleUser.isAdmin)
+                || (!state.googleUser
+                    && state.config
+                    && !(state.config.bypassLoginGateOnLan && state.config.isLocalLan)
+                    && state.config.allowStandardJellyfinLogin
+                    && state.config.hasAccess)
+            );
+            if (isScopedJfUser) {
+                var scopedActivatable = getProfiles().filter(function (p) { return p && p.canActivate !== false; });
+                if (scopedActivatable.length === 1 && !scopedActivatable[0].hasPin && scopedActivatable[0].googleLockSatisfied !== false) {
+                    activateServerProfile(scopedActivatable[0], '').catch(function () {
+                        renderProfilePickerGate();
+                    });
+                    return;
+                }
+            }
+        }
+
         if (!state.activeProfile || !state.activeProfile.id || !state.activeProfile.accessToken || hashHasLogin) {
             if (typeof removeBedtimeLockOverlay === 'function') {
                 removeBedtimeLockOverlay();

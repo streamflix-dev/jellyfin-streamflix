@@ -28,6 +28,8 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        await EnsureCallerJellyfinProfileIfNeededAsync(config, caller).ConfigureAwait(false);
+
         if (caller.JellyfinUser == null)
         {
             return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
@@ -110,6 +112,7 @@ public partial class StreamFlixController
             bedtimeStart = p.BedtimeStart ?? string.Empty,
             bedtimeEnd = p.BedtimeEnd ?? string.Empty,
             jellyfinUsername = p.JellyfinUsername,
+            autoProvisionedFromJellyfinLogin = p.AutoProvisionedFromJellyfinLogin,
         }).ToList();
 
         return Ok(new
@@ -473,6 +476,7 @@ public partial class StreamFlixController
                         IsPluginCreatedJellyfinUser = prevProf?.IsPluginCreatedJellyfinUser ?? false,
                         PermissionsInitialized = prevProf?.PermissionsInitialized ?? false,
                         LiveTvPermissionInitialized = prevProf?.LiveTvPermissionInitialized ?? false,
+                        AutoProvisionedFromJellyfinLogin = src.AutoProvisionedFromJellyfinLogin || (prevProf?.AutoProvisionedFromJellyfinLogin ?? false),
                     });
                 }
 

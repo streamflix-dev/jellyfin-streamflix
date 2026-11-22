@@ -259,10 +259,19 @@
         var onAdminPage = typeof isAdminConfigRoute === 'function' && isAdminConfigRoute();
         var canOpenPluginSettings = Boolean(isAdmin && !onAdminPage);
         var canResumeOrReturn = Boolean((state.activeProfile && state.activeProfile.accessToken) || onAdminPage);
+        var canOfferLanSignIn = Boolean(!hasSessionToken && !isGuest && isOpenWithoutLogin(state.config)
+            && state.config
+            && ((state.config.enableGoogleSignIn !== false && state.config.googleConfigured)
+                || (state.config.enableCustomOidc && state.config.oidcConfigured)
+                || state.config.allowStandardJellyfinLogin
+                || state.config.canShowAdminFallback));
         var resumeLabel = onAdminPage ? 'Back to Settings' : ('Back to ' + escapeHtml(getBrandName()));
         var actionsHtml = buildAccountChipHtml()
             + (canOpenPluginSettings
                 ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-open-plugin-cfg-btn" title="Open StreamFlix Plugin Settings">' + icon('gear') + '<span>Plugin Settings</span></button>'
+                : '')
+            + (canOfferLanSignIn
+                ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-lan-signin-btn" title="Sign in with your account">Sign in</button>'
                 : '')
             + (hasSessionToken
                 ? '<button type="button" class="streamflix-ghost-btn" id="streamflix-google-signout-btn">' + (isGuest ? 'Exit Guest Pass' : 'Sign out') + '</button>'
@@ -438,6 +447,14 @@
         if (signOutBtn) {
             signOutBtn.addEventListener('click', function () {
                 signOutHousehold();
+            });
+        }
+
+        var lanSignInBtn = root.querySelector('#streamflix-lan-signin-btn');
+        if (lanSignInBtn) {
+            lanSignInBtn.addEventListener('click', function () {
+                state.explicitAuthPrompt = true;
+                renderGoogleAuthGate();
             });
         }
 

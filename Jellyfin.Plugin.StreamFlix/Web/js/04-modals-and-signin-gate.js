@@ -857,8 +857,15 @@
 
                 var pendingId = takePendingProfileId();
                 return fetchPublicConfig().then(function () {
-                    renderProfilePickerGate();
                     var pending = pendingId ? findProfileById(pendingId) : null;
+                    if (!pending && !res.isAdmin && !adminOnly) {
+                        var allProfs = (state.config && Array.isArray(state.config.profiles)) ? state.config.profiles : [];
+                        var activatable = allProfs.filter(function (p) { return p && p.canActivate !== false; });
+                        if (activatable.length === 1) {
+                            pending = activatable[0];
+                        }
+                    }
+                    renderProfilePickerGate();
                     if (pending) {
                         handleSelectProfile(pending);
                     } else {

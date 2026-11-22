@@ -23,6 +23,7 @@ public static class StreamFlixErrorCodes
     public const string AdminFallbackDisabled = "SF-AUTH-108";
     public const string GateUnconfiguredOrOwnerUnprotected = "SF-AUTH-109";
     public const string JellyfinSessionRequired = "SF-AUTH-110";
+    public const string RemoteAccessDisabled = "SF-AUTH-111";
 
     // Custom OpenID Connect / SSO (200-299)
     public const string OidcNotConfigured = "SF-OIDC-201";
@@ -89,6 +90,7 @@ public static class StreamFlixErrorCodes
         ["standard_login_disabled"] = StandardLoginDisabled,
         ["admin_fallback_disabled"] = AdminFallbackDisabled,
         ["lan_only"] = AdminFallbackDisabled,
+        ["remote_access_disabled"] = RemoteAccessDisabled,
 
         ["oidc_disabled"] = OidcNotConfigured,
         ["oidc_unconfigured"] = OidcNotConfigured,

@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.15",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.15 Release Candidate (Dev Test Channel): Fix Issue #22 where remote/existing Jellyfin users signing in with valid Jellyfin credentials hit SF-REQ-743 (not_household_member); automatically provision & link a scoped StreamFlix profile on first sign-in while respecting Jellyfin's EnableRemoteAccess user permission and auto-activating single-profile accounts directly into StreamFlix Home.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.15_12.0.0.zip",
+        "checksum": "f91b87842f821e7edc3026a472c36973",
+        "timestamp": "2026-11-22T15:26:16Z"
+      },
+      {
+        "version": "0.9.8.15",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.15 Release Candidate (Dev Test Channel): Fix Issue #22 where remote/existing Jellyfin users signing in with valid Jellyfin credentials hit SF-REQ-743 (not_household_member); automatically provision & link a scoped StreamFlix profile on first sign-in while respecting Jellyfin's EnableRemoteAccess user permission and auto-activating single-profile accounts directly into StreamFlix Home.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.15_10.11.0.zip",
+        "checksum": "a61065a177db911681c6d532ec4379ab",
+        "timestamp": "2026-11-22T15:26:16Z"
+      },
+      {
+        "version": "0.9.8.15",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.15 Release Candidate (Dev Test Channel): Fix Issue #22 where remote/existing Jellyfin users signing in with valid Jellyfin credentials hit SF-REQ-743 (not_household_member); automatically provision & link a scoped StreamFlix profile on first sign-in while respecting Jellyfin's EnableRemoteAccess user permission and auto-activating single-profile accounts directly into StreamFlix Home.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.15_10.9.0.zip",
+        "checksum": "2e9568f8d2bdda19d1fe4f288a646d17",
+        "timestamp": "2026-11-22T15:26:16Z"
+      },
+      {
         "version": "0.9.8.14",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.14 Release Candidate (Dev Test Channel): Switch Hero Billboard previews & Detail Modal trailers to official YouTube trailers (Jellyfin RemoteTrailers + automatic embeddable YouTube Official Trailer search + Error-153-safe /StreamFlix/Trailers/Embed relay), enabled by default with live Mute/Unmute and an on-demand Trailer button in every Detail Modal.",
         "targetAbi": "12.0.0.0",

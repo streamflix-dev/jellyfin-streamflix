@@ -54,7 +54,7 @@ namespace Jellyfin.Plugin.StreamFlix.Controllers;
 [StreamFlixErrorEnvelope]
 public partial class StreamFlixController : ControllerBase
 {
-    private const int MaxProfilesCount = 24;
+    private const int MaxProfilesCount = 64;
     private const int MaxStoredGuestPasses = 100;
     private const int MaxActiveGuestPasses = 50;
 
@@ -146,6 +146,7 @@ public partial class StreamFlixController : ControllerBase
         if (HasHouseholdAccess(config, caller))
         {
             await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
+            await EnsureCallerJellyfinProfileIfNeededAsync(config, caller).ConfigureAwait(false);
         }
 
         return Ok(BuildPublicState(config, caller));
@@ -442,6 +443,21 @@ public partial class StreamFlixController : ControllerBase
             && !config.AllowStandardJellyfinLogin;
     }
 
+    internal static bool IsJellyfinUserAllowedStandardLogin(object? user, bool isLocalLan)
+    {
+        if (user == null || StreamFlixStartupTask.IsUserDisabledCompat(user))
+        {
+            return false;
+        }
+
+        if (StreamFlixStartupTask.IsUserAdminCompat(user))
+        {
+            return true;
+        }
+
+        return isLocalLan || StreamFlixStartupTask.HasRemoteAccessCompat(user);
+    }
+
     private static bool IsJellyfinUserHouseholdMember(PluginConfiguration config, JUser? user)
     {
         if (user == null || StreamFlixStartupTask.IsUserDisabledCompat(user))
@@ -476,7 +492,7 @@ public partial class StreamFlixController : ControllerBase
             || caller.Session != null
             || (config.AllowStandardJellyfinLogin
                 && caller.IsJellyfinAuthenticated
-                && IsJellyfinUserHouseholdMember(config, caller.JellyfinUser));
+                && IsJellyfinUserAllowedStandardLogin(caller.JellyfinUser, caller.IsLocalLan));
     }
 
     private ObjectResult GoogleRequired(PluginConfiguration? config = null)
@@ -563,7 +579,7 @@ public partial class StreamFlixController : ControllerBase
                     {
                         sessionIsAdmin = true;
                     }
-                    else if (!config.AllowStandardJellyfinLogin || !IsJellyfinUserHouseholdMember(config, u))
+                    else if (!config.AllowStandardJellyfinLogin || !IsJellyfinUserAllowedStandardLogin(u, isLocalLan))
                     {
                         session = null;
                     }
@@ -685,6 +701,12 @@ public partial class StreamFlixController : ControllerBase
                             && pUid == scopedUid.Value)
                         .ToList()
                     : new List<StreamFlixProfileConfig>();
+            }
+            else
+            {
+                profilesSnapshot = profilesSnapshot
+                    .Where(p => !p.AutoProvisionedFromJellyfinLogin)
+                    .ToList();
             }
         }
 

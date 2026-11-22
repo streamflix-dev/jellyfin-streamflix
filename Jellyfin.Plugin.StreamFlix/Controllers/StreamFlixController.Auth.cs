@@ -320,15 +320,18 @@ public partial class StreamFlixController
         StreamFlixSessionService.ResetLoginFailures(lockKey);
         await SyncProfilesAsync(config, force: false).ConfigureAwait(false);
         var isAdmin = StreamFlixStartupTask.IsUserAdminCompat(user);
-        if (!isAdmin && !IsJellyfinUserHouseholdMember(config, user))
+        var isLocalLan = StreamFlixSessionService.IsLocalLanRequest(HttpContext, config.TreatTailscaleAsLocalLan);
+        if (!isAdmin && !isLocalLan && !StreamFlixStartupTask.HasRemoteAccessCompat(user))
         {
             return StatusCode(403, new
             {
                 verified = false,
-                code = "not_household_member",
-                message = $"\"{user.Username}\" isn't linked to a StreamFlix household profile on this server. Ask an administrator to link a profile in Manage Profiles.",
+                code = "remote_access_disabled",
+                message = $"Remote connections are disabled for \"{user.Username}\" in Jellyfin User Settings.",
             });
         }
+
+        await EnsureProfileForJellyfinUserAsync(config, user).ConfigureAwait(false);
 
         var kind = isAdmin
             ? StreamFlixSessionService.AuthKindJellyfinAdmin

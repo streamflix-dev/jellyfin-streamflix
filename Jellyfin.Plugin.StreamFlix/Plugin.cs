@@ -614,6 +614,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                         IsPluginCreatedJellyfinUser = BoolVal(pEl, nameof(StreamFlixProfileConfig.IsPluginCreatedJellyfinUser), false),
                         PermissionsInitialized = BoolVal(pEl, nameof(StreamFlixProfileConfig.PermissionsInitialized), false),
                         LiveTvPermissionInitialized = BoolVal(pEl, nameof(StreamFlixProfileConfig.LiveTvPermissionInitialized), false),
+                        AutoProvisionedFromJellyfinLogin = BoolVal(pEl, nameof(StreamFlixProfileConfig.AutoProvisionedFromJellyfinLogin), false),
                     });
                 }
             }

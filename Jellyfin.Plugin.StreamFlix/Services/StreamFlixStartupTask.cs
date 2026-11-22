@@ -399,6 +399,63 @@ public class StreamFlixStartupTask : IScheduledTask
         return false;
     }
 
+    /// <summary>
+    /// Checks whether a Jellyfin user entity is permitted to connect remotely (<c>PermissionKind.EnableRemoteAccess</c>).
+    /// Defaults to <c>true</c> unless an explicit <c>EnableRemoteAccess = false</c> permission is present.
+    /// </summary>
+    public static bool HasRemoteAccessCompat(object? user)
+    {
+        if (user == null)
+        {
+            return false;
+        }
+
+        if (IsUserAdminCompat(user))
+        {
+            return true;
+        }
+
+        try
+        {
+            var permsProp = user.GetType().GetProperty("Permissions", BindingFlags.Public | BindingFlags.Instance);
+            if (permsProp?.GetValue(user) is IEnumerable perms)
+            {
+                foreach (var perm in perms)
+                {
+                    if (perm == null)
+                    {
+                        continue;
+                    }
+
+                    var kindObj = perm.GetType().GetProperty("Kind")?.GetValue(perm);
+                    var valObj = perm.GetType().GetProperty("Value")?.GetValue(perm);
+                    if (kindObj != null && string.Equals(kindObj.ToString(), "EnableRemoteAccess", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return valObj is bool b ? b : true;
+                    }
+                }
+            }
+
+            var hasPermMethod = user.GetType().GetMethod("HasPermission", BindingFlags.Public | BindingFlags.Instance);
+            if (hasPermMethod != null)
+            {
+                var ps = hasPermMethod.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType.IsEnum
+                    && Enum.TryParse(ps[0].ParameterType, "EnableRemoteAccess", ignoreCase: true, out var remoteEnum)
+                    && remoteEnum != null
+                    && hasPermMethod.Invoke(user, new[] { remoteEnum }) is bool allowed)
+                {
+                    return allowed;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return true;
+    }
+
     public static long GetInternalIdCompat(object? user)
     {
         if (user == null)
