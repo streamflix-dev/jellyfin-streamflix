@@ -254,11 +254,12 @@ public class StreamFlixCoreTests
     [Fact]
     public void BuildYouTubeEmbedRelayHtml_IncludesError153ReferrerPolicyAndPostMessageBridge()
     {
-        var html = StreamFlixController.BuildYouTubeEmbedRelayHtml("zSWdZVtXT7E", autoplay: true, mute: true, controls: false, loop: false);
+        var html = StreamFlixController.BuildYouTubeEmbedRelayHtml("zSWdZVtXT7E", autoplay: true, mute: true, controls: false, loop: false, startSeconds: 10);
         Assert.Contains("meta name=\"referrer\" content=\"strict-origin-when-cross-origin\"", html);
         Assert.Contains("referrerpolicy=\"strict-origin-when-cross-origin\"", html);
         Assert.Contains("https://www.youtube-nocookie.com/embed/", html);
         Assert.Contains("autoplay=1&mute=1&controls=0", html);
+        Assert.Contains("&start=10", html);
         Assert.Contains("streamflix-yt", html);
     }
 

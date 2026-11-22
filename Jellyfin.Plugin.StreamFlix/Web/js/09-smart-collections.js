@@ -3694,8 +3694,11 @@
         img.src = url;
     }
 
+    var HERO_PREVIEW_MAX_PLAY_MS = 3000;
     var heroPreviewTimer = null;
     var heroYtWatchdogTimer = null;
+    var heroPlayCapTimer = null;
+    var heroFadeOutTimer = null;
     var activeHeroYtIframe = null;
     var heroYtMessageBound = false;
 
@@ -3746,11 +3749,13 @@
 
     function buildYouTubeRelaySrc(youtubeId, opts) {
         opts = opts || {};
+        var startSec = Number(opts.startSeconds) > 0 ? Math.floor(Number(opts.startSeconds)) : 0;
         return apiBase() + '/StreamFlix/Trailers/Embed/' + encodeURIComponent(youtubeId)
             + '?autoplay=' + (opts.autoplay === false ? '0' : '1')
             + '&mute=' + (opts.mute === false ? '0' : '1')
             + '&controls=' + (opts.controls ? '1' : '0')
-            + (opts.loop ? '&loop=1' : '');
+            + (opts.loop ? '&loop=1' : '')
+            + (startSec > 0 ? ('&start=' + startSec) : '');
     }
 
     function sendCommandToYouTubeRelay(iframeEl, cmd, args) {
@@ -3813,6 +3818,41 @@
         return p;
     }
 
+    function scheduleHeroPreviewPlayCap(targetId) {
+        if (heroPlayCapTimer || heroFadeOutTimer) {
+            return;
+        }
+        heroPlayCapTimer = setTimeout(function () {
+            heroPlayCapTimer = null;
+            var curHero = document.getElementById('streamflix-hero-billboard');
+            if (!curHero || curHero.getAttribute('data-hero-item') !== targetId) {
+                stopHeroVideoPreview(true);
+                return;
+            }
+            if (activeHeroYtIframe) {
+                sendCommandToYouTubeRelay(activeHeroYtIframe, 'mute', []);
+                var ytWrap = activeHeroYtIframe.parentNode;
+                if (ytWrap && ytWrap.classList) {
+                    ytWrap.classList.remove('is-playing');
+                }
+            }
+            var vid = curHero.querySelector('video.bfx-hero-preview-video');
+            if (vid) {
+                vid.muted = true;
+                vid.classList.remove('is-playing');
+            }
+            var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+            if (muteBtn) {
+                muteBtn.classList.add('is-hidden');
+            }
+            heroFadeOutTimer = setTimeout(function () {
+                heroFadeOutTimer = null;
+                stopHeroVideoPreview(true);
+                restartHeroTimer();
+            }, 650);
+        }, HERO_PREVIEW_MAX_PLAY_MS);
+    }
+
     function ensureHeroYouTubeMessageListener() {
         if (heroYtMessageBound) {
             return;
@@ -3838,22 +3878,23 @@
                     state.heroVideoActive = true;
                     state.heroVideoItemId = targetId;
                     var wrap = activeHeroYtIframe.parentNode;
-                    if (wrap && wrap.classList) {
+                    if (wrap && wrap.classList && !heroFadeOutTimer) {
                         wrap.classList.add('is-playing');
                     }
                     curHero.classList.add('is-video-playing');
                     var shouldMute = Boolean(state.heroPreviewMuted !== false);
-                    if (!shouldMute) {
+                    if (!shouldMute && !heroFadeOutTimer) {
                         sendCommandToYouTubeRelay(activeHeroYtIframe, 'unMute', []);
                         sendCommandToYouTubeRelay(activeHeroYtIframe, 'setVolume', [100]);
                     }
                     var muteBtn = document.getElementById('streamflix-hero-mute-btn');
-                    if (muteBtn) {
+                    if (muteBtn && !heroFadeOutTimer) {
                         muteBtn.classList.remove('is-hidden');
                         muteBtn.innerHTML = icon(shouldMute ? 'volumeOff' : 'volume');
                         muteBtn.title = shouldMute ? 'Unmute preview' : 'Mute preview';
                         muteBtn.setAttribute('aria-label', muteBtn.title);
                     }
+                    scheduleHeroPreviewPlayCap(targetId);
                 } else if (d.state === 0) {
                     stopHeroVideoPreview(true);
                     restartHeroTimer();
@@ -3872,6 +3913,14 @@
         if (heroYtWatchdogTimer) {
             clearTimeout(heroYtWatchdogTimer);
             heroYtWatchdogTimer = null;
+        }
+        if (heroPlayCapTimer) {
+            clearTimeout(heroPlayCapTimer);
+            heroPlayCapTimer = null;
+        }
+        if (heroFadeOutTimer) {
+            clearTimeout(heroFadeOutTimer);
+            heroFadeOutTimer = null;
         }
         if (!endedNaturally) {
             state.heroTrailerAttemptedSlide = '';
@@ -3982,7 +4031,7 @@
                     ifr.setAttribute('tabindex', '-1');
                     ifr.setAttribute('aria-hidden', 'true');
                     ifr.setAttribute('title', (desc.title || item.Name || 'Trailer') + ' Preview');
-                    ifr.src = buildYouTubeRelaySrc(desc.youtubeId, { autoplay: true, mute: true, controls: false });
+                    ifr.src = buildYouTubeRelaySrc(desc.youtubeId, { autoplay: true, mute: true, controls: false, startSeconds: 10 });
                     activeHeroYtIframe = ifr;
                     wrap.appendChild(ifr);
                     bgStack.appendChild(wrap);
@@ -4026,6 +4075,7 @@
                             muteBtn.classList.remove('is-hidden');
                             muteBtn.innerHTML = icon(vid.muted ? 'volumeOff' : 'volume');
                         }
+                        scheduleHeroPreviewPlayCap(targetId);
                     });
                     vid.addEventListener('ended', onCleanup);
                     vid.addEventListener('error', onCleanup);

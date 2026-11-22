@@ -959,7 +959,8 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.ok(v93.fetchedUrls.some((u) => u.includes('/StreamFlix/Trailers/Resolve?itemId=')), 'Hero Billboard must resolve YouTube trailer via /StreamFlix/Trailers/Resolve');
     const heroEl = v93.hub.querySelector('#streamflix-hero-billboard') || v93.win.document.getElementById('streamflix-hero-billboard');
     const heroBgStack = heroEl && heroEl.querySelector('.streamflix-hero-bg-stack');
-    assert.ok(heroBgStack && heroBgStack.children.some((w) => w.className.includes('bfx-hero-yt-wrap') && w.children.some((f) => String(f.src || '').includes('/StreamFlix/Trailers/Embed/zSWdZVtXT7E?autoplay=1&mute=1&controls=0'))), 'Hero Billboard must mount Error-153-safe YouTube relay iframe');
+    assert.ok(heroBgStack && heroBgStack.children.some((w) => w.className.includes('bfx-hero-yt-wrap') && w.children.some((f) => String(f.src || '').includes('/StreamFlix/Trailers/Embed/zSWdZVtXT7E?autoplay=1&mute=1&controls=0&start=10'))), 'Hero Billboard must mount Error-153-safe YouTube relay iframe with start offset');
+    assert.match(combinedJs, /HERO_PREVIEW_MAX_PLAY_MS\s*=\s*3000/, 'Hero Billboard trailer preview must cap active playback at 3 seconds (3000ms)');
 
     const moviesIdx = v93.hub.innerHTML.indexOf('data-row-id="movies"');
     const top10Idx = v93.hub.innerHTML.indexOf('data-row-id="top10"');
