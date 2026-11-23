@@ -1159,11 +1159,16 @@
             if (typeof cancelPendingSearch === 'function') {
                 cancelPendingSearch();
             }
+            if (typeof stopHeroVideoPreview === 'function') {
+                stopHeroVideoPreview(false);
+            }
             state.itemCache = {};
             state.browseFilter = null;
             state.libraryBrowser = null;
             state.libraryViewData = {};
             state.liveTvData = null;
+            state.liveTvEpg = null;
+            state.hotTabExtra = null;
             if (activated.isKids && state.activeCategory === 'livetv') {
                 state.activeCategory = 'all';
             }

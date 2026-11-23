@@ -155,6 +155,14 @@
         }
         var d = state.hubData || {};
         var itemMap = {};
+        var liveChannelPrograms = [];
+        if (state.liveTvData && Array.isArray(state.liveTvData.channels)) {
+            state.liveTvData.channels.forEach(function (ch) {
+                if (ch && ch.CurrentProgram && ch.CurrentProgram.Id) {
+                    liveChannelPrograms.push(ch.CurrentProgram);
+                }
+            });
+        }
         [
             d.heroItems, d.resumeItems, d.nextUpItems, d.top10Items,
             d.favoriteItems, d.recentMovies, d.recentSeries,
@@ -164,6 +172,7 @@
             (state.liveTvData && state.liveTvData.channels) || [],
             (state.liveTvData && state.liveTvData.onNow) || [],
             (state.liveTvData && state.liveTvData.recordings) || [],
+            liveChannelPrograms,
             (state.liveTvEpg && state.liveTvEpg.programs) || [],
             (state.hotTabExtra && state.hotTabExtra.upcomingEpisodes) || [],
             personalRowItems(), extraItemsList || []
@@ -171,10 +180,14 @@
             (arr || []).forEach(function (it) {
                 if (it && it.Id) {
                     // The same title can sit in several rows; keep the copy that knows how far in you are
-                    var prev = itemMap[it.Id];
+                    var normKey = normalizeGuid(it.Id);
+                    var prev = itemMap[it.Id] || (normKey ? itemMap[normKey] : null);
                     var prevPct = prev && prev.UserData && prev.UserData.PlayedPercentage;
                     if (!prevPct || (it.UserData && it.UserData.PlayedPercentage)) {
                         itemMap[it.Id] = it;
+                        if (normKey) {
+                            itemMap[normKey] = it;
+                        }
                     }
                 }
             });
@@ -211,8 +224,16 @@
 
         Array.prototype.forEach.call(containerEl.querySelectorAll('[data-item-id]'), function (card) {
             var itemId = card.getAttribute('data-item-id');
-            var item = itemMap[itemId] || findCachedItemById(itemId) || { Id: itemId };
+            var normCardId = normalizeGuid(itemId);
+            var item = itemMap[itemId] || (normCardId ? itemMap[normCardId] : null) || findCachedItemById(itemId) || { Id: itemId };
             card.__bfxItem = item;
+            var openCardDetail = function () {
+                if (!item.Name && item.Id && typeof openHeroDetailModalById === 'function') {
+                    openHeroDetailModalById(item.Id);
+                } else {
+                    openHeroDetailModal(item);
+                }
+            };
 
             card.addEventListener('click', function (ev) {
                 var actionBtn = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
@@ -231,16 +252,16 @@
                     } else if (act === 'remove-resume') {
                         removeFromContinueWatching(item);
                     } else if (act === 'info') {
-                        openHeroDetailModal(item);
+                        openCardDetail();
                     }
                     return;
                 }
-                openHeroDetailModal(item);
+                openCardDetail();
             });
             card.addEventListener('keydown', function (ev) {
                 if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === card) {
                     ev.preventDefault();
-                    openHeroDetailModal(item);
+                    openCardDetail();
                 }
             });
         });

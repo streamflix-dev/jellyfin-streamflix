@@ -1148,9 +1148,15 @@
 
     function clearShowcaseAndMediaCaches() {
         try { localStorage.removeItem(SHOWCASE_ITEMS_KEY); } catch (e) {}
+        if (typeof stopHeroVideoPreview === 'function') {
+            stopHeroVideoPreview(false);
+        }
         state.itemCache = {};
         state.seerrSearchResults = null;
         state.seerrSearchLoading = false;
+        state.liveTvData = null;
+        state.liveTvEpg = null;
+        state.hotTabExtra = null;
         state.ambientCache = {};
         state.personalRowsByUser = {};
         if (state.hubData) {

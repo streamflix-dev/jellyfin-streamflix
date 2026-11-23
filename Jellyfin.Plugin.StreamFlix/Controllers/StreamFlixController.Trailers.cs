@@ -11,6 +11,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.StreamFlix.Configuration;
+using Jellyfin.Plugin.StreamFlix.Services;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
@@ -151,13 +153,18 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        if (!caller.IsAdmin && caller.JellyfinUser == null)
+        {
+            return StatusCode(401, new { ok = false, code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
+        }
+
         if (string.IsNullOrWhiteSpace(itemId) || !Guid.TryParse(itemId.Trim(), out var parsedGuid) || parsedGuid == Guid.Empty)
         {
             return BadRequest(new { ok = false, code = "invalid_item_id", message = "A valid Jellyfin itemId is required." });
         }
 
         var item = _libraryManager.GetItemById(parsedGuid);
-        if (item == null)
+        if (item == null || (!caller.IsAdmin && caller.JellyfinUser != null && !item.IsVisible(caller.JellyfinUser)))
         {
             return NotFound(new { ok = false, code = "item_not_found", message = "Media item was not found." });
         }
@@ -166,10 +173,15 @@ public partial class StreamFlixController
         if (item is Episode ep && ep.SeriesId != Guid.Empty && (item.RemoteTrailers == null || item.RemoteTrailers.Count == 0))
         {
             var parentSeries = _libraryManager.GetItemById(ep.SeriesId);
-            if (parentSeries != null)
+            if (parentSeries != null && (caller.IsAdmin || caller.JellyfinUser == null || parentSeries.IsVisible(caller.JellyfinUser)))
             {
                 targetItem = parentSeries;
             }
+        }
+
+        if (!IsItemAllowedForCallerProfileLibraries(config, caller, targetItem))
+        {
+            return NotFound(new { ok = false, code = "item_not_found", message = "Media item was not found." });
         }
 
         var cacheKey = targetItem.Id.ToString("N");
@@ -251,6 +263,32 @@ public partial class StreamFlixController
 
         TrailerResolveCache[cacheKey] = resolved;
         return Ok(BuildTrailerResolveResponse(resolved));
+    }
+
+    private bool IsItemAllowedForCallerProfileLibraries(PluginConfiguration config, CallerContext caller, BaseItem item)
+    {
+        if (caller.IsAdmin || caller.JellyfinUser == null)
+        {
+            return true;
+        }
+
+        if (IsGuestSession(caller))
+        {
+            var guestProfile = FindProfile(config, caller.Session?.LockedProfileId);
+            return guestProfile == null
+                || JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, guestProfile.AllowedLibraryIds);
+        }
+
+        var callerUid = caller.JellyfinUser.Id.ToString("N");
+        var linkedProfiles = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Where(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (linkedProfiles.Count == 0)
+        {
+            return true;
+        }
+
+        return linkedProfiles.Any(p => JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, p.AllowedLibraryIds));
     }
 
     [HttpGet("Trailers/Embed/{youtubeId}")]

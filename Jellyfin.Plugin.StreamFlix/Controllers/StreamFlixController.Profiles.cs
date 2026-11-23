@@ -1273,6 +1273,7 @@ public partial class StreamFlixController
         var unlinkedMatch = config.Profiles.FirstOrDefault(p =>
             string.IsNullOrWhiteSpace(p.JellyfinUserId)
             && (isAdminUser || !StreamFlixStartupTask.IsOwnerProfile(p))
+            && (isAdminUser || IsUnlinkedProfileCompatibleWithJellyfinLogin(p, cleanUsername))
             && (string.Equals(p.JellyfinUsername?.Trim(), cleanUsername, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(p.Name?.Trim(), cleanUsername, StringComparison.OrdinalIgnoreCase)));
         if (unlinkedMatch != null)
@@ -1317,6 +1318,18 @@ public partial class StreamFlixController
         };
         config.Profiles.Add(created);
         return (created, true);
+    }
+
+    private static bool IsUnlinkedProfileCompatibleWithJellyfinLogin(StreamFlixProfileConfig profile, string cleanUsername)
+    {
+        if (string.IsNullOrWhiteSpace(profile.GoogleAccountEmail))
+        {
+            return true;
+        }
+
+        var normKind = NormalizeAccountLockKind(profile.AccountLockKind);
+        return string.Equals(normKind, "jellyfin", StringComparison.Ordinal)
+            && string.Equals(profile.GoogleAccountEmail.Trim(), cleanUsername, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<StreamFlixProfileConfig?> EnsureProfileForJellyfinUserAsync(PluginConfiguration config, JUser? user)

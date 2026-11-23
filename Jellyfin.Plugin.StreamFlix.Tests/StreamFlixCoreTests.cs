@@ -309,6 +309,39 @@ public class StreamFlixCoreTests
         Assert.True(changed3);
         Assert.Equal("Owner (Jellyfin)", collisionProf.Name);
 
+        // Unlinked household profile locked to Google/OIDC or another Jellyfin username must NOT be hijacked by a matching Jellyfin username
+        var ssoLockedProf = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_alex_sso",
+            Name = "Alex",
+            AccountLockKind = "google",
+            GoogleAccountEmail = "alex@example.com",
+        };
+        cfg.Profiles.Add(ssoLockedProf);
+        var alexJfUid = Guid.NewGuid();
+        var (alexJfProf, changedAlex) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, alexJfUid, "Alex", isAdminUser: false);
+        Assert.True(changedAlex);
+        Assert.NotSame(ssoLockedProf, alexJfProf);
+        Assert.Null(ssoLockedProf.JellyfinUserId);
+        Assert.Equal("Alex (Jellyfin)", alexJfProf.Name);
+        Assert.Equal("jellyfin", alexJfProf.AccountLockKind);
+        Assert.Equal("Alex", alexJfProf.GoogleAccountEmail);
+
+        // Unlinked profile explicitly pre-locked to the same Jellyfin username links cleanly
+        var preLockedJfProf = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_sam_jf",
+            Name = "Sam",
+            AccountLockKind = "jellyfin",
+            GoogleAccountEmail = "Sam",
+        };
+        cfg.Profiles.Add(preLockedJfProf);
+        var samJfUid = Guid.NewGuid();
+        var (linkedSamProf, changedSam) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, samJfUid, "sam", isAdminUser: false);
+        Assert.True(changedSam);
+        Assert.Same(preLockedJfProf, linkedSamProf);
+        Assert.Equal(samJfUid.ToString("N"), preLockedJfProf.JellyfinUserId);
+
         // 2. Remote user with EnableRemoteAccess = false is blocked on WAN, allowed on LAN
         var remoteBlockedUser = new FakeUserEntity();
         remoteBlockedUser.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = false });

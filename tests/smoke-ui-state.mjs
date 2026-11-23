@@ -993,6 +993,13 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     // Verify Detail Modal YouTube Trailer button, 1-Click DVR Record & Admin Config controls
     assert.match(combinedJs, /streamflix-modal-trailer-btn/, 'Detail modal YouTube Trailer button must be wired');
     assert.match(combinedJs, /\/StreamFlix\/Trailers\/Embed\//, 'YouTube Error-153-safe embed relay endpoint must be wired');
+    assert.match(combinedJs, /openHeroDetailModalById\(item\.Id\)/, 'Uncached card stubs must resolve full metadata via openHeroDetailModalById');
+    assert.match(combinedJs, /admin_profile_required:\s*'SF-PROF-307'/, 'CLIENT_ERROR_CODE_MAP must include SF-PROF-307 activation error codes');
+    const trailersControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.Trailers.cs'), 'utf8');
+    assert.match(trailersControllerCs, /IsVisible\(caller\.JellyfinUser\)/, 'Trailers/Resolve must enforce Jellyfin user IsVisible parental/library checks');
+    assert.match(trailersControllerCs, /IsItemAllowedForCallerProfileLibraries/, 'Trailers/Resolve must enforce per-profile AllowedLibraryIds');
+    const profilesControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.Profiles.cs'), 'utf8');
+    assert.match(profilesControllerCs, /IsUnlinkedProfileCompatibleWithJellyfinLogin/, 'EnsureProfileForJellyfinUserNoLock must not hijack SSO-locked unlinked profiles');
     assert.match(combinedJs, /streamflix-modal-record-btn/, 'Detail modal 1-Click DVR Record button must be wired');
     assert.match(combinedJs, /\/LiveTv\/Timers\/Defaults\?programId=/, 'DVR recording must fetch Jellyfin /LiveTv/Timers/Defaults');
     assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose EnableHeroTrailerPreview toggle');

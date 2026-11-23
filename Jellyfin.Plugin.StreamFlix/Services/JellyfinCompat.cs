@@ -350,6 +350,34 @@ public static class JellyfinCompat
         return changed;
     }
 
+    public static bool IsItemInAllowedLibraries(
+        ILibraryManager libraryManager,
+        JUser user,
+        BaseItem item,
+        IReadOnlyList<string>? profileAllowedLibIds)
+    {
+        var allowedSet = BuildNormalizedIdSet(profileAllowedLibIds);
+        if (allowedSet.Count == 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            var folders = libraryManager.GetCollectionFolders(item);
+            if (folders != null)
+            {
+                return folders.Any(f => f != null && f.Id != Guid.Empty && allowedSet.Contains(NormalizeGuid(f.Id)));
+            }
+        }
+        catch
+        {
+        }
+
+        var accessible = ResolveAccessibleLibraryFolders(libraryManager, user, allowedSet);
+        return accessible.Count > 0;
+    }
+
     private static InternalItemsQuery CreateScopedQuery(JUser user, BaseItemKind[] itemTypes, Guid[]? ancestorIds)
     {
         var q = new InternalItemsQuery(user)
