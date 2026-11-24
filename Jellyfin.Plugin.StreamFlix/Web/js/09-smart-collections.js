@@ -3814,7 +3814,10 @@
         }
 
         var clientRemoteYt = extractClientRemoteYouTubeId(item);
-        var p = apiFetch('/StreamFlix/Trailers/Resolve?itemId=' + encodeURIComponent(lookupId))
+        var activeProfId = (state.activeProfile && state.activeProfile.id) ? String(state.activeProfile.id) : '';
+        var resolveUrl = '/StreamFlix/Trailers/Resolve?itemId=' + encodeURIComponent(lookupId)
+            + (activeProfId ? ('&profileId=' + encodeURIComponent(activeProfId)) : '');
+        var p = apiFetch(resolveUrl)
             .then(function (res) {
                 var desc = null;
                 if (res && res.ok && res.kind === 'youtube' && res.youtubeId && /^[A-Za-z0-9_-]{11}$/.test(res.youtubeId)) {

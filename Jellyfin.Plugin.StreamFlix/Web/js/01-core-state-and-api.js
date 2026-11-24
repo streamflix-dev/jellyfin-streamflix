@@ -1270,6 +1270,8 @@
         pin_invalid: 'SF-PIN-312',
         pin_locked: 'SF-PIN-313',
         seerr_forbidden: 'SF-SEERR-401',
+        seerr_permission_denied: 'SF-SEERR-401',
+        seerr_cancel_forbidden: 'SF-SEERR-401',
         seerr_unreachable: 'SF-SEERR-402',
         seerr_timeout: 'SF-SEERR-403',
         seerr_request_failed: 'SF-SEERR-404',
@@ -1282,12 +1284,17 @@
         guest_handoff_missing: 'SF-GUEST-502',
         guest_locked: 'SF-GUEST-503',
         guest_pass_restricted: 'SF-GUEST-504',
+        guest_pass_permission_required: 'SF-GUEST-504',
         guest_profile_locked: 'SF-GUEST-504',
         guest_admin_forbidden: 'SF-GUEST-505',
         admin_required: 'SF-ADMIN-601',
         room_not_found: 'SF-WP-622',
         host_only: 'SF-WP-621',
-        watch_party_disabled: 'SF-WP-621'
+        watch_party_disabled: 'SF-WP-621',
+        watchparty_disabled: 'SF-WP-621',
+        kids_forbidden: 'SF-WP-621',
+        invalid_item_id: 'SF-REQ-740',
+        item_not_found: 'SF-REQ-744'
     };
 
     function resolveStreamFlixErrorCode(status, symbolicCode, path) {
@@ -1306,10 +1313,10 @@
             return (status === 401 || status === 403) ? 'SF-OIDC-205' : 'SF-OIDC-204';
         }
         if (p.indexOf('/guest') !== -1) {
-            return status === 429 ? 'SF-GUEST-503' : 'SF-GUEST-502';
+            return status === 429 ? 'SF-GUEST-503' : (status === 403 ? 'SF-GUEST-504' : 'SF-GUEST-502');
         }
         if (p.indexOf('/watchparty') !== -1) {
-            return status === 404 ? 'SF-WP-622' : 'SF-WP-620';
+            return status === 404 ? 'SF-WP-622' : (status === 403 ? 'SF-WP-621' : 'SF-WP-620');
         }
         if (p.indexOf('/profiles') !== -1) {
             if (status === 409) { return 'SF-PROF-301'; }

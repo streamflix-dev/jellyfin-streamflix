@@ -355,4 +355,98 @@ public class StreamFlixCoreTests
         Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: true));
         Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: false));
     }
+
+    [Fact]
+    public void ResolveWatchPartyProfile_BlocksUnactivatedCallerFromSpoofingHostProfile()
+    {
+        var ownerProfile = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_owner",
+            Name = "Owner",
+            JellyfinUserId = Guid.NewGuid().ToString("N"),
+        };
+        var guestLockedProfile = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_guest_prof",
+            Name = "Guest Viewer",
+            JellyfinUserId = Guid.NewGuid().ToString("N"),
+        };
+        var cfg = new PluginConfiguration
+        {
+            Profiles = new List<StreamFlixProfileConfig> { ownerProfile, guestLockedProfile },
+        };
+
+        // Non-admin caller without an active Jellyfin user session must NEVER resolve an arbitrary requested profile
+        var unactivatedLanCaller = new StreamFlixController.CallerContext(
+            Session: null,
+            IsJellyfinAuthenticated: false,
+            IsAdmin: false,
+            IsLocalLan: true,
+            JellyfinUser: null);
+        Assert.Null(StreamFlixController.ResolveWatchPartyProfile(cfg, unactivatedLanCaller, "streamflix_owner"));
+
+        // Guest Pass session always resolves strictly to its own LockedProfileId even if another profileId is requested
+        var guestSession = new StreamFlixSessionService.SessionInfo(
+            string.Empty,
+            DateTimeOffset.UtcNow.AddHours(4),
+            StreamFlixSessionService.AuthKindGuestPass,
+            GuestPassId: "gp_1",
+            LockedProfileId: "streamflix_guest_prof");
+        var guestCaller = new StreamFlixController.CallerContext(
+            Session: guestSession,
+            IsJellyfinAuthenticated: false,
+            IsAdmin: false,
+            IsLocalLan: false,
+            JellyfinUser: null);
+        Assert.Same(guestLockedProfile, StreamFlixController.ResolveWatchPartyProfile(cfg, guestCaller, "streamflix_owner"));
+
+        // Active administrator can resolve the requested profile cleanly
+        var adminCaller = new StreamFlixController.CallerContext(
+            Session: null,
+            IsJellyfinAuthenticated: true,
+            IsAdmin: true,
+            IsLocalLan: true,
+            JellyfinUser: null);
+        Assert.Same(ownerProfile, StreamFlixController.ResolveWatchPartyProfile(cfg, adminCaller, "streamflix_owner"));
+
+        // Symbolic Watch Party error codes resolve cleanly
+        Assert.Equal(StreamFlixErrorCodes.WatchPartyForbidden, StreamFlixErrorCodes.Resolve("watchparty_disabled", 403, "/StreamFlix/WatchParty/Create"));
+        Assert.Equal(StreamFlixErrorCodes.WatchPartyForbidden, StreamFlixErrorCodes.Resolve("kids_forbidden", 403, "/StreamFlix/WatchParty/Join"));
+        Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, StreamFlixErrorCodes.Resolve("item_not_found", 404, "/StreamFlix/Trailers/Resolve"));
+    }
+
+    [Fact]
+    public void ErrorEnvelope_PreservesNormalTrailerNoneLookupWithoutInjectingErrorCode()
+    {
+        var filter = new StreamFlixErrorEnvelopeAttribute();
+        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        httpContext.Request.Path = "/StreamFlix/Trailers/Resolve";
+        var actionContext = new Microsoft.AspNetCore.Mvc.ActionContext(
+            httpContext,
+            new Microsoft.AspNetCore.Routing.RouteData(),
+            new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor());
+
+        // Normal 200 OK { ok = false, kind = "none" } when a title has no trailer must NOT be rewritten with SF-REQ-740
+        var nonePayload = new { ok = false, kind = "none" };
+        var okResult = new Microsoft.AspNetCore.Mvc.OkObjectResult(nonePayload);
+        var okExecuting = new Microsoft.AspNetCore.Mvc.Filters.ResultExecutingContext(
+            actionContext,
+            new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>(),
+            okResult,
+            controller: new object());
+        filter.OnResultExecuting(okExecuting);
+        Assert.Same(nonePayload, ((Microsoft.AspNetCore.Mvc.ObjectResult)okExecuting.Result).Value);
+
+        // Real 404 { ok = false, code = "item_not_found" } still receives canonical errorCode enrichment
+        var notFoundResult = new Microsoft.AspNetCore.Mvc.NotFoundObjectResult(new { ok = false, code = "item_not_found", message = "Media item was not found." });
+        var errExecuting = new Microsoft.AspNetCore.Mvc.Filters.ResultExecutingContext(
+            actionContext,
+            new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>(),
+            notFoundResult,
+            controller: new object());
+        filter.OnResultExecuting(errExecuting);
+        var enriched = Assert.IsType<Dictionary<string, object?>>(((Microsoft.AspNetCore.Mvc.ObjectResult)errExecuting.Result).Value);
+        Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, enriched["errorCode"]);
+        Assert.Equal(404, enriched["httpStatus"]);
+    }
 }

@@ -143,7 +143,10 @@ public partial class StreamFlixController
     [HttpGet("Trailers/Resolve")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> ResolveItemTrailer([FromQuery] string? itemId = null, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> ResolveItemTrailer(
+        [FromQuery] string? itemId = null,
+        [FromQuery] string? profileId = null,
+        CancellationToken cancellationToken = default)
     {
         SetNoStoreSecurityHeaders();
         var config = Config;
@@ -153,7 +156,8 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
-        if (!caller.IsAdmin && caller.JellyfinUser == null)
+        var effectiveAdmin = IsEffectiveActiveAdmin(caller);
+        if (!effectiveAdmin && caller.JellyfinUser == null)
         {
             return StatusCode(401, new { ok = false, code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
         }
@@ -164,7 +168,9 @@ public partial class StreamFlixController
         }
 
         var item = _libraryManager.GetItemById(parsedGuid);
-        if (item == null || (!caller.IsAdmin && caller.JellyfinUser != null && !item.IsVisible(caller.JellyfinUser)))
+        if (item == null
+            || (!effectiveAdmin && caller.JellyfinUser != null && !item.IsVisible(caller.JellyfinUser))
+            || !IsItemAllowedForCallerProfileLibraries(config, caller, effectiveAdmin, item, profileId))
         {
             return NotFound(new { ok = false, code = "item_not_found", message = "Media item was not found." });
         }
@@ -173,15 +179,12 @@ public partial class StreamFlixController
         if (item is Episode ep && ep.SeriesId != Guid.Empty && (item.RemoteTrailers == null || item.RemoteTrailers.Count == 0))
         {
             var parentSeries = _libraryManager.GetItemById(ep.SeriesId);
-            if (parentSeries != null && (caller.IsAdmin || caller.JellyfinUser == null || parentSeries.IsVisible(caller.JellyfinUser)))
+            if (parentSeries != null
+                && (effectiveAdmin || caller.JellyfinUser == null || parentSeries.IsVisible(caller.JellyfinUser))
+                && IsItemAllowedForCallerProfileLibraries(config, caller, effectiveAdmin, parentSeries, profileId))
             {
                 targetItem = parentSeries;
             }
-        }
-
-        if (!IsItemAllowedForCallerProfileLibraries(config, caller, targetItem))
-        {
-            return NotFound(new { ok = false, code = "item_not_found", message = "Media item was not found." });
         }
 
         var cacheKey = targetItem.Id.ToString("N");
@@ -265,9 +268,14 @@ public partial class StreamFlixController
         return Ok(BuildTrailerResolveResponse(resolved));
     }
 
-    private bool IsItemAllowedForCallerProfileLibraries(PluginConfiguration config, CallerContext caller, BaseItem item)
+    private bool IsItemAllowedForCallerProfileLibraries(
+        PluginConfiguration config,
+        CallerContext caller,
+        bool effectiveAdmin,
+        BaseItem item,
+        string? requestedProfileId)
     {
-        if (caller.IsAdmin || caller.JellyfinUser == null)
+        if (effectiveAdmin || caller.JellyfinUser == null)
         {
             return true;
         }
@@ -286,6 +294,17 @@ public partial class StreamFlixController
         if (linkedProfiles.Count == 0)
         {
             return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedProfileId))
+        {
+            var matched = linkedProfiles.FirstOrDefault(p =>
+                string.Equals(p.Id, requestedProfileId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(p.Name, requestedProfileId, StringComparison.OrdinalIgnoreCase));
+            if (matched != null)
+            {
+                return JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, matched.AllowedLibraryIds);
+            }
         }
 
         return linkedProfiles.Any(p => JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, p.AllowedLibraryIds));

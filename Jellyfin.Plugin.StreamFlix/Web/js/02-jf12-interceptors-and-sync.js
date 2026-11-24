@@ -1152,6 +1152,8 @@
             stopHeroVideoPreview(false);
         }
         state.itemCache = {};
+        state.heroTrailerCache = {};
+        state.heroTrailerInFlight = {};
         state.seerrSearchResults = null;
         state.seerrSearchLoading = false;
         state.liveTvData = null;
@@ -1167,7 +1169,9 @@
             state.hubData.allMovies = [];
             state.hubData.allSeries = [];
             state.hubData.resumeItems = [];
+            state.hubData.nextUpItems = [];
             state.hubData.favoriteItems = [];
+            state.hubData.collectionsItems = [];
             state.hubData.recentMovies = [];
             state.hubData.recentSeries = [];
         }
@@ -1184,6 +1188,9 @@
         var wasGuest = isGuestPassSession();
         clearHouseholdSession();
         var openAccess = isOpenWithoutLogin(state.config);
+        if (!openAccess && typeof detachEndedWatchPartyCleanly === 'function') {
+            try { detachEndedWatchPartyCleanly(false); } catch (eWpLost) {}
+        }
         if (state.config) {
             state.config.hasAccess = openAccess;
             state.config.session = null;

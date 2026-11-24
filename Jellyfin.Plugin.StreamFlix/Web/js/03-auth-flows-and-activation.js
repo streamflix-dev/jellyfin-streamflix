@@ -1163,6 +1163,8 @@
                 stopHeroVideoPreview(false);
             }
             state.itemCache = {};
+            state.heroTrailerCache = {};
+            state.heroTrailerInFlight = {};
             state.browseFilter = null;
             state.libraryBrowser = null;
             state.libraryViewData = {};

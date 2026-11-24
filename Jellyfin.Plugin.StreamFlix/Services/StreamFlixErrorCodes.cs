@@ -144,6 +144,10 @@ public static class StreamFlixErrorCodes
         ["room_not_found"] = WatchPartyNotFound,
         ["host_only"] = WatchPartyForbidden,
         ["watch_party_disabled"] = WatchPartyForbidden,
+        ["watchparty_disabled"] = WatchPartyForbidden,
+        ["kids_forbidden"] = WatchPartyForbidden,
+        ["invalid_item_id"] = BadRequestPayload,
+        ["item_not_found"] = NotFoundGeneric,
     };
 
     public static string Resolve(string? symbolicCode, int statusCode, string? routePath = null)
@@ -263,6 +267,7 @@ public sealed class StreamFlixErrorEnvelopeAttribute : ResultFilterAttribute
 
         bool? okField = null;
         string? symbolicCode = null;
+        string? kindField = null;
         var hasErrorCodeAlready = false;
 
         foreach (var p in props)
@@ -275,6 +280,10 @@ public sealed class StreamFlixErrorEnvelopeAttribute : ResultFilterAttribute
             {
                 symbolicCode = p.GetValue(val) as string;
             }
+            else if (string.Equals(p.Name, "kind", StringComparison.OrdinalIgnoreCase))
+            {
+                kindField = p.GetValue(val) as string;
+            }
             else if (string.Equals(p.Name, "ok", StringComparison.OrdinalIgnoreCase) && p.GetValue(val) is bool b1)
             {
                 okField = b1;
@@ -285,7 +294,10 @@ public sealed class StreamFlixErrorEnvelopeAttribute : ResultFilterAttribute
             }
         }
 
-        var isErrorPayload = statusCode >= 400 || okField == false;
+        var isNormalNegativeLookup = statusCode < 400
+            && string.IsNullOrEmpty(symbolicCode)
+            && string.Equals(kindField, "none", StringComparison.OrdinalIgnoreCase);
+        var isErrorPayload = statusCode >= 400 || (okField == false && !isNormalNegativeLookup);
         if (!isErrorPayload || hasErrorCodeAlready)
         {
             base.OnResultExecuting(context);

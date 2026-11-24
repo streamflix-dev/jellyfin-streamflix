@@ -995,9 +995,13 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.match(combinedJs, /\/StreamFlix\/Trailers\/Embed\//, 'YouTube Error-153-safe embed relay endpoint must be wired');
     assert.match(combinedJs, /openHeroDetailModalById\(item\.Id\)/, 'Uncached card stubs must resolve full metadata via openHeroDetailModalById');
     assert.match(combinedJs, /admin_profile_required:\s*'SF-PROF-307'/, 'CLIENT_ERROR_CODE_MAP must include SF-PROF-307 activation error codes');
+    assert.match(combinedJs, /watchparty_disabled:\s*'SF-WP-621'/, 'CLIENT_ERROR_CODE_MAP must include watchparty_disabled -> SF-WP-621');
     const trailersControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.Trailers.cs'), 'utf8');
+    assert.match(trailersControllerCs, /IsEffectiveActiveAdmin\(caller\)/, 'Trailers/Resolve must scope admin bypass to IsEffectiveActiveAdmin so Kids/restricted profiles on primary SSO devices stay isolated');
     assert.match(trailersControllerCs, /IsVisible\(caller\.JellyfinUser\)/, 'Trailers/Resolve must enforce Jellyfin user IsVisible parental/library checks');
     assert.match(trailersControllerCs, /IsItemAllowedForCallerProfileLibraries/, 'Trailers/Resolve must enforce per-profile AllowedLibraryIds');
+    const watchPartyControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.WatchParty.cs'), 'utf8');
+    assert.match(watchPartyControllerCs, /TryResolveAuthorizedWatchPartyMedia/, 'WatchParty Create & set_media must enforce Jellyfin user IsVisible and per-profile AllowedLibraryIds');
     const profilesControllerCs = fs.readFileSync(path.join(rootDir, 'Jellyfin.Plugin.StreamFlix', 'Controllers', 'StreamFlixController.Profiles.cs'), 'utf8');
     assert.match(profilesControllerCs, /IsUnlinkedProfileCompatibleWithJellyfinLogin/, 'EnsureProfileForJellyfinUserNoLock must not hijack SSO-locked unlinked profiles');
     assert.match(combinedJs, /streamflix-modal-record-btn/, 'Detail modal 1-Click DVR Record button must be wired');

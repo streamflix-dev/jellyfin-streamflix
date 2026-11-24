@@ -550,6 +550,23 @@
     function signOutHousehold(opts) {
         var options = (opts && typeof opts === 'object') ? opts : {};
         var token = getActiveToken();
+        if (!options.skipServerLogout
+            && !options.fromBroadcast
+            && typeof leaveWatchPartyRoom === 'function'
+            && typeof watchPartyState !== 'undefined'
+            && (watchPartyState.activeGroup || watchPartyState.joinedGroupId)) {
+            try { leaveWatchPartyRoom(false); } catch (eWpLeave) {}
+        }
+        if (typeof detachEndedWatchPartyCleanly === 'function') {
+            try { detachEndedWatchPartyCleanly(false); } catch (eWpDetach) {}
+        }
+        if (typeof watchPartyState !== 'undefined' && watchPartyState) {
+            watchPartyState.groups = [];
+            watchPartyState.targetItem = null;
+        }
+        try {
+            sessionStorage.removeItem('streamflix_pending_watchparty_v2');
+        } catch (eWpPend) {}
         if (token && !options.skipServerLogout) {
             // Best effort: revoke this device's Jellyfin token so a shared device doesn't keep a live session
             try {
