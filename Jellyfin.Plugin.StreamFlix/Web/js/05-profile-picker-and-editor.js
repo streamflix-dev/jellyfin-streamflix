@@ -1310,7 +1310,7 @@
             + '  </label>'
             + '  <div class="streamflix-field-hint" style="margin-top:3px;">Prompts for any adult profile PIN (or a 4-word grown-up check if no adult PINs exist) when leaving Kids mode.</div>'
             + '</div>'
-            + '<div class="streamflix-editor-section">Playback &amp; Bedtime</div>'
+            + '<div class="streamflix-editor-section" id="streamflix-prof-playback-sec-label">' + (draft.isKids ? 'Playback &amp; Bedtime' : 'Playback') + '</div>'
             + '<div class="streamflix-field-row">'
             + '  <label class="streamflix-check">'
             + '    <input type="checkbox" id="streamflix-prof-autoplay-next" ' + (draft.autoplayNextEpisode !== false ? 'checked' : '') + ' />'
@@ -1321,12 +1321,12 @@
             + '    <span>Muted hero video previews</span>'
             + '  </label>'
             + '</div>'
-            + '<div class="streamflix-field">'
+            + '<div class="streamflix-field streamflix-kids-bedtime-opt' + (draft.isKids ? '' : ' is-hidden') + '" id="streamflix-prof-bed-wrap">'
             + '  <label for="streamflix-prof-bed-start">Bedtime Window (Optional)</label>'
             + '  <div class="streamflix-inline-row">'
-            + '    <input type="time" id="streamflix-prof-bed-start" class="streamflix-input" value="' + escapeHtml(draft.bedtimeStart || '') + '" aria-label="Bedtime start" />'
+            + '    <input type="time" id="streamflix-prof-bed-start" class="streamflix-input" value="' + escapeHtml(draft.isKids ? (draft.bedtimeStart || '') : '') + '" aria-label="Bedtime start" />'
             + '    <span style="opacity:.65;font-size:13px;">to</span>'
-            + '    <input type="time" id="streamflix-prof-bed-end" class="streamflix-input" value="' + escapeHtml(draft.bedtimeEnd || '') + '" aria-label="Bedtime end" />'
+            + '    <input type="time" id="streamflix-prof-bed-end" class="streamflix-input" value="' + escapeHtml(draft.isKids ? (draft.bedtimeEnd || '') : '') + '" aria-label="Bedtime end" />'
             + '    <button type="button" class="streamflix-ghost-btn" id="streamflix-prof-bed-clear">Clear</button>'
             + '  </div>'
             + '  <div class="streamflix-field-hint">Shows a friendly “Time for Bed 🌙” screen during these hours (can be unlocked tonight with an Adult PIN).</div>'
@@ -1444,11 +1444,19 @@
         var kidsCheck = modal.querySelector('#streamflix-prof-kids');
         var kidsExitWrap = modal.querySelector('#streamflix-prof-kids-exit-wrap');
         var kidsExitCheck = modal.querySelector('#streamflix-prof-kids-exit-pin');
+        var bedWrap = modal.querySelector('#streamflix-prof-bed-wrap');
+        var playbackSecLabel = modal.querySelector('#streamflix-prof-playback-sec-label');
         var maturitySelect = modal.querySelector('#streamflix-prof-maturity');
         if (kidsCheck && maturitySelect) {
             kidsCheck.addEventListener('change', function () {
                 if (kidsExitWrap) {
                     kidsExitWrap.classList.toggle('is-hidden', !kidsCheck.checked);
+                }
+                if (bedWrap) {
+                    bedWrap.classList.toggle('is-hidden', !kidsCheck.checked);
+                }
+                if (playbackSecLabel) {
+                    playbackSecLabel.textContent = kidsCheck.checked ? 'Playback & Bedtime' : 'Playback';
                 }
                 if (kidsCheck.checked && maturitySelect.value === MATURITY_LEVELS[0].value) {
                     maturitySelect.value = MATURITY_LEVELS[2].value;
@@ -1551,9 +1559,9 @@
             }
             var autoplayNextEl = modal.querySelector('#streamflix-prof-autoplay-next');
             var autoplayPrevEl = modal.querySelector('#streamflix-prof-autoplay-previews');
-            var bStartVal = bedStartInput ? (bedStartInput.value || '').trim() : '';
-            var bEndVal = bedEndInput ? (bedEndInput.value || '').trim() : '';
-            if ((bStartVal && !bEndVal) || (!bStartVal && bEndVal)) {
+            var bStartVal = (kidsCheck && kidsCheck.checked && bedStartInput) ? (bedStartInput.value || '').trim() : '';
+            var bEndVal = (kidsCheck && kidsCheck.checked && bedEndInput) ? (bedEndInput.value || '').trim() : '';
+            if (kidsCheck && kidsCheck.checked && ((bStartVal && !bEndVal) || (!bStartVal && bEndVal))) {
                 errEl.textContent = 'Please set both a start and end time for the Bedtime Window, or click Clear.';
                 return;
             }

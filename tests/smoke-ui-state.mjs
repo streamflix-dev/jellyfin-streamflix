@@ -1381,6 +1381,8 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
             'Saving Jellyfin Home Preferences must immediately invalidate SWR cache and update Home row order (#23)'
         );
         assert.equal(updatedRowIds.includes('nextup'), false, 'Setting Next Up to None in Jellyfin Home Preferences must hide Next Up on Home (#23)');
+        assert.match(combinedJs, /streamflix-kids-bedtime-opt'\s*\+\s*\(draft\.isKids\s*\?\s*''\s*:\s*' is-hidden'\)/, 'Bedtime Window customization must only appear for Kids profiles');
+        assert.match(combinedJs, /!p\.isKids\s*\|\|\s*p\.isAdmin\s*\|\|\s*!p\.bedtimeStart/, 'Bedtime lock enforcement must only apply to Kids profiles');
         console.log('[PASS] Issue #23 Jellyfin Home Sections 1–9, Configured Library Order (OrderedViews), HidePlayedInLatest & Live Sync verified');
     }
 }

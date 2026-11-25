@@ -624,12 +624,16 @@ public partial class StreamFlixController
                 }
             }
 
-            if (request.BedtimeStart != null || request.BedtimeEnd != null)
+            if (!existing.IsKids)
+            {
+                existing.BedtimeStart = string.Empty;
+                existing.BedtimeEnd = string.Empty;
+            }
+            else if (request.BedtimeStart != null || request.BedtimeEnd != null)
             {
                 var nextStart = NormalizeTimeString(request.BedtimeStart ?? existing.BedtimeStart);
                 var nextEnd = NormalizeTimeString(request.BedtimeEnd ?? existing.BedtimeEnd);
-                var hadExistingKidsBedtime = existing.IsKids
-                    && !string.IsNullOrEmpty(existing.BedtimeStart)
+                var hadExistingKidsBedtime = !string.IsNullOrEmpty(existing.BedtimeStart)
                     && !string.IsNullOrEmpty(existing.BedtimeEnd);
                 var canModifyKidsBedtime = effectiveAdmin
                     || !hadExistingKidsBedtime

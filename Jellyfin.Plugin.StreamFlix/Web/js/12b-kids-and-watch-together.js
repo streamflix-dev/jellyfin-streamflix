@@ -656,7 +656,7 @@
 
     function isProfileCurrentlyInBedtime(profile) {
         var p = profile || state.activeProfile;
-        if (!p || !p.id || p.isAdmin || !p.bedtimeStart || !p.bedtimeEnd) {
+        if (!p || !p.id || !p.isKids || p.isAdmin || !p.bedtimeStart || !p.bedtimeEnd) {
             return false;
         }
         if (hasActiveBedtimeOverrideTonight(p.id)) {

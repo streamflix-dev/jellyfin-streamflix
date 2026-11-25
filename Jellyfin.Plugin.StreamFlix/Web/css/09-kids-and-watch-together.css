@@ -199,7 +199,8 @@ body.bfx-kids-mode .streamflix-FilterPills .streamflix-pill.active {
     background: rgba(99, 102, 241, 0.09);
     border: 1px solid rgba(129, 140, 248, 0.24);
 }
-.streamflix-kids-lock-opt.is-hidden {
+.streamflix-kids-lock-opt.is-hidden,
+.streamflix-kids-bedtime-opt.is-hidden {
     display: none !important;
 }
 .bfx-kids-lock-head {
