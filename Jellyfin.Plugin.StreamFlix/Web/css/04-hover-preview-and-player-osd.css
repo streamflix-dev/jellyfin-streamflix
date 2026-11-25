@@ -567,70 +567,73 @@ body.streamflix-nf-player .upNextDialog .btnHide { background: rgba(255, 255, 25
 .skinHeader .syncButton,
 body.streamflix-nf-player .osdHeader .headerSyncButton { display: none !important; }
 
-/* Menu: compact Netflix-sized footprint & slim quick actions */
-body:not(.bfx-phone-mode) #streamflix-account-dropdown {
-    width: 256px !important;
-    border-radius: 15px !important;
-    padding: 5px !important;
+/* Menu: roomy, readable desktop proportions & sleek side-by-side quick actions */
+@media (min-width: 641px) {
+    body:not(.bfx-phone-mode):not(.bfx-tv-mode) #streamflix-account-dropdown {
+        width: 332px !important;
+        border-radius: 20px !important;
+        padding: 8px !important;
+    }
 }
 .streamflix-dd-active-header {
-    padding: 7px 6px 6px 8px !important;
-    gap: 9px !important;
+    padding: 10px 8px 9px 10px;
+    gap: 12px;
 }
 .streamflix-dd-active-avatar {
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 9px !important;
-    font-size: 18px !important;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    font-size: 22px;
 }
-.streamflix-dd-active-name { font-size: 13.5px !important; }
-.streamflix-dd-active-sub { font-size: 11px !important; }
-.bfx-dd-close { width: 26px !important; height: 26px !important; }
-.bfx-dd-profiles { gap: 2px !important; padding: 3px 2px 4px 2px !important; }
-.bfx-dd-prof { flex: 0 0 54px !important; gap: 4px !important; padding: 4px 2px !important; border-radius: 9px !important; }
-.bfx-dd-prof-av { width: 34px !important; height: 34px !important; border-radius: 9px !important; font-size: 17px !important; }
-.bfx-dd-prof-manage .bfx-dd-prof-av .bfx-icon { width: 16px !important; height: 16px !important; }
-.bfx-dd-prof-name { max-width: 52px !important; font-size: 10.5px !important; }
-.bfx-dd-tiles { gap: 5px; padding: 2px 4px 5px 4px; }
+.streamflix-dd-active-name { font-size: 15.5px; }
+.streamflix-dd-active-sub { font-size: 12.5px; }
+.bfx-dd-close { width: 34px; height: 34px; }
+.bfx-dd-profiles { gap: 6px; padding: 6px 4px 8px 4px; }
+.bfx-dd-prof { flex: 0 0 66px; gap: 6px; padding: 6px 2px; border-radius: 12px; }
+.bfx-dd-prof-av { width: 44px; height: 44px; border-radius: 12px; font-size: 21px; }
+.bfx-dd-prof-manage .bfx-dd-prof-av .bfx-icon { width: 20px; height: 20px; }
+.bfx-dd-prof-name { max-width: 64px; font-size: 12px; }
+.bfx-dd-tiles { gap: 8px; padding: 4px 6px 8px 6px; }
 .bfx-dd-tile {
     flex-direction: row;
-    justify-content: center;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 9px;
-    background: rgba(255, 255, 255, 0.055);
-    color: rgba(255, 255, 255, 0.9);
+    justify-content: flex-start;
+    min-height: 44px;
+    gap: 10px;
+    padding: 7px 12px 7px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
 }
 .bfx-dd-tile:hover,
 .bfx-dd-tile:focus-visible { background: rgba(255, 255, 255, 0.12); }
 .bfx-dd-tile-ico,
 .bfx-dd-tile.is-cast .bfx-dd-tile-ico,
 .bfx-dd-tile.is-qc .bfx-dd-tile-ico {
-    width: 16px;
-    height: 16px;
+    width: 32px;
+    height: 32px;
     flex: none;
-    border-radius: 0;
-    background: transparent;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
 }
-.bfx-dd-tile-ico .bfx-icon { width: 14.5px; height: 14.5px; }
-.bfx-dd-tile-label { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.streamflix-dd-divider { margin: 3px 6px !important; }
+.bfx-dd-tile-ico .bfx-icon { width: 17px; height: 17px; }
+.bfx-dd-tile-label { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.streamflix-dd-divider { margin: 5px 8px; }
 .streamflix-dd-item {
-    min-height: 32px !important;
-    padding: 5px 9px !important;
-    gap: 9px !important;
-    border-radius: 8px !important;
-    font-size: 12.5px !important;
+    min-height: 42px;
+    padding: 8px 11px;
+    gap: 12px;
+    border-radius: 12px;
+    font-size: 14.5px;
 }
 .bfx-dd-ico,
 .streamflix-dd-item:hover .bfx-dd-ico {
-    width: 18px !important;
-    height: 18px !important;
+    width: 22px;
+    height: 22px;
 }
-.bfx-dd-ico .bfx-icon { width: 15px !important; height: 15px !important; }
-.bfx-dd-duo { gap: 5px !important; padding: 3px 4px 2px 4px !important; }
-.bfx-dd-duo-btn { height: 30px !important; padding: 0 8px !important; border-radius: 8px !important; font-size: 11.5px !important; gap: 5px !important; }
-.bfx-dd-duo-btn .bfx-icon { width: 13.5px !important; height: 13.5px !important; }
+.bfx-dd-ico .bfx-icon { width: 19px; height: 19px; }
+.bfx-dd-duo { gap: 8px; padding: 5px 6px 3px 6px; }
+.bfx-dd-duo-btn { height: 40px; padding: 0 12px; border-radius: 12px; font-size: 13.5px; gap: 7px; }
+.bfx-dd-duo-btn .bfx-icon { width: 16px; height: 16px; }
 
 /* Rows: a little tighter, calmer titles */
 .streamflix-row { margin-bottom: clamp(22px, 2.6vw, 34px); }

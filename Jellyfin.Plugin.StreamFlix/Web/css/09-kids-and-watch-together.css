@@ -321,7 +321,7 @@ button.headerSyncButton {
 /* Account Menu Non-Truncating Layout, Watch Together Row & Media Detail Modal Button */
 @media (min-width: 641px) {
     #streamflix-account-dropdown {
-        width: 344px !important;
+        width: 332px !important;
         max-width: calc(100vw - 24px) !important;
     }
 }

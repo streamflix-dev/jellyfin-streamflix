@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.9.2",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.2 Release Candidate (Dev Test Channel): Restore roomy, full-size Account Menu & UI proportions on computers (332px width, 44px avatars, 42px rows) and upgrade smartphone Account Sheet & touch controls with larger touch-first sizing (50px avatars, 48-50px tap rows/tiles, 15.5px labels).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.2_12.0.0.zip",
+        "checksum": "9718e28cccb7198122a65c61373909e0",
+        "timestamp": "2026-11-25T22:05:09Z"
+      },
+      {
+        "version": "0.9.9.2",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.9.2 Release Candidate (Dev Test Channel): Restore roomy, full-size Account Menu & UI proportions on computers (332px width, 44px avatars, 42px rows) and upgrade smartphone Account Sheet & touch controls with larger touch-first sizing (50px avatars, 48-50px tap rows/tiles, 15.5px labels).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.2_10.11.0.zip",
+        "checksum": "dbf460b80586db4bbb097df71cf6e345",
+        "timestamp": "2026-11-25T22:05:09Z"
+      },
+      {
+        "version": "0.9.9.2",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.9.2 Release Candidate (Dev Test Channel): Restore roomy, full-size Account Menu & UI proportions on computers (332px width, 44px avatars, 42px rows) and upgrade smartphone Account Sheet & touch controls with larger touch-first sizing (50px avatars, 48-50px tap rows/tiles, 15.5px labels).",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.2_10.9.0.zip",
+        "checksum": "3442358c7db5681263b61b86548f3bf8",
+        "timestamp": "2026-11-25T22:05:09Z"
+      },
+      {
         "version": "0.9.9.1",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.1 Release Candidate (Dev Test Channel): Move Appearance, Visual Presets & Home Layout into User Settings (#/mypreferencesmenu), remove Watch Activity, and shrink & declutter the Account Dropdown menu (256px compact footprint, smaller avatars/tiles, side-by-side Admin/Dashboard shortcuts).",
         "targetAbi": "12.0.0.0",

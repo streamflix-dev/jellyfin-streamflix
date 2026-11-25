@@ -1318,24 +1318,124 @@ body.bfx-settings-route button:focus-visible {
         pointer-events: none !important;
     }
 
-    /* Anchor Account Sheet cleanly right above the floating dock for thumb reachability */
+    /* Anchor Account Sheet cleanly right above the floating dock with generous touch-sized controls */
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) #streamflix-account-dropdown {
         top: auto !important;
         bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
         left: 12px !important;
         right: 12px !important;
+        width: auto !important;
+        max-width: none !important;
+        padding: 12px !important;
         max-height: calc(100vh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
         max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-        border-radius: 22px !important;
+        border-radius: 24px !important;
         transform-origin: bottom center !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown {
+        padding: 12px !important;
+        border-radius: 24px !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-header {
+        padding: 10px 8px 10px 10px;
+        gap: 13px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 15px;
+        font-size: 25px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-name {
+        font-size: 17px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-sub {
+        font-size: 13px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-close {
+        width: 38px;
+        height: 38px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-profiles {
+        gap: 8px;
+        padding: 8px 4px 10px 4px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof {
+        flex: 0 0 74px;
+        gap: 7px;
+        padding: 7px 3px;
+        border-radius: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-av {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        font-size: 24px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-manage .bfx-dd-prof-av .bfx-icon {
+        width: 22px;
+        height: 22px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-name {
+        max-width: 72px;
+        font-size: 12.5px;
     }
     html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tiles {
         grid-auto-flow: row !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 8px !important;
+        gap: 9px !important;
+        padding: 4px 4px 10px 4px !important;
     }
     html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tiles > .bfx-dd-tile:last-child:nth-child(odd) {
         grid-column: 1 / -1 !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile {
+        min-height: 50px;
+        padding: 9px 12px 9px 10px;
+        gap: 11px;
+        border-radius: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-ico .bfx-icon {
+        width: 18px;
+        height: 18px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-label {
+        font-size: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-item {
+        min-height: 48px;
+        padding: 10px 12px;
+        gap: 14px;
+        border-radius: 13px;
+        font-size: 15.5px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-ico {
+        width: 24px;
+        height: 24px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-ico .bfx-icon {
+        width: 20px;
+        height: 20px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo {
+        gap: 9px;
+        padding: 6px 4px 4px 4px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo-btn {
+        height: 46px;
+        border-radius: 13px;
+        font-size: 14px;
+        gap: 8px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo-btn .bfx-icon {
+        width: 17px;
+        height: 17px;
     }
 
     /* De-clutter Mobile Subnav: clean individual Netflix-style category pills, edge-to-edge scroll without gutter clipping */

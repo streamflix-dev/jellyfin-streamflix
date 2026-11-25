@@ -1106,9 +1106,9 @@ textarea.bfx-meta-textarea {
 
 /* Compact desktop Surprise Me icon pill (keeps label only in TV mode) */
 body:not(.bfx-tv-mode) #streamflix-surprise-btn {
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
     padding: 0;
     border-radius: 50%;
 }
@@ -1293,17 +1293,33 @@ html.bfx-no-flex-gap .bfx-quality-badges-wrap > * {
 .bfx-qbadge {
     display: inline-flex;
     align-items: center;
-    height: 19px;
-    padding: 0 5.5px;
-    border-radius: 3.5px;
-    font-size: 10.5px;
+    height: 21px;
+    padding: 0 6.5px;
+    border-radius: 4px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    color: rgba(255, 255, 255, 0.86);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.9);
     line-height: 1;
+}
+@media (max-width: 640px) {
+    .bfx-more-menu-item {
+        min-height: 44px;
+        padding: 10px 13px;
+        font-size: 14.5px;
+    }
+    .bfx-more-menu-item .bfx-icon {
+        width: 18px;
+        height: 18px;
+    }
+    .bfx-ep-shuffle-btn {
+        height: 40px;
+        padding: 0 14px;
+        font-size: 13.5px;
+    }
 }
 .bfx-qbadge.is-critic {
     border: none;
