@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.15)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.8.16)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.8.15';
+    var VERSION = '0.9.8.16';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -238,7 +238,11 @@
             totalMoviesCount: 0,
             totalSeriesCount: 0,
             totalCollectionsCount: 0,
-            views: []
+            views: [],
+            userHomePreferences: null,
+            libraryLatest: [],
+            resumeAudioItems: [],
+            resumeBookItems: []
         },
         heroIndex: 0,
         heroTimer: null,

@@ -1,20 +1,27 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Jellyfin.Data.Enums;
+using MediaBrowser.Common.Extensions;
+using MediaBrowser.Controller;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 
 #if JF1011 || JF12
+using Jellyfin.Data;
 using JUser = Jellyfin.Database.Implementations.Entities.User;
+using JPrefKind = Jellyfin.Database.Implementations.Enums.PreferenceKind;
 using JSortBy = Jellyfin.Data.Enums.ItemSortBy;
 using JSortOrder = Jellyfin.Database.Implementations.Enums.SortOrder;
 #else
 using JUser = Jellyfin.Data.Entities.User;
+using JPrefKind = Jellyfin.Data.Enums.PreferenceKind;
 using JSortBy = Jellyfin.Data.Enums.ItemSortBy;
 using JSortOrder = Jellyfin.Data.Enums.SortOrder;
 #endif
@@ -135,6 +142,20 @@ public static class JellyfinCompat
         return list;
     }
 
+    private static readonly string[] DefaultJellyfinHomeSlots =
+    {
+        "smalllibrarytiles",
+        "resume",
+        "resumeaudio",
+        "resumebook",
+        "livetv",
+        "nextup",
+        "latestmedia",
+        "none",
+        "none",
+        "none",
+    };
+
     public static object BuildHubBootstrap(
         ILibraryManager libraryManager,
         IUserDataManager userDataManager,
@@ -142,14 +163,28 @@ public static class JellyfinCompat
         string serverId,
         IReadOnlyList<string>? profileAllowedLibIds,
         IReadOnlyList<string>? heroLibraryIds,
-        IReadOnlyDictionary<string, double> popularScores)
+        IReadOnlyDictionary<string, double> popularScores,
+        IDisplayPreferencesManager? displayPreferencesManager = null)
     {
+        var userPrefs = ExtractUserHomePreferences(user, displayPreferencesManager);
         var allowedSet = BuildNormalizedIdSet(profileAllowedLibIds);
-        var accessibleFolders = ResolveAccessibleLibraryFolders(libraryManager, user, allowedSet);
+        var accessibleFolders = ResolveAccessibleLibraryFolders(libraryManager, user, allowedSet, userPrefs.OrderedViews);
+        var latestExcludesSet = BuildNormalizedIdSet(userPrefs.LatestItemsExcludes);
 
         var viewsPayload = accessibleFolders.Select(cf =>
         {
             var ct = (cf.CollectionType?.ToString() ?? string.Empty).ToLowerInvariant();
+            var viewImageTags = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (HasPrimaryImage(cf))
+            {
+                viewImageTags["Primary"] = ComputeImageTag(cf, "Primary");
+            }
+
+            if (cf.HasImage(ImageType.Thumb, 0))
+            {
+                viewImageTags["Thumb"] = ComputeImageTag(cf, "Thumb");
+            }
+
             return (object)new
             {
                 Id = cf.Id.ToString("N"),
@@ -157,8 +192,20 @@ public static class JellyfinCompat
                 Name = cf.Name ?? "Library",
                 Type = "CollectionFolder",
                 CollectionType = string.IsNullOrEmpty(ct) ? null : ct,
+                ImageTags = viewImageTags,
+                BackdropImageTags = GetBackdropTags(cf),
             };
         }).ToList();
+
+        var userHomePreferencesPayload = new
+        {
+            hasCustomHomeSections = userPrefs.HasCustomHomeSections,
+            homeSections = userPrefs.HomeSections,
+            orderedViews = userPrefs.OrderedViews,
+            latestItemsExcludes = userPrefs.LatestItemsExcludes,
+            myMediaExcludes = userPrefs.MyMediaExcludes,
+            hidePlayedInLatest = userPrefs.HidePlayedInLatest,
+        };
 
         // Scope queries strictly to allowed folders when a profile has explicit library restrictions
         Guid[]? ancestorScope = allowedSet.Count > 0
@@ -172,7 +219,11 @@ public static class JellyfinCompat
                 userId = user.Id.ToString("N"),
                 serverId,
                 views = viewsPayload,
+                userHomePreferences = userHomePreferencesPayload,
+                libraryLatest = Array.Empty<object>(),
                 resumeItems = Array.Empty<object>(),
+                resumeAudioItems = Array.Empty<object>(),
+                resumeBookItems = Array.Empty<object>(),
                 nextUpItems = Array.Empty<object>(),
                 favoriteItems = Array.Empty<object>(),
                 allMovies = Array.Empty<object>(),
@@ -230,6 +281,26 @@ public static class JellyfinCompat
         };
         var resumeItems = SafeGetItems(libraryManager, resumeQuery);
 
+        var resumeAudioItems = Array.Empty<BaseItem>();
+        if (userPrefs.HomeSections.Any(s => string.Equals(s, "resumeaudio", StringComparison.OrdinalIgnoreCase)))
+        {
+            var audioQuery = CreateScopedQuery(user, new[] { BaseItemKind.Audio, BaseItemKind.AudioBook }, ancestorScope);
+            audioQuery.IsResumable = true;
+            audioQuery.Limit = 12;
+            audioQuery.OrderBy = new[] { (JSortBy.DatePlayed, JSortOrder.Descending) };
+            resumeAudioItems = SafeGetItems(libraryManager, audioQuery).ToArray();
+        }
+
+        var resumeBookItems = Array.Empty<BaseItem>();
+        if (userPrefs.HomeSections.Any(s => string.Equals(s, "resumebook", StringComparison.OrdinalIgnoreCase)))
+        {
+            var bookQuery = CreateScopedQuery(user, new[] { BaseItemKind.Book }, ancestorScope);
+            bookQuery.IsResumable = true;
+            bookQuery.Limit = 12;
+            bookQuery.OrderBy = new[] { (JSortBy.DatePlayed, JSortOrder.Descending) };
+            resumeBookItems = SafeGetItems(libraryManager, bookQuery).ToArray();
+        }
+
         var favQuery = CreateScopedQuery(user, new[] { BaseItemKind.Movie, BaseItemKind.Series, BaseItemKind.Episode, BaseItemKind.BoxSet }, ancestorScope);
         favQuery.IsFavorite = true;
         favQuery.Limit = 48;
@@ -240,6 +311,72 @@ public static class JellyfinCompat
         var favItems = SafeGetItems(libraryManager, favQuery);
 
         var nextUpItems = ComputeNextUpEpisodes(libraryManager, userDataManager, user, ancestorScope);
+
+        // Per-library "Recently Added in {Library}" slices in exact Configured Library Order (OrderedViews),
+        // respecting LatestItemsExcludes and HidePlayedInLatest.
+        var libraryLatestPayload = new List<object>(accessibleFolders.Count);
+        foreach (var cf in accessibleFolders)
+        {
+            var normFolderId = NormalizeGuid(cf.Id);
+            if (latestExcludesSet.Contains(normFolderId))
+            {
+                continue;
+            }
+
+            var ct = (cf.CollectionType?.ToString() ?? string.Empty).ToLowerInvariant();
+            if (ct is "music" or "books" or "audiobooks" or "photos" or "playlists" or "livetv")
+            {
+                continue;
+            }
+
+            var folderKinds = ct switch
+            {
+                "movies" => new[] { BaseItemKind.Movie },
+                "tvshows" => new[] { BaseItemKind.Series },
+                "boxsets" => new[] { BaseItemKind.BoxSet },
+                _ => new[] { BaseItemKind.Movie, BaseItemKind.Series, BaseItemKind.Video },
+            };
+
+            var latestQuery = CreateScopedQuery(user, folderKinds, new[] { cf.Id });
+            if (userPrefs.HidePlayedInLatest)
+            {
+                latestQuery.IsPlayed = false;
+            }
+
+            latestQuery.Limit = 20;
+            latestQuery.OrderBy = new[]
+            {
+                (JSortBy.DateCreated, JSortOrder.Descending),
+                (JSortBy.SortName, JSortOrder.Ascending),
+            };
+
+            var rawLatest = SafeGetItems(libraryManager, latestQuery);
+            var mappedLatest = new List<object>(rawLatest.Count);
+            foreach (var latestItem in rawLatest)
+            {
+                if (userPrefs.HidePlayedInLatest)
+                {
+                    var latestUd = userDataManager.GetUserData(user, latestItem);
+                    if (latestUd?.Played == true)
+                    {
+                        continue;
+                    }
+                }
+
+                mappedLatest.Add(MapItemSummaryDto(latestItem, user, userDataManager, libraryManager, serverId));
+            }
+
+            if (mappedLatest.Count > 0)
+            {
+                libraryLatestPayload.Add(new
+                {
+                    id = cf.Id.ToString("N"),
+                    name = cf.Name ?? "Library",
+                    collectionType = string.IsNullOrEmpty(ct) ? null : ct,
+                    items = mappedLatest,
+                });
+            }
+        }
 
         var filteredHeroPool = new List<BaseItem>();
         var heroSet = BuildNormalizedIdSet(heroLibraryIds);
@@ -267,7 +404,11 @@ public static class JellyfinCompat
             userId = user.Id.ToString("N"),
             serverId,
             views = viewsPayload,
+            userHomePreferences = userHomePreferencesPayload,
+            libraryLatest = libraryLatestPayload,
             resumeItems = resumeItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
+            resumeAudioItems = resumeAudioItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
+            resumeBookItems = resumeBookItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
             nextUpItems = nextUpItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
             favoriteItems = favItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
             allMovies = movieItems.Select(i => MapItemSummaryDto(i, user, userDataManager, libraryManager, serverId)).ToList(),
@@ -433,12 +574,267 @@ public static class JellyfinCompat
         }
     }
 
+    internal sealed record UserHomePreferencesSnapshot(
+        bool HasCustomHomeSections,
+        IReadOnlyList<string> HomeSections,
+        IReadOnlyList<string> OrderedViews,
+        IReadOnlyList<string> LatestItemsExcludes,
+        IReadOnlyList<string> MyMediaExcludes,
+        bool HidePlayedInLatest);
+
+    internal static List<T> SortItemsByOrderedViews<T>(
+        IEnumerable<T> items,
+        IReadOnlyList<string>? orderedViewIds,
+        Func<T, Guid> getId,
+        Func<T, string?> getSortName)
+    {
+        var list = items?.ToList() ?? new List<T>();
+        if (list.Count <= 1)
+        {
+            return list;
+        }
+
+        var rankByGuid = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (orderedViewIds != null)
+        {
+            var rank = 0;
+            foreach (var raw in orderedViewIds)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+
+                var norm = raw.Replace("-", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
+                if (norm.Length > 0 && !rankByGuid.ContainsKey(norm))
+                {
+                    rankByGuid[norm] = rank++;
+                }
+            }
+        }
+
+        if (rankByGuid.Count == 0)
+        {
+            return list
+                .OrderBy(item => getSortName(item) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        return list
+            .OrderBy(item =>
+            {
+                var id = getId(item);
+                return id != Guid.Empty && rankByGuid.TryGetValue(NormalizeGuid(id), out var idx)
+                    ? idx
+                    : int.MaxValue;
+            })
+            .ThenBy(item => getSortName(item) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static (bool HasCustomSections, List<string> Sections) ParseHomeSectionsFromCustomPrefs(
+        IReadOnlyDictionary<string, string?>? customPrefs)
+    {
+        if (customPrefs == null || customPrefs.Count == 0)
+        {
+            return (false, new List<string>());
+        }
+
+        var ciPrefs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in customPrefs)
+        {
+            if (!string.IsNullOrWhiteSpace(kv.Key) && kv.Value != null)
+            {
+                ciPrefs[kv.Key.Trim()] = kv.Value.Trim();
+            }
+        }
+
+        var hasAnyHomeSectionKey = false;
+        for (var i = 0; i < DefaultJellyfinHomeSlots.Length; i++)
+        {
+            if (ciPrefs.TryGetValue("homesection" + i.ToString(CultureInfo.InvariantCulture), out var v) && v.Length > 0)
+            {
+                hasAnyHomeSectionKey = true;
+                break;
+            }
+        }
+
+        if (!hasAnyHomeSectionKey)
+        {
+            return (false, new List<string>());
+        }
+
+        var sections = new List<string>(DefaultJellyfinHomeSlots.Length);
+        for (var i = 0; i < DefaultJellyfinHomeSlots.Length; i++)
+        {
+            var key = "homesection" + i.ToString(CultureInfo.InvariantCulture);
+            var rawVal = ciPrefs.TryGetValue(key, out var found) && found.Length > 0
+                ? found.ToLowerInvariant()
+                : DefaultJellyfinHomeSlots[i];
+            var normalized = rawVal switch
+            {
+                "librarybuttons" or "smalllibrarytiles" => "smalllibrarytiles",
+                "resume" => "resume",
+                "nextup" => "nextup",
+                "latestmedia" => "latestmedia",
+                "livetv" => "livetv",
+                "resumeaudio" => "resumeaudio",
+                "resumebook" => "resumebook",
+                "activerecordings" => "activerecordings",
+                "none" => "none",
+                _ => "none",
+            };
+            sections.Add(normalized);
+        }
+
+        return (true, sections);
+    }
+
+    internal static UserHomePreferencesSnapshot ExtractUserHomePreferences(
+        JUser? user,
+        IDisplayPreferencesManager? displayPreferencesManager = null)
+    {
+        if (user == null)
+        {
+            return new UserHomePreferencesSnapshot(
+                false,
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                false);
+        }
+
+        var orderedViews = GetUserPreferenceGuidStrings(user, JPrefKind.OrderedViews, "OrderedViews");
+        var latestExcludes = GetUserPreferenceGuidStrings(user, JPrefKind.LatestItemExcludes, "LatestItemExcludes");
+        var myMediaExcludes = GetUserPreferenceGuidStrings(user, JPrefKind.MyMediaExcludes, "MyMediaExcludes");
+        var hidePlayedInLatest = false;
+        try
+        {
+            hidePlayedInLatest = user.HidePlayedInLatest;
+        }
+        catch
+        {
+        }
+
+        var hasCustomSections = false;
+        var homeSections = new List<string>();
+        if (displayPreferencesManager != null && user.Id != Guid.Empty)
+        {
+            try
+            {
+                var rawPrefs = displayPreferencesManager.ListCustomItemDisplayPreferences(
+                    user.Id,
+                    "usersettings".GetMD5(),
+                    "emby");
+                if (rawPrefs != null && rawPrefs.Count > 0)
+                {
+                    var copy = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var kv in rawPrefs)
+                    {
+                        copy[kv.Key] = kv.Value;
+                    }
+
+                    (hasCustomSections, homeSections) = ParseHomeSectionsFromCustomPrefs(copy);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return new UserHomePreferencesSnapshot(
+            hasCustomSections,
+            homeSections,
+            orderedViews,
+            latestExcludes,
+            myMediaExcludes,
+            hidePlayedInLatest);
+    }
+
+    private static List<string> GetUserPreferenceGuidStrings(JUser user, JPrefKind kind, string kindNameFallback)
+    {
+        var list = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var guids = user.GetPreferenceValues<Guid>(kind);
+            if (guids != null)
+            {
+                foreach (var g in guids)
+                {
+                    if (g != Guid.Empty)
+                    {
+                        var norm = NormalizeGuid(g);
+                        if (seen.Add(norm))
+                        {
+                            list.Add(norm);
+                        }
+                    }
+                }
+
+                if (list.Count > 0)
+                {
+                    return list;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var prefsProp = user.GetType().GetProperty("Preferences");
+            if (prefsProp?.GetValue(user) is IEnumerable prefs)
+            {
+                foreach (var pref in prefs)
+                {
+                    if (pref == null)
+                    {
+                        continue;
+                    }
+
+                    var pKind = pref.GetType().GetProperty("Kind")?.GetValue(pref)?.ToString();
+                    if (!string.Equals(pKind, kindNameFallback, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var rawVal = pref.GetType().GetProperty("Value")?.GetValue(pref) as string;
+                    if (string.IsNullOrWhiteSpace(rawVal))
+                    {
+                        continue;
+                    }
+
+                    foreach (var token in rawVal.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        if (Guid.TryParse(token, out var parsed) && parsed != Guid.Empty)
+                        {
+                            var norm = NormalizeGuid(parsed);
+                            if (seen.Add(norm))
+                            {
+                                list.Add(norm);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return list;
+    }
+
     private static List<CollectionFolder> ResolveAccessibleLibraryFolders(
         ILibraryManager libraryManager,
         JUser user,
-        HashSet<string> profileAllowedSet)
+        HashSet<string> profileAllowedSet,
+        IReadOnlyList<string>? orderedViewIds = null)
     {
-        var result = new List<CollectionFolder>();
+        var candidates = new List<CollectionFolder>();
         try
         {
             var root = libraryManager.GetUserRootFolder();
@@ -446,7 +842,7 @@ public static class JellyfinCompat
                 ? root.GetChildren(user, true)
                 : Array.Empty<BaseItem>();
 
-            foreach (var child in children.OrderBy(c => c.SortName ?? c.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var child in children)
             {
                 if (child is not CollectionFolder cf || cf.Id == Guid.Empty)
                 {
@@ -458,14 +854,19 @@ public static class JellyfinCompat
                     continue;
                 }
 
-                result.Add(cf);
+                candidates.Add(cf);
             }
         }
         catch
         {
         }
 
-        return result;
+        var effectiveOrder = orderedViewIds ?? GetUserPreferenceGuidStrings(user, JPrefKind.OrderedViews, "OrderedViews");
+        return SortItemsByOrderedViews(
+            candidates,
+            effectiveOrder,
+            cf => cf.Id,
+            cf => cf.SortName ?? cf.Name);
     }
 
     private static List<BaseItem> ComputeNextUpEpisodes(

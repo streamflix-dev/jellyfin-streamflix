@@ -2537,3 +2537,113 @@ body.bfx-search-page-open .skinHeader:not(.osdHeader) {
         justify-content: center;
     }
 }
+
+/* ---------- My Media Library Tiles Row (Home Section: My Media) ---------- */
+.bfx-mymedia-card {
+    position: relative;
+    flex: 0 0 260px;
+    width: 260px;
+    aspect-ratio: 16 / 9;
+    min-height: 140px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1b1b24 0%, #101016 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+html.bfx-no-flex-gap .bfx-row-mymedia .bfx-mymedia-card {
+    margin-right: 12px;
+}
+.bfx-mymedia-card:hover,
+.bfx-mymedia-card:focus-visible {
+    transform: translateY(-3px) scale(1.025);
+    border-color: rgba(255, 255, 255, 0.34);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+    outline: none;
+    z-index: 2;
+}
+.bfx-mymedia-bg {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.32s ease, opacity 0.25s ease;
+    opacity: 0.78;
+}
+.bfx-mymedia-card:hover .bfx-mymedia-bg {
+    transform: scale(1.06);
+    opacity: 0.92;
+}
+.bfx-mymedia-scrim {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(180deg, rgba(10, 10, 14, 0.14) 0%, rgba(10, 10, 14, 0.55) 55%, rgba(8, 8, 12, 0.92) 100%);
+}
+.bfx-mymedia-inner {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px 16px;
+    z-index: 1;
+    box-sizing: border-box;
+}
+.bfx-mymedia-badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(15, 15, 20, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f3f4f6;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.bfx-mymedia-badge .bfx-icon {
+    width: 17px;
+    height: 17px;
+}
+.bfx-mymedia-title {
+    display: block;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+    line-height: 1.2;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 680px) {
+    .bfx-mymedia-card {
+        flex: 0 0 196px;
+        width: 196px;
+        min-height: 110px;
+    }
+    .bfx-mymedia-title {
+        font-size: 14.5px;
+    }
+}

@@ -449,4 +449,80 @@ public class StreamFlixCoreTests
         Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, enriched["errorCode"]);
         Assert.Equal(404, enriched["httpStatus"]);
     }
+
+    [Fact]
+    public void HomePreferences_OrderedViewsAndHomeSectionsRespectUserConfiguration()
+    {
+        var gMovies = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        var gShows = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        var gAnimeMovies = Guid.Parse("30000000-0000-0000-0000-000000000003");
+        var gAnimeShows = Guid.Parse("40000000-0000-0000-0000-000000000004");
+        var gUnrankedDocs = Guid.Parse("50000000-0000-0000-0000-000000000005");
+
+        var folders = new[]
+        {
+            (Id: gAnimeMovies, Name: "Anime Movies"),
+            (Id: gAnimeShows, Name: "Anime Shows"),
+            (Id: gUnrankedDocs, Name: "Documentaries"),
+            (Id: gMovies, Name: "Movies"),
+            (Id: gShows, Name: "TV Shows"),
+        };
+
+        // User configured Library Order: Anime Shows -> Movies -> Anime Movies -> TV Shows (with Documentaries newly added & unranked)
+        var orderedViews = new[]
+        {
+            gAnimeShows.ToString("D"),
+            gMovies.ToString("N"),
+            gAnimeMovies.ToString("N"),
+            gShows.ToString("D"),
+        };
+
+        var sorted = JellyfinCompat.SortItemsByOrderedViews(
+            folders,
+            orderedViews,
+            f => f.Id,
+            f => f.Name);
+
+        Assert.Equal(
+            new[] { "Anime Shows", "Movies", "Anime Movies", "TV Shows", "Documentaries" },
+            sorted.Select(f => f.Name).ToArray());
+
+        // Empty CustomPrefs -> HasCustomSections is false so default layout applies
+        var emptyParsed = JellyfinCompat.ParseHomeSectionsFromCustomPrefs(new Dictionary<string, string?>
+        {
+            ["chromecastVersion"] = "stable",
+        });
+        Assert.False(emptyParsed.HasCustomSections);
+        Assert.Empty(emptyParsed.Sections);
+
+        // Configured Home Screen Sections 1–9 (Issue #23 user configuration)
+        var customParsed = JellyfinCompat.ParseHomeSectionsFromCustomPrefs(new Dictionary<string, string?>
+        {
+            ["homesection0"] = "librarybuttons",
+            ["homesection1"] = "resume",
+            ["homesection2"] = "nextup",
+            ["homesection3"] = "latestmedia",
+            ["homesection4"] = "resumebook",
+            ["homesection5"] = "livetv",
+            ["homesection6"] = "resumeaudio",
+            ["homesection7"] = "none",
+            ["homesection8"] = "none",
+        });
+        Assert.True(customParsed.HasCustomSections);
+        Assert.Equal(
+            new[]
+            {
+                "smalllibrarytiles",
+                "resume",
+                "nextup",
+                "latestmedia",
+                "resumebook",
+                "livetv",
+                "resumeaudio",
+                "none",
+                "none",
+                "none",
+            },
+            customParsed.Sections);
+    }
 }

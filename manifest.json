@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.8.16",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.16 Release Candidate (Dev Test Channel): Fix Issue #23 so StreamFlix Home respects Jellyfin User Settings -> Home sections 1-9 (My Media, Continue Watching, Next Up, Recently Added Media, Continue Reading, Live TV, Continue Listening, Active Recordings, None), Configured Library Order (OrderedViews) across My Media, per-library Recently Added rows, and top navigation pills, LatestItemsExcludes/MyMediaExcludes, HidePlayedInLatest, live sync upon saving Home preferences, and checkbox label alignment on Home settings; also cap Hero Billboard YouTube trailer preview playback at 3 seconds and harden Watch Together/SSO profile isolation.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.16_12.0.0.zip",
+        "checksum": "a3863abf7cf7fc70d87e0f4ba891b24c",
+        "timestamp": "2026-11-25T03:44:21Z"
+      },
+      {
+        "version": "0.9.8.16",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.8.16 Release Candidate (Dev Test Channel): Fix Issue #23 so StreamFlix Home respects Jellyfin User Settings -> Home sections 1-9 (My Media, Continue Watching, Next Up, Recently Added Media, Continue Reading, Live TV, Continue Listening, Active Recordings, None), Configured Library Order (OrderedViews) across My Media, per-library Recently Added rows, and top navigation pills, LatestItemsExcludes/MyMediaExcludes, HidePlayedInLatest, live sync upon saving Home preferences, and checkbox label alignment on Home settings; also cap Hero Billboard YouTube trailer preview playback at 3 seconds and harden Watch Together/SSO profile isolation.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.16_10.11.0.zip",
+        "checksum": "c7c5348fe85f412d66ae25be756eeeb9",
+        "timestamp": "2026-11-25T03:44:21Z"
+      },
+      {
+        "version": "0.9.8.16",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.8.16 Release Candidate (Dev Test Channel): Fix Issue #23 so StreamFlix Home respects Jellyfin User Settings -> Home sections 1-9 (My Media, Continue Watching, Next Up, Recently Added Media, Continue Reading, Live TV, Continue Listening, Active Recordings, None), Configured Library Order (OrderedViews) across My Media, per-library Recently Added rows, and top navigation pills, LatestItemsExcludes/MyMediaExcludes, HidePlayedInLatest, live sync upon saving Home preferences, and checkbox label alignment on Home settings; also cap Hero Billboard YouTube trailer preview playback at 3 seconds and harden Watch Together/SSO profile isolation.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.8.16_10.9.0.zip",
+        "checksum": "2cadda8c99ffb7ea4ead0da260ab6539",
+        "timestamp": "2026-11-25T03:44:21Z"
+      },
+      {
         "version": "0.9.8.15",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.8.15 Release Candidate (Dev Test Channel): Fix Issue #22 where remote/existing Jellyfin users signing in with valid Jellyfin credentials hit SF-REQ-743 (not_household_member); automatically provision & link a scoped StreamFlix profile on first sign-in while respecting Jellyfin's EnableRemoteAccess user permission and auto-activating single-profile accounts directly into StreamFlix Home.",
         "targetAbi": "12.0.0.0",

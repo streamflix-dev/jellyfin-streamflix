@@ -1132,6 +1132,257 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         assert.equal(activatedTabProf.id, 'streamflix_remote_friend', 'Remote Jellyfin user profile must become active in sessionStorage (#22)');
         console.log('[PASS] Issue #22 remote Jellyfin account auto-provisioning & single-profile auto-activation verified');
     }
+
+    // 6. Issue #23: Home Screen Sections (homesection0..9), Configured Library Order (OrderedViews), HidePlayedInLatest & Live Sync on Save
+    {
+        const localStore = makeStorage();
+        const sessionStore = makeStorage();
+        const prof23 = {
+            id: 'streamflix_owner',
+            name: 'Owner',
+            isAdmin: true,
+            isOwner: true,
+            allowLiveTv: true,
+            jellyfinUserId: '55555555555555555555555555555555',
+            accessToken: 'tok_23',
+        };
+        localStore.setItem('streamflix_session_v7', JSON.stringify({
+            token: 'signed.23.token',
+            email: 'owner@example.com',
+            authKind: 'google',
+            isAdmin: true,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        }));
+        localStore.setItem('jellyfin_credentials', JSON.stringify({
+            Servers: [{ Id: 'srv_23', UserId: prof23.jellyfinUserId, AccessToken: 'tok_23', ManualAddress: 'https://jellyfin.example.com' }],
+        }));
+        localStore.setItem('streamflix_active_profile_v64', JSON.stringify(prof23));
+        sessionStore.setItem('streamflix_tab_profile_v1', JSON.stringify(prof23));
+
+        const idAnimeShows = '40000000000000000000000000000004';
+        const idMovies = '10000000000000000000000000000001';
+        const idAnimeMovies = '30000000000000000000000000000003';
+        const idShows = '20000000000000000000000000000002';
+        const idLiveTv = '90000000000000000000000000000009';
+
+        let currentHomeSections = [
+            'smalllibrarytiles',
+            'resume',
+            'nextup',
+            'latestmedia',
+            'resumebook',
+            'livetv',
+            'resumeaudio',
+            'none',
+            'none',
+            'none',
+        ];
+
+        const doc23 = createLiveTvHubDom();
+        const win23 = {
+            location: { origin: 'https://jellyfin.example.com', pathname: '/web/index.html', hash: '#/home', search: '', assign() {}, reload() {}, replace() {} },
+            history: { length: 1, replaceState() {}, back() {} },
+            navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', clipboard: { writeText: async () => {} } },
+            document: doc23,
+            localStorage: localStore,
+            sessionStorage: sessionStore,
+            BroadcastChannel: MockBroadcastChannel,
+            ApiClient: {
+                _serverInfo: { Id: 'srv_23', UserId: prof23.jellyfinUserId, AccessToken: 'tok_23' },
+                accessToken: () => 'tok_23',
+                getCurrentUserId: () => prof23.jellyfinUserId,
+                serverId: () => 'srv_23',
+            },
+            URL,
+            URLSearchParams,
+            Headers,
+            Response,
+            AbortController,
+            MutationObserver: class { observe() {} disconnect() {} },
+            CustomEvent: class { constructor(type) { this.type = type; } },
+            Image: class { set src(_) { if (this.onload) this.onload(); } },
+            matchMedia: () => ({ matches: false, addEventListener() {} }),
+            requestAnimationFrame: (fn) => { fn(); return 1; },
+            setTimeout: (fn, ms) => (!ms || ms <= 500 ? setTimeout(() => { try { fn(); } catch {} }, Math.min(Number(ms) || 0, 15)) : 1),
+            clearTimeout() {},
+            setInterval: () => 1,
+            clearInterval() {},
+            addEventListener() {},
+            scrollTo() {},
+            innerWidth: 1440,
+            innerHeight: 900,
+            fetch: async (url, init) => {
+                const u = String(url);
+                const method = String((init && init.method) || 'GET').toUpperCase();
+                if (method === 'POST' && u.toLowerCase().includes('/displaypreferences/usersettings')) {
+                    return new Response(null, { status: 204 });
+                }
+                if (u.includes('/StreamFlix/PublicConfig')) {
+                    return new Response(JSON.stringify({
+                        version: '0.9.8.16',
+                        assetVersion: '0.9.8.16',
+                        serverId: 'srv_23',
+                        serverName: 'StreamFlix',
+                        enableStreamFlixUi: true,
+                        hasAccess: true,
+                        isAdmin: true,
+                        enableLiveTv: true,
+                        enableHeroTrailerPreview: false,
+                        showLibrariesInNav: true,
+                        navHiddenBuiltIns: [],
+                        navLibraryIds: [],
+                        session: { authKind: 'google', email: 'owner@example.com', expiresAt: new Date(Date.now() + 86400000).toISOString() },
+                        profiles: [prof23],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/StreamFlix/Hub/Bootstrap')) {
+                    return new Response(JSON.stringify({
+                        userId: prof23.jellyfinUserId,
+                        serverId: 'srv_23',
+                        // Intentionally pass unsorted views to verify client + server OrderedViews sorting
+                        views: [
+                            { Id: idAnimeMovies, Name: 'Anime Movies', CollectionType: 'movies', ImageTags: { Primary: 'am1' } },
+                            { Id: idAnimeShows, Name: 'Anime Shows', CollectionType: 'tvshows', ImageTags: { Primary: 'as1' } },
+                            { Id: idLiveTv, Name: 'Live TV', CollectionType: 'livetv' },
+                            { Id: idMovies, Name: 'Movies', CollectionType: 'movies', ImageTags: { Primary: 'm1' } },
+                            { Id: idShows, Name: 'TV Shows', CollectionType: 'tvshows', ImageTags: { Primary: 's1' } },
+                        ],
+                        userHomePreferences: {
+                            hasCustomHomeSections: true,
+                            homeSections: currentHomeSections,
+                            orderedViews: [idAnimeShows, idMovies, idAnimeMovies, idShows],
+                            latestItemsExcludes: [],
+                            myMediaExcludes: [idLiveTv],
+                            hidePlayedInLatest: true,
+                        },
+                        libraryLatest: [
+                            {
+                                id: idAnimeShows,
+                                name: 'Anime Shows',
+                                collectionType: 'tvshows',
+                                items: [{ Id: 'as_1', Name: 'Frieren', Type: 'Series', ImageTags: { Primary: 'p_as1' }, UserData: { Played: false } }],
+                            },
+                            {
+                                id: idMovies,
+                                name: 'Movies',
+                                collectionType: 'movies',
+                                items: [
+                                    { Id: 'm_played', Name: 'Already Watched Film', Type: 'Movie', ImageTags: { Primary: 'p_mp' }, UserData: { Played: true } },
+                                    { Id: 'm_fresh', Name: 'Dune: Part Two', Type: 'Movie', ImageTags: { Primary: 'p_mf' }, UserData: { Played: false } },
+                                ],
+                            },
+                            {
+                                id: idAnimeMovies,
+                                name: 'Anime Movies',
+                                collectionType: 'movies',
+                                items: [{ Id: 'am_1', Name: 'Suzume', Type: 'Movie', ImageTags: { Primary: 'p_am1' }, UserData: { Played: false } }],
+                            },
+                            {
+                                id: idShows,
+                                name: 'TV Shows',
+                                collectionType: 'tvshows',
+                                items: [{ Id: 's_1', Name: 'Severance', Type: 'Series', ImageTags: { Primary: 'p_s1' }, UserData: { Played: false } }],
+                            },
+                        ],
+                        resumeItems: [{ Id: 'res_1', Name: 'Interstellar', Type: 'Movie', RunTimeTicks: 100000000, ImageTags: { Primary: 'pr1' }, BackdropImageTags: ['br1'], UserData: { PlaybackPositionTicks: 35000000, PlayedPercentage: 35 } }],
+                        resumeBookItems: [{ Id: 'bk_1', Name: 'Project Hail Mary', Type: 'Book', ImageTags: { Primary: 'pbk1' }, UserData: { PlaybackPositionTicks: 100 } }],
+                        resumeAudioItems: [],
+                        nextUpItems: [{ Id: 'nx_1', Name: 'Hello, Ms. Cobel', SeriesId: 's_1', SeriesName: 'Severance', ParentIndexNumber: 2, IndexNumber: 1, Type: 'Episode', ImageTags: { Primary: 'pnx1' } }],
+                        favoriteItems: [],
+                        allMovies: [{ Id: 'm_fresh', Name: 'Dune: Part Two', Type: 'Movie', CommunityRating: 8.6, ImageTags: { Primary: 'p_mf' }, BackdropImageTags: ['bmf'] }],
+                        allSeries: [{ Id: 's_1', Name: 'Severance', Type: 'Series', CommunityRating: 8.8, ImageTags: { Primary: 'p_s1' }, BackdropImageTags: ['bs1'] }],
+                        collectionsItems: [],
+                        filteredHeroPool: [],
+                        popularScores: {},
+                        totalMoviesCount: 2,
+                        totalSeriesCount: 2,
+                        totalCollectionsCount: 0,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/LiveTv/Channels')) {
+                    return new Response(JSON.stringify({
+                        Items: [{
+                            Id: 'ch_23',
+                            Name: 'HBO HD',
+                            Number: '201',
+                            Type: 'TvChannel',
+                            ChannelType: 'TV',
+                            ImageTags: { Primary: 'ch23' },
+                            UserData: { IsFavorite: true },
+                        }],
+                        TotalRecordCount: 1,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/Users/Me')) {
+                    return new Response(JSON.stringify({ Id: prof23.jellyfinUserId, Name: 'Owner', Policy: { IsAdministrator: true, EnableLiveTvAccess: true } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ Items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            },
+        };
+        win23.window = win23;
+        win23.self = win23;
+        vm.runInContext(combinedJs, vm.createContext(win23));
+        await new Promise((r) => setTimeout(r, 90));
+
+        const hub23 = doc23.getElementById('streamflix-cinema-hub');
+        const html23 = hub23.innerHTML;
+        const rowIds23 = Array.from(html23.matchAll(/data-row-id="([^"]+)"/g), (m) => m[1]);
+        const expectedPrefix = [
+            'mymedia',
+            'resume',
+            'nextup',
+            `latest-${idAnimeShows}`,
+            `latest-${idMovies}`,
+            `latest-${idAnimeMovies}`,
+            `latest-${idShows}`,
+            'resumebook',
+            'livetv-home',
+        ];
+        assert.deepEqual(
+            rowIds23.slice(0, expectedPrefix.length),
+            expectedPrefix,
+            'Home Screen rows must follow exact Jellyfin Home Sections 1–9 AND Configured Library Order (OrderedViews) (#23)'
+        );
+
+        // Verify My Media tiles respect OrderedViews and exclude MyMediaExcludes
+        const myMediaIds = Array.from(html23.matchAll(/data-mymedia-id="([^"]+)"/g), (m) => m[1]);
+        assert.deepEqual(
+            myMediaIds,
+            [idAnimeShows, idMovies, idAnimeMovies, idShows],
+            'My Media library tiles must follow Configured Library Order and omit MyMediaExcludes (#23)'
+        );
+
+        // Verify Top Navigation Bar pills respect OrderedViews (Movies before Shows, Anime Shows before Anime Movies)
+        const navPillIds = Array.from(html23.matchAll(/data-cat-id="([^"]+)"/g), (m) => m[1]);
+        assert.ok(
+            navPillIds.indexOf('movies') < navPillIds.indexOf('series'),
+            'Top Nav Bar must place Movies before Shows when Movies precedes TV Shows in OrderedViews (#23)'
+        );
+        assert.ok(
+            navPillIds.indexOf(`lib:${idAnimeShows}`) < navPillIds.indexOf(`lib:${idAnimeMovies}`),
+            'Top Nav Bar library pills must follow Configured Library Order instead of alphabetical order (#23)'
+        );
+
+        // Verify HidePlayedInLatest filters out watched items from Recently Added rows
+        assert.doesNotMatch(html23, /Already Watched Film/, 'HidePlayedInLatest must hide watched items from Recently Added rows (#23)');
+        assert.match(html23, /Dune: Part Two/, 'Unwatched items must render in Recently Added rows (#23)');
+
+        // Verify saving #/mypreferenceshome.html (POST /DisplayPreferences/usersettings) immediately invalidates cache & reorders Home
+        currentHomeSections = ['livetv', 'smalllibrarytiles', 'resume', 'none', 'none', 'none', 'none', 'none', 'none', 'none'];
+        await win23.fetch(`https://jellyfin.example.com/DisplayPreferences/usersettings?userId=${prof23.jellyfinUserId}&client=emby`, {
+            method: 'POST',
+            body: JSON.stringify({ CustomPrefs: { homesection0: 'livetv', homesection1: 'smalllibrarytiles', homesection2: 'resume' } }),
+        });
+        await new Promise((r) => setTimeout(r, 75));
+        const updatedRowIds = Array.from(hub23.innerHTML.matchAll(/data-row-id="([^"]+)"/g), (m) => m[1]);
+        assert.deepEqual(
+            updatedRowIds.slice(0, 3),
+            ['livetv-home', 'mymedia', 'resume'],
+            'Saving Jellyfin Home Preferences must immediately invalidate SWR cache and update Home row order (#23)'
+        );
+        assert.equal(updatedRowIds.includes('nextup'), false, 'Setting Next Up to None in Jellyfin Home Preferences must hide Next Up on Home (#23)');
+        console.log('[PASS] Issue #23 Jellyfin Home Sections 1–9, Configured Library Order (OrderedViews), HidePlayedInLatest & Live Sync verified');
+    }
 }
 
 console.log('ALL STREAMFLIX SMOKE CHECKS PASSED!');
