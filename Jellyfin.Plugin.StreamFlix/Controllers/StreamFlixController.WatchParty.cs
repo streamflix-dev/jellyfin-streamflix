@@ -61,7 +61,10 @@ public partial class StreamFlixController
             request?.StartPositionSeconds,
             isBuffering: false);
 
-        var (itemId, itemName, seriesName, seasonNum, episodeNum, itemType, runTimeTicks) = EnrichMediaMetadata(
+        var (mediaError, itemId, itemName, seriesName, seasonNum, episodeNum, itemType, runTimeTicks) = TryResolveAuthorizedWatchPartyMedia(
+            caller,
+            resolvedProfile,
+            allowEmptyItemId: true,
             request?.ItemId,
             request?.ItemName,
             request?.SeriesName,
@@ -69,6 +72,10 @@ public partial class StreamFlixController
             request?.EpisodeNumber,
             request?.ItemType,
             request?.RunTimeTicks);
+        if (mediaError != null)
+        {
+            return mediaError;
+        }
 
         var (room, errorMessage) = StreamFlixWatchPartyService.CreateRoom(
             new StreamFlixWatchPartyService.CreateRoomInput
@@ -158,6 +165,12 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        var isLeaveAdmin = IsEffectiveActiveAdmin(caller);
+        if (!isLeaveAdmin && caller.JellyfinUser == null)
+        {
+            return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
+        }
+
         var resolvedProfile = ResolveWatchPartyProfile(config, caller, request?.ProfileId);
         var participant = BuildParticipantIdentity(
             caller,
@@ -169,7 +182,6 @@ public partial class StreamFlixController
             positionSeconds: null,
             isBuffering: null);
 
-        var isLeaveAdmin = IsEffectiveActiveAdmin(caller);
         StreamFlixWatchPartyService.LeaveRoom(
             request?.RoomId,
             participant.ParticipantId,
@@ -201,6 +213,13 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        var isGuest = IsGuestSession(caller);
+        var isAdmin = !isGuest && IsEffectiveActiveAdmin(caller);
+        if (!isAdmin && caller.JellyfinUser == null)
+        {
+            return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
+        }
+
         var resolvedProfile = ResolveWatchPartyProfile(config, caller, request.ProfileId);
         var participant = BuildParticipantIdentity(
             caller,
@@ -212,8 +231,6 @@ public partial class StreamFlixController
             positionSeconds: null,
             isBuffering: null);
 
-        var isGuest = IsGuestSession(caller);
-        var isAdmin = !isGuest && IsEffectiveActiveAdmin(caller);
         var (deleted, statusCode, errorMessage) = StreamFlixWatchPartyService.DeleteRoom(
             request.RoomId,
             participant,
@@ -267,16 +284,40 @@ public partial class StreamFlixController
             request.PositionSeconds,
             request.IsBuffering);
 
-        var (itemId, itemName, seriesName, seasonNum, episodeNum, itemType, runTimeTicks) = string.Equals(request.Action.Trim(), "set_media", StringComparison.OrdinalIgnoreCase)
-            ? EnrichMediaMetadata(
+        var isSetMedia = string.Equals(request.Action.Trim(), "set_media", StringComparison.OrdinalIgnoreCase);
+        string? itemId = request.ItemId;
+        string? itemName = request.ItemName;
+        string? seriesName = request.SeriesName;
+        int? seasonNum = request.SeasonNumber;
+        int? episodeNum = request.EpisodeNumber;
+        string? itemType = request.ItemType;
+        long? runTimeTicks = request.RunTimeTicks;
+        if (isSetMedia)
+        {
+            var resolvedMedia = TryResolveAuthorizedWatchPartyMedia(
+                caller,
+                resolvedProfile,
+                allowEmptyItemId: false,
                 request.ItemId,
                 request.ItemName,
                 request.SeriesName,
                 request.SeasonNumber,
                 request.EpisodeNumber,
                 request.ItemType,
-                request.RunTimeTicks)
-            : (request.ItemId, request.ItemName, request.SeriesName, request.SeasonNumber, request.EpisodeNumber, request.ItemType, request.RunTimeTicks);
+                request.RunTimeTicks);
+            if (resolvedMedia.Error != null)
+            {
+                return resolvedMedia.Error;
+            }
+
+            itemId = resolvedMedia.ItemId;
+            itemName = resolvedMedia.ItemName;
+            seriesName = resolvedMedia.SeriesName;
+            seasonNum = resolvedMedia.SeasonNumber;
+            episodeNum = resolvedMedia.EpisodeNumber;
+            itemType = resolvedMedia.ItemType;
+            runTimeTicks = resolvedMedia.RunTimeTicks;
+        }
 
         var (room, statusCode, errorMessage) = StreamFlixWatchPartyService.ApplyCommand(
             request.RoomId,
@@ -392,6 +433,11 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        if (!IsEffectiveActiveAdmin(caller) && caller.JellyfinUser == null)
+        {
+            return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
+        }
+
         if (!config.EnableWatchTogether)
         {
             return StatusCode(403, new { code = "watchparty_disabled", message = "Watch Together is turned off in StreamFlix settings." });
@@ -406,7 +452,7 @@ public partial class StreamFlixController
         return null;
     }
 
-    private StreamFlixProfileConfig? ResolveWatchPartyProfile(
+    internal static StreamFlixProfileConfig? ResolveWatchPartyProfile(
         PluginConfiguration config,
         CallerContext caller,
         string? requestedProfileId)
@@ -416,8 +462,13 @@ public partial class StreamFlixController
             return FindProfile(config, caller.Session?.LockedProfileId);
         }
 
-        if (!IsEffectiveActiveAdmin(caller) && caller.JellyfinUser != null)
+        if (!IsEffectiveActiveAdmin(caller))
         {
+            if (caller.JellyfinUser == null)
+            {
+                return null;
+            }
+
             var callerUid = caller.JellyfinUser.Id.ToString("N");
             var candidates = (config.Profiles ?? new List<StreamFlixProfileConfig>())
                 .Where(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
@@ -491,7 +542,10 @@ public partial class StreamFlixController
         };
     }
 
-    private (string? ItemId, string? ItemName, string? SeriesName, int? SeasonNumber, int? EpisodeNumber, string? ItemType, long? RunTimeTicks) EnrichMediaMetadata(
+    private (ActionResult? Error, string? ItemId, string? ItemName, string? SeriesName, int? SeasonNumber, int? EpisodeNumber, string? ItemType, long? RunTimeTicks) TryResolveAuthorizedWatchPartyMedia(
+        CallerContext caller,
+        StreamFlixProfileConfig? resolvedProfile,
+        bool allowEmptyItemId,
         string? itemId,
         string? itemName,
         string? seriesName,
@@ -500,35 +554,55 @@ public partial class StreamFlixController
         string? itemType,
         long? runTimeTicks)
     {
-        if (string.IsNullOrWhiteSpace(itemId) || !Guid.TryParse(itemId.Trim(), out var parsedId))
+        if (string.IsNullOrWhiteSpace(itemId))
         {
-            return (itemId, itemName, seriesName, seasonNumber, episodeNumber, itemType, runTimeTicks);
+            if (allowEmptyItemId)
+            {
+                return (null, null, null, null, null, null, null, null);
+            }
+
+            return (BadRequest(new { code = "invalid_item_id", message = "Choose a valid movie or episode to watch together." }), null, null, null, null, null, null, null);
         }
 
+        if (!Guid.TryParse(itemId.Trim(), out var parsedId) || parsedId == Guid.Empty)
+        {
+            return (BadRequest(new { code = "invalid_item_id", message = "Choose a valid movie or episode to watch together." }), null, null, null, null, null, null, null);
+        }
+
+        var effectiveAdmin = IsEffectiveActiveAdmin(caller);
         try
         {
             var libItem = _libraryManager.GetItemById(parsedId);
-            if (libItem != null)
+            if (libItem == null
+                || (!effectiveAdmin && (caller.JellyfinUser == null
+                    || !libItem.IsVisible(caller.JellyfinUser)
+                    || !JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, libItem, resolvedProfile?.AllowedLibraryIds))))
             {
-                var resolvedName = !string.IsNullOrWhiteSpace(itemName) ? itemName : libItem.Name;
-                var resolvedType = !string.IsNullOrWhiteSpace(itemType) ? itemType : libItem.GetType().Name;
-                var resolvedTicks = runTimeTicks is > 0 ? runTimeTicks : libItem.RunTimeTicks;
-                var resolvedSeason = seasonNumber ?? libItem.ParentIndexNumber;
-                var resolvedEp = episodeNumber ?? libItem.IndexNumber;
-                var resolvedSeries = seriesName;
-                if (string.IsNullOrWhiteSpace(resolvedSeries) && libItem is Episode ep)
-                {
-                    resolvedSeries = ep.SeriesName;
-                }
-
-                return (parsedId.ToString("N"), resolvedName, resolvedSeries, resolvedSeason, resolvedEp, resolvedType, resolvedTicks);
+                return (NotFound(new { code = "item_not_found", message = "Media item was not found." }), null, null, null, null, null, null, null);
             }
+
+            var resolvedName = !string.IsNullOrWhiteSpace(itemName) ? itemName : libItem.Name;
+            var resolvedType = !string.IsNullOrWhiteSpace(itemType) ? itemType : libItem.GetType().Name;
+            var resolvedTicks = runTimeTicks is > 0 ? runTimeTicks : libItem.RunTimeTicks;
+            var resolvedSeason = seasonNumber ?? libItem.ParentIndexNumber;
+            var resolvedEp = episodeNumber ?? libItem.IndexNumber;
+            var resolvedSeries = seriesName;
+            if (string.IsNullOrWhiteSpace(resolvedSeries) && libItem is Episode ep)
+            {
+                resolvedSeries = ep.SeriesName;
+            }
+
+            return (null, parsedId.ToString("N"), resolvedName, resolvedSeries, resolvedSeason, resolvedEp, resolvedType, resolvedTicks);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "StreamFlix: non-fatal lookup skipped for Watch Party item {ItemId}.", itemId);
+            if (!effectiveAdmin)
+            {
+                return (NotFound(new { code = "item_not_found", message = "Media item was not found." }), null, null, null, null, null, null, null);
+            }
         }
 
-        return (parsedId.ToString("N"), itemName, seriesName, seasonNumber, episodeNumber, itemType, runTimeTicks);
+        return (null, parsedId.ToString("N"), itemName, seriesName, seasonNumber, episodeNumber, itemType, runTimeTicks);
     }
 }

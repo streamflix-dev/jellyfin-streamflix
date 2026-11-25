@@ -15,15 +15,15 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.9.3.2"
+  PLUGIN_VERSION: "0.9.3.3"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin"
   PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, opt-in Live TV compatibility, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
   PLUGIN_CHANGELOG: |
-    - **Fix Remote & Existing Jellyfin User Sign-In (#22)**: Eliminates the `SF-REQ-743` (`not_household_member`) block when remote or existing Jellyfin accounts authenticate with valid Jellyfin credentials (`AllowStandardJellyfinLogin`). StreamFlix now automatically links an existing matching profile or provisions a dedicated StreamFlix profile (`IsPluginCreatedJellyfinUser = false`, preserving 100% of the user's Jellyfin permissions, libraries, and password).
-    - **Scoped Remote Account Privacy & `EnableRemoteAccess` Enforcement**: Auto-provisioned Jellyfin user profiles are locked to their Jellyfin account (`AccountLockKind = "jellyfin"`) so remote/personal users don't clutter shared LAN-bypass household pickers (while remaining fully manageable by Administrators in Manage Profiles), and external WAN logins strictly honor Jellyfin's per-user `EnableRemoteAccess` permission (`SF-AUTH-111`).
-    - **Seamless Single-Profile Auto-Activation**: Non-admin Jellyfin users with a single linked profile (and no separate profile PIN) now enter StreamFlix Home directly upon signing in across Web, Mobile Apps, and Jellyfin Media Player, plus a `Sign in` button on LAN-bypass profile pickers.
+    - **Jellyfin Home Screen Sections & Configured Library Order (#23)**: StreamFlix Home now honors your Jellyfin **User Settings → Home** configuration end-to-end — rendering Sections 1–9 (`My Media`, `Continue Watching`, `Next Up`, `Recently Added Media`, `Continue Reading`, `Live TV`, `Continue Listening`, `Active Recordings`, and `None` to hide removed sections) in exact sequence, ordering **`My Media`** tiles, per-library **`Recently Added in {Library}`** rows, and top navigation library pills strictly by your **Configured Library Order (`OrderedViews`)**, honoring `LatestItemsExcludes`, `MyMediaExcludes`, and **`Hide watched content from 'Recently Added Media'` (`HidePlayedInLatest`)**, syncing live immediately upon saving `#/mypreferenceshome.html`, and fixing checkbox label alignment on Home settings.
+    - **3-Second Hero Billboard YouTube Trailer Preview**: Caps active Hero Billboard trailer playback at 3 seconds (`HERO_PREVIEW_MAX_PLAY_MS = 3000` with a 10-second studio-logo skip) before smoothly cross-fading back to artwork, while keeping full-length trailers available via the Detail Modal **Trailer** button.
+    - **Profile & Media Scope Hardening**: Enforces per-profile `IsVisible` and `AllowedLibraryIds` checks across trailer resolution and Watch Together rooms, guards SSO-locked profiles during Jellyfin auto-linking, and cleans up Watch Together sync state on sign-out.
 
 jobs:
   build-and-publish:

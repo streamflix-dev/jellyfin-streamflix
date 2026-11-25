@@ -64,6 +64,14 @@
         }
     }
 
+    function isUserHomePrefsMutationUrl(lowUrl) {
+        if (!lowUrl) {
+            return false;
+        }
+        return lowUrl.indexOf('/displaypreferences/') !== -1
+            || (lowUrl.indexOf('/users/') !== -1 && lowUrl.indexOf('/configuration') !== -1);
+    }
+
     function installJellyfin12XhrInterceptor() {
         if (window.__STREAMFLIX_XHR_PATCHED__ || typeof XMLHttpRequest === 'undefined') {
             return;
@@ -131,10 +139,20 @@
                         && !(this.__streamflixHeaders && this.__streamflixHeaders['x-streamflix-session'])) {
                         origSetRequestHeader.call(this, 'X-StreamFlix-Session', state.googleUser.token);
                     }
-                    if (this.__streamflixMethod === 'POST' && typeof bodyArg === 'string' && typeof onWatchPartyNativeProgressReport === 'function') {
+                    if (this.__streamflixMethod === 'POST') {
                         var xUrlLow = String(this.__streamflixUrl || '').toLowerCase();
-                        if (xUrlLow.indexOf('/sessions/playing') !== -1 && bodyArg.charAt(0) === '{') {
-                            onWatchPartyNativeProgressReport(JSON.parse(bodyArg), xUrlLow);
+                        if (typeof bodyArg === 'string' && typeof onWatchPartyNativeProgressReport === 'function') {
+                            if (xUrlLow.indexOf('/sessions/playing') !== -1 && bodyArg.charAt(0) === '{') {
+                                onWatchPartyNativeProgressReport(JSON.parse(bodyArg), xUrlLow);
+                            }
+                        }
+                        if (isUserHomePrefsMutationUrl(xUrlLow) && typeof this.addEventListener === 'function') {
+                            var xhrRef = this;
+                            this.addEventListener('loadend', function () {
+                                if (xhrRef.status >= 200 && xhrRef.status < 300 && typeof invalidateHubHomePreferencesCache === 'function') {
+                                    invalidateHubHomePreferencesCache();
+                                }
+                            });
                         }
                     }
                 }
@@ -243,6 +261,14 @@
                                 scheduleLifecycleTick(0);
                             });
                         }
+                    }
+                }
+
+                if (isSameOrigin && method === 'POST' && res && res.ok && isUserHomePrefsMutationUrl(lowCheckUrl)) {
+                    if (typeof invalidateHubHomePreferencesCache === 'function') {
+                        setTimeout(function () {
+                            invalidateHubHomePreferencesCache();
+                        }, 0);
                     }
                 }
 
@@ -1148,9 +1174,17 @@
 
     function clearShowcaseAndMediaCaches() {
         try { localStorage.removeItem(SHOWCASE_ITEMS_KEY); } catch (e) {}
+        if (typeof stopHeroVideoPreview === 'function') {
+            stopHeroVideoPreview(false);
+        }
         state.itemCache = {};
+        state.heroTrailerCache = {};
+        state.heroTrailerInFlight = {};
         state.seerrSearchResults = null;
         state.seerrSearchLoading = false;
+        state.liveTvData = null;
+        state.liveTvEpg = null;
+        state.hotTabExtra = null;
         state.ambientCache = {};
         state.personalRowsByUser = {};
         if (state.hubData) {
@@ -1161,7 +1195,9 @@
             state.hubData.allMovies = [];
             state.hubData.allSeries = [];
             state.hubData.resumeItems = [];
+            state.hubData.nextUpItems = [];
             state.hubData.favoriteItems = [];
+            state.hubData.collectionsItems = [];
             state.hubData.recentMovies = [];
             state.hubData.recentSeries = [];
         }
@@ -1178,6 +1214,9 @@
         var wasGuest = isGuestPassSession();
         clearHouseholdSession();
         var openAccess = isOpenWithoutLogin(state.config);
+        if (!openAccess && typeof detachEndedWatchPartyCleanly === 'function') {
+            try { detachEndedWatchPartyCleanly(false); } catch (eWpLost) {}
+        }
         if (state.config) {
             state.config.hasAccess = openAccess;
             state.config.session = null;

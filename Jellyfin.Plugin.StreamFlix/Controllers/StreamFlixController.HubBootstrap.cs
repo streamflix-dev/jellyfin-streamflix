@@ -7,8 +7,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.StreamFlix.Configuration;
 using Jellyfin.Plugin.StreamFlix.Services;
+using MediaBrowser.Controller;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.StreamFlix.Controllers;
 
@@ -66,6 +68,7 @@ public partial class StreamFlixController
         }
 
         var scores = GetPopularScoresCached(_libraryManager, _userManager, _userDataManager);
+        var displayPrefsManager = HttpContext?.RequestServices?.GetService<IDisplayPreferencesManager>();
         var payload = JellyfinCompat.BuildHubBootstrap(
             _libraryManager,
             _userDataManager,
@@ -73,7 +76,8 @@ public partial class StreamFlixController
             _appHost.SystemId,
             profile?.AllowedLibraryIds,
             config.HeroLibraryIds,
-            scores);
+            scores,
+            displayPrefsManager);
 
         return Ok(payload);
     }

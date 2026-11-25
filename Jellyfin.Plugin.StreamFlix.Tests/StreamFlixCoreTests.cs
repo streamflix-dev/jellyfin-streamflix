@@ -254,11 +254,12 @@ public class StreamFlixCoreTests
     [Fact]
     public void BuildYouTubeEmbedRelayHtml_IncludesError153ReferrerPolicyAndPostMessageBridge()
     {
-        var html = StreamFlixController.BuildYouTubeEmbedRelayHtml("zSWdZVtXT7E", autoplay: true, mute: true, controls: false, loop: false);
+        var html = StreamFlixController.BuildYouTubeEmbedRelayHtml("zSWdZVtXT7E", autoplay: true, mute: true, controls: false, loop: false, startSeconds: 10);
         Assert.Contains("meta name=\"referrer\" content=\"strict-origin-when-cross-origin\"", html);
         Assert.Contains("referrerpolicy=\"strict-origin-when-cross-origin\"", html);
         Assert.Contains("https://www.youtube-nocookie.com/embed/", html);
         Assert.Contains("autoplay=1&mute=1&controls=0", html);
+        Assert.Contains("&start=10", html);
         Assert.Contains("streamflix-yt", html);
     }
 
@@ -308,6 +309,39 @@ public class StreamFlixCoreTests
         Assert.True(changed3);
         Assert.Equal("Owner (Jellyfin)", collisionProf.Name);
 
+        // Unlinked household profile locked to Google/OIDC or another Jellyfin username must NOT be hijacked by a matching Jellyfin username
+        var ssoLockedProf = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_alex_sso",
+            Name = "Alex",
+            AccountLockKind = "google",
+            GoogleAccountEmail = "alex@example.com",
+        };
+        cfg.Profiles.Add(ssoLockedProf);
+        var alexJfUid = Guid.NewGuid();
+        var (alexJfProf, changedAlex) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, alexJfUid, "Alex", isAdminUser: false);
+        Assert.True(changedAlex);
+        Assert.NotSame(ssoLockedProf, alexJfProf);
+        Assert.Null(ssoLockedProf.JellyfinUserId);
+        Assert.Equal("Alex (Jellyfin)", alexJfProf.Name);
+        Assert.Equal("jellyfin", alexJfProf.AccountLockKind);
+        Assert.Equal("Alex", alexJfProf.GoogleAccountEmail);
+
+        // Unlinked profile explicitly pre-locked to the same Jellyfin username links cleanly
+        var preLockedJfProf = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_sam_jf",
+            Name = "Sam",
+            AccountLockKind = "jellyfin",
+            GoogleAccountEmail = "Sam",
+        };
+        cfg.Profiles.Add(preLockedJfProf);
+        var samJfUid = Guid.NewGuid();
+        var (linkedSamProf, changedSam) = StreamFlixController.EnsureProfileForJellyfinUserNoLock(cfg, samJfUid, "sam", isAdminUser: false);
+        Assert.True(changedSam);
+        Assert.Same(preLockedJfProf, linkedSamProf);
+        Assert.Equal(samJfUid.ToString("N"), preLockedJfProf.JellyfinUserId);
+
         // 2. Remote user with EnableRemoteAccess = false is blocked on WAN, allowed on LAN
         var remoteBlockedUser = new FakeUserEntity();
         remoteBlockedUser.Permissions.Add(new FakePerm { Kind = "EnableRemoteAccess", Value = false });
@@ -320,5 +354,175 @@ public class StreamFlixCoreTests
         disabledUser.Permissions.Add(new FakePerm { Kind = "IsDisabled", Value = true });
         Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: true));
         Assert.False(StreamFlixController.IsJellyfinUserAllowedStandardLogin(disabledUser, isLocalLan: false));
+    }
+
+    [Fact]
+    public void ResolveWatchPartyProfile_BlocksUnactivatedCallerFromSpoofingHostProfile()
+    {
+        var ownerProfile = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_owner",
+            Name = "Owner",
+            JellyfinUserId = Guid.NewGuid().ToString("N"),
+        };
+        var guestLockedProfile = new StreamFlixProfileConfig
+        {
+            Id = "streamflix_guest_prof",
+            Name = "Guest Viewer",
+            JellyfinUserId = Guid.NewGuid().ToString("N"),
+        };
+        var cfg = new PluginConfiguration
+        {
+            Profiles = new List<StreamFlixProfileConfig> { ownerProfile, guestLockedProfile },
+        };
+
+        // Non-admin caller without an active Jellyfin user session must NEVER resolve an arbitrary requested profile
+        var unactivatedLanCaller = new StreamFlixController.CallerContext(
+            Session: null,
+            IsJellyfinAuthenticated: false,
+            IsAdmin: false,
+            IsLocalLan: true,
+            JellyfinUser: null);
+        Assert.Null(StreamFlixController.ResolveWatchPartyProfile(cfg, unactivatedLanCaller, "streamflix_owner"));
+
+        // Guest Pass session always resolves strictly to its own LockedProfileId even if another profileId is requested
+        var guestSession = new StreamFlixSessionService.SessionInfo(
+            string.Empty,
+            DateTimeOffset.UtcNow.AddHours(4),
+            StreamFlixSessionService.AuthKindGuestPass,
+            GuestPassId: "gp_1",
+            LockedProfileId: "streamflix_guest_prof");
+        var guestCaller = new StreamFlixController.CallerContext(
+            Session: guestSession,
+            IsJellyfinAuthenticated: false,
+            IsAdmin: false,
+            IsLocalLan: false,
+            JellyfinUser: null);
+        Assert.Same(guestLockedProfile, StreamFlixController.ResolveWatchPartyProfile(cfg, guestCaller, "streamflix_owner"));
+
+        // Active administrator can resolve the requested profile cleanly
+        var adminCaller = new StreamFlixController.CallerContext(
+            Session: null,
+            IsJellyfinAuthenticated: true,
+            IsAdmin: true,
+            IsLocalLan: true,
+            JellyfinUser: null);
+        Assert.Same(ownerProfile, StreamFlixController.ResolveWatchPartyProfile(cfg, adminCaller, "streamflix_owner"));
+
+        // Symbolic Watch Party error codes resolve cleanly
+        Assert.Equal(StreamFlixErrorCodes.WatchPartyForbidden, StreamFlixErrorCodes.Resolve("watchparty_disabled", 403, "/StreamFlix/WatchParty/Create"));
+        Assert.Equal(StreamFlixErrorCodes.WatchPartyForbidden, StreamFlixErrorCodes.Resolve("kids_forbidden", 403, "/StreamFlix/WatchParty/Join"));
+        Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, StreamFlixErrorCodes.Resolve("item_not_found", 404, "/StreamFlix/Trailers/Resolve"));
+    }
+
+    [Fact]
+    public void ErrorEnvelope_PreservesNormalTrailerNoneLookupWithoutInjectingErrorCode()
+    {
+        var filter = new StreamFlixErrorEnvelopeAttribute();
+        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        httpContext.Request.Path = "/StreamFlix/Trailers/Resolve";
+        var actionContext = new Microsoft.AspNetCore.Mvc.ActionContext(
+            httpContext,
+            new Microsoft.AspNetCore.Routing.RouteData(),
+            new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor());
+
+        // Normal 200 OK { ok = false, kind = "none" } when a title has no trailer must NOT be rewritten with SF-REQ-740
+        var nonePayload = new { ok = false, kind = "none" };
+        var okResult = new Microsoft.AspNetCore.Mvc.OkObjectResult(nonePayload);
+        var okExecuting = new Microsoft.AspNetCore.Mvc.Filters.ResultExecutingContext(
+            actionContext,
+            new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>(),
+            okResult,
+            controller: new object());
+        filter.OnResultExecuting(okExecuting);
+        Assert.Same(nonePayload, ((Microsoft.AspNetCore.Mvc.ObjectResult)okExecuting.Result).Value);
+
+        // Real 404 { ok = false, code = "item_not_found" } still receives canonical errorCode enrichment
+        var notFoundResult = new Microsoft.AspNetCore.Mvc.NotFoundObjectResult(new { ok = false, code = "item_not_found", message = "Media item was not found." });
+        var errExecuting = new Microsoft.AspNetCore.Mvc.Filters.ResultExecutingContext(
+            actionContext,
+            new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>(),
+            notFoundResult,
+            controller: new object());
+        filter.OnResultExecuting(errExecuting);
+        var enriched = Assert.IsType<Dictionary<string, object?>>(((Microsoft.AspNetCore.Mvc.ObjectResult)errExecuting.Result).Value);
+        Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, enriched["errorCode"]);
+        Assert.Equal(404, enriched["httpStatus"]);
+    }
+
+    [Fact]
+    public void HomePreferences_OrderedViewsAndHomeSectionsRespectUserConfiguration()
+    {
+        var gMovies = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        var gShows = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        var gAnimeMovies = Guid.Parse("30000000-0000-0000-0000-000000000003");
+        var gAnimeShows = Guid.Parse("40000000-0000-0000-0000-000000000004");
+        var gUnrankedDocs = Guid.Parse("50000000-0000-0000-0000-000000000005");
+
+        var folders = new[]
+        {
+            (Id: gAnimeMovies, Name: "Anime Movies"),
+            (Id: gAnimeShows, Name: "Anime Shows"),
+            (Id: gUnrankedDocs, Name: "Documentaries"),
+            (Id: gMovies, Name: "Movies"),
+            (Id: gShows, Name: "TV Shows"),
+        };
+
+        // User configured Library Order: Anime Shows -> Movies -> Anime Movies -> TV Shows (with Documentaries newly added & unranked)
+        var orderedViews = new[]
+        {
+            gAnimeShows.ToString("D"),
+            gMovies.ToString("N"),
+            gAnimeMovies.ToString("N"),
+            gShows.ToString("D"),
+        };
+
+        var sorted = JellyfinCompat.SortItemsByOrderedViews(
+            folders,
+            orderedViews,
+            f => f.Id,
+            f => f.Name);
+
+        Assert.Equal(
+            new[] { "Anime Shows", "Movies", "Anime Movies", "TV Shows", "Documentaries" },
+            sorted.Select(f => f.Name).ToArray());
+
+        // Empty CustomPrefs -> HasCustomSections is false so default layout applies
+        var emptyParsed = JellyfinCompat.ParseHomeSectionsFromCustomPrefs(new Dictionary<string, string?>
+        {
+            ["chromecastVersion"] = "stable",
+        });
+        Assert.False(emptyParsed.HasCustomSections);
+        Assert.Empty(emptyParsed.Sections);
+
+        // Configured Home Screen Sections 1–9 (Issue #23 user configuration)
+        var customParsed = JellyfinCompat.ParseHomeSectionsFromCustomPrefs(new Dictionary<string, string?>
+        {
+            ["homesection0"] = "librarybuttons",
+            ["homesection1"] = "resume",
+            ["homesection2"] = "nextup",
+            ["homesection3"] = "latestmedia",
+            ["homesection4"] = "resumebook",
+            ["homesection5"] = "livetv",
+            ["homesection6"] = "resumeaudio",
+            ["homesection7"] = "none",
+            ["homesection8"] = "none",
+        });
+        Assert.True(customParsed.HasCustomSections);
+        Assert.Equal(
+            new[]
+            {
+                "smalllibrarytiles",
+                "resume",
+                "nextup",
+                "latestmedia",
+                "resumebook",
+                "livetv",
+                "resumeaudio",
+                "none",
+                "none",
+                "none",
+            },
+            customParsed.Sections);
     }
 }

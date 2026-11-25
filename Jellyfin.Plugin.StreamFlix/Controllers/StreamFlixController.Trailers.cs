@@ -11,6 +11,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.StreamFlix.Configuration;
+using Jellyfin.Plugin.StreamFlix.Services;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
@@ -141,7 +143,10 @@ public partial class StreamFlixController
     [HttpGet("Trailers/Resolve")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> ResolveItemTrailer([FromQuery] string? itemId = null, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> ResolveItemTrailer(
+        [FromQuery] string? itemId = null,
+        [FromQuery] string? profileId = null,
+        CancellationToken cancellationToken = default)
     {
         SetNoStoreSecurityHeaders();
         var config = Config;
@@ -151,13 +156,21 @@ public partial class StreamFlixController
             return GoogleRequired(config);
         }
 
+        var effectiveAdmin = IsEffectiveActiveAdmin(caller);
+        if (!effectiveAdmin && caller.JellyfinUser == null)
+        {
+            return StatusCode(401, new { ok = false, code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
+        }
+
         if (string.IsNullOrWhiteSpace(itemId) || !Guid.TryParse(itemId.Trim(), out var parsedGuid) || parsedGuid == Guid.Empty)
         {
             return BadRequest(new { ok = false, code = "invalid_item_id", message = "A valid Jellyfin itemId is required." });
         }
 
         var item = _libraryManager.GetItemById(parsedGuid);
-        if (item == null)
+        if (item == null
+            || (!effectiveAdmin && caller.JellyfinUser != null && !item.IsVisible(caller.JellyfinUser))
+            || !IsItemAllowedForCallerProfileLibraries(config, caller, effectiveAdmin, item, profileId))
         {
             return NotFound(new { ok = false, code = "item_not_found", message = "Media item was not found." });
         }
@@ -166,7 +179,9 @@ public partial class StreamFlixController
         if (item is Episode ep && ep.SeriesId != Guid.Empty && (item.RemoteTrailers == null || item.RemoteTrailers.Count == 0))
         {
             var parentSeries = _libraryManager.GetItemById(ep.SeriesId);
-            if (parentSeries != null)
+            if (parentSeries != null
+                && (effectiveAdmin || caller.JellyfinUser == null || parentSeries.IsVisible(caller.JellyfinUser))
+                && IsItemAllowedForCallerProfileLibraries(config, caller, effectiveAdmin, parentSeries, profileId))
             {
                 targetItem = parentSeries;
             }
@@ -253,6 +268,48 @@ public partial class StreamFlixController
         return Ok(BuildTrailerResolveResponse(resolved));
     }
 
+    private bool IsItemAllowedForCallerProfileLibraries(
+        PluginConfiguration config,
+        CallerContext caller,
+        bool effectiveAdmin,
+        BaseItem item,
+        string? requestedProfileId)
+    {
+        if (effectiveAdmin || caller.JellyfinUser == null)
+        {
+            return true;
+        }
+
+        if (IsGuestSession(caller))
+        {
+            var guestProfile = FindProfile(config, caller.Session?.LockedProfileId);
+            return guestProfile == null
+                || JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, guestProfile.AllowedLibraryIds);
+        }
+
+        var callerUid = caller.JellyfinUser.Id.ToString("N");
+        var linkedProfiles = (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Where(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (linkedProfiles.Count == 0)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedProfileId))
+        {
+            var matched = linkedProfiles.FirstOrDefault(p =>
+                string.Equals(p.Id, requestedProfileId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(p.Name, requestedProfileId, StringComparison.OrdinalIgnoreCase));
+            if (matched != null)
+            {
+                return JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, matched.AllowedLibraryIds);
+            }
+        }
+
+        return linkedProfiles.Any(p => JellyfinCompat.IsItemInAllowedLibraries(_libraryManager, caller.JellyfinUser, item, p.AllowedLibraryIds));
+    }
+
     [HttpGet("Trailers/Embed/{youtubeId}")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Text.Html)]
@@ -261,7 +318,8 @@ public partial class StreamFlixController
         [FromQuery] int autoplay = 1,
         [FromQuery] int mute = 1,
         [FromQuery] int controls = 0,
-        [FromQuery] int loop = 0)
+        [FromQuery] int loop = 0,
+        [FromQuery] int start = 0)
     {
         if (string.IsNullOrWhiteSpace(youtubeId) || !YouTubeIdRegex.IsMatch(youtubeId.Trim()))
         {
@@ -278,7 +336,8 @@ public partial class StreamFlixController
             autoplay != 0,
             mute != 0,
             controls != 0,
-            loop != 0);
+            loop != 0,
+            start);
         return Content(html, "text/html; charset=utf-8", Encoding.UTF8);
     }
 
@@ -287,12 +346,14 @@ public partial class StreamFlixController
         bool autoplay,
         bool mute,
         bool controls,
-        bool loop)
+        bool loop,
+        int startSeconds = 0)
     {
         var ap = autoplay ? "1" : "0";
         var mu = mute ? "1" : "0";
         var ct = controls ? "1" : "0";
         var lp = loop ? $"&loop=1&playlist={youtubeId}" : string.Empty;
+        var st = startSeconds > 0 ? $"&start={Math.Clamp(startSeconds, 1, 600).ToString(CultureInfo.InvariantCulture)}" : string.Empty;
 
         return $@"<!DOCTYPE html>
 <html lang=""en"">
@@ -391,7 +452,7 @@ iframe{{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;b
   }});
 
   f.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(vid)
-    + '?enablejsapi=1&autoplay={ap}&mute={mu}&controls={ct}&rel=0&playsinline=1&iv_load_policy=3&modestbranding=1{lp}'
+    + '?enablejsapi=1&autoplay={ap}&mute={mu}&controls={ct}&rel=0&playsinline=1&iv_load_policy=3&modestbranding=1{lp}{st}'
     + originParam;
 }})();
 </script>

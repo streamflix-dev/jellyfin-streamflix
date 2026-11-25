@@ -10,6 +10,12 @@
             clearUserPreferencesEnhancements();
         } catch (ePref) {}
         try {
+            if (typeof stopHeroVideoPreview === 'function') {
+                stopHeroVideoPreview(false);
+            }
+            if (typeof stopWatchPartySyncEngine === 'function') {
+                stopWatchPartySyncEngine();
+            }
             if (state.heroTimer) {
                 clearInterval(state.heroTimer);
                 state.heroTimer = null;
@@ -42,10 +48,17 @@
                 '#streamflix-overlay-root-closing',
                 '#streamflix-cinema-hub',
                 '#streamflix-header-profile-btn',
+                '#streamflix-header-bell-btn',
                 '#streamflix-account-dropdown',
+                '#streamflix-notif-dropdown',
+                '#bfx-exit-kids-btn',
+                '#bfx-kids-brand-pill',
+                '#bfx-bedtime-lock-overlay',
                 '#bfx-fixed-corner-brand',
                 '#streamflix-mobile-dock',
-                '#streamflix-playback-loader'
+                '#streamflix-playback-loader',
+                '#bfx-wp-osd-banner',
+                '#bfx-wp-autoplay-unlock'
             ].forEach(function (sel) {
                 var el = document.querySelector(sel);
                 if (el && el.parentNode) {

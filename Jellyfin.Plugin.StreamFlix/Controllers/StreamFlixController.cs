@@ -944,7 +944,7 @@ public partial class StreamFlixController : ControllerBase
         return Content(asset.Text, contentType);
     }
 
-    private sealed record CallerContext(
+    internal sealed record CallerContext(
         StreamFlixSessionService.SessionInfo? Session,
         bool IsJellyfinAuthenticated,
         bool IsAdmin,

@@ -904,8 +904,8 @@
                         if (err && err.name === 'AbortError') {
                             return;
                         }
-                        if (err && (err.status === 403 || err.status === 404)) {
-                            detachEndedWatchPartyCleanly(true);
+                        if (err && (err.status === 401 || err.status === 403 || err.status === 404)) {
+                            detachEndedWatchPartyCleanly(err.status !== 401);
                             return;
                         }
                         step(2500);

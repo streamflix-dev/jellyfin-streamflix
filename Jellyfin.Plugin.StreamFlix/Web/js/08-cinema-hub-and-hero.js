@@ -1213,6 +1213,146 @@
         }
     }
 
+    var DEFAULT_JELLYFIN_HOME_SLOTS = [
+        'smalllibrarytiles',
+        'resume',
+        'resumeaudio',
+        'resumebook',
+        'livetv',
+        'nextup',
+        'latestmedia',
+        'none',
+        'none',
+        'none'
+    ];
+
+    function parseCustomPrefsHomeSectionsJs(customPrefs) {
+        if (!customPrefs || typeof customPrefs !== 'object') {
+            return { hasCustomHomeSections: false, homeSections: [] };
+        }
+        var ci = {};
+        Object.keys(customPrefs).forEach(function (k) {
+            if (k && customPrefs[k] != null) {
+                ci[String(k).trim().toLowerCase()] = String(customPrefs[k]).trim().toLowerCase();
+            }
+        });
+        var hasAny = false;
+        for (var i = 0; i < DEFAULT_JELLYFIN_HOME_SLOTS.length; i++) {
+            if (ci['homesection' + i]) {
+                hasAny = true;
+                break;
+            }
+        }
+        if (!hasAny) {
+            return { hasCustomHomeSections: false, homeSections: [] };
+        }
+        var out = [];
+        for (var s = 0; s < DEFAULT_JELLYFIN_HOME_SLOTS.length; s++) {
+            var raw = ci['homesection' + s] || DEFAULT_JELLYFIN_HOME_SLOTS[s];
+            if (raw === 'librarybuttons' || raw === 'smalllibrarytiles') {
+                out.push('smalllibrarytiles');
+            } else if (raw === 'resume' || raw === 'nextup' || raw === 'latestmedia' || raw === 'livetv'
+                || raw === 'resumeaudio' || raw === 'resumebook' || raw === 'activerecordings' || raw === 'none') {
+                out.push(raw);
+            } else {
+                out.push('none');
+            }
+        }
+        return { hasCustomHomeSections: true, homeSections: out };
+    }
+
+    function normalizeUserHomePreferences(rawPrefs) {
+        if (!rawPrefs || typeof rawPrefs !== 'object') {
+            return {
+                hasCustomHomeSections: false,
+                homeSections: [],
+                orderedViews: [],
+                latestItemsExcludes: [],
+                myMediaExcludes: [],
+                hidePlayedInLatest: false
+            };
+        }
+        var normGuidList = function (arr) {
+            var out = [];
+            var seen = {};
+            (Array.isArray(arr) ? arr : []).forEach(function (id) {
+                var n = normalizeGuid(id);
+                if (n && !seen[n]) {
+                    seen[n] = true;
+                    out.push(n);
+                }
+            });
+            return out;
+        };
+        var secs = (Array.isArray(rawPrefs.homeSections) ? rawPrefs.homeSections : []).map(function (s) {
+            var clean = String(s || '').trim().toLowerCase();
+            return clean === 'librarybuttons' ? 'smalllibrarytiles' : clean;
+        });
+        var hasCustom = Boolean(rawPrefs.hasCustomHomeSections) && secs.length > 0;
+        return {
+            hasCustomHomeSections: hasCustom,
+            homeSections: secs,
+            orderedViews: normGuidList(rawPrefs.orderedViews),
+            latestItemsExcludes: normGuidList(rawPrefs.latestItemsExcludes),
+            myMediaExcludes: normGuidList(rawPrefs.myMediaExcludes),
+            hidePlayedInLatest: Boolean(rawPrefs.hidePlayedInLatest)
+        };
+    }
+
+    function sortViewsByOrderedIds(views, orderedIds) {
+        var list = Array.isArray(views) ? views.slice() : [];
+        if (list.length <= 1 || !Array.isArray(orderedIds) || orderedIds.length === 0) {
+            return list;
+        }
+        var rankMap = {};
+        orderedIds.forEach(function (id, idx) {
+            var n = normalizeGuid(id);
+            if (n && rankMap[n] === undefined) {
+                rankMap[n] = idx;
+            }
+        });
+        return list.map(function (v, origIdx) {
+            var n = v && v.Id ? normalizeGuid(v.Id) : '';
+            var r = (n && rankMap[n] !== undefined) ? rankMap[n] : (10000 + origIdx);
+            return { view: v, rank: r, origIdx: origIdx };
+        }).sort(function (a, b) {
+            return a.rank !== b.rank ? (a.rank - b.rank) : (a.origIdx - b.origIdx);
+        }).map(function (entry) {
+            return entry.view;
+        });
+    }
+
+    function filterLatestPlayedIfConfigured(items, hidePlayed) {
+        var arr = Array.isArray(items) ? items : [];
+        if (!hidePlayed) {
+            return arr;
+        }
+        return arr.filter(function (it) {
+            return !(it && it.UserData && it.UserData.Played);
+        });
+    }
+
+    function invalidateHubHomePreferencesCache() {
+        var auth = getJellyfinAuthContext();
+        var uid = (auth && auth.userId) || (state.hubData && state.hubData.userId) || '';
+        try {
+            if (typeof saveProfileHomeRowPrefs === 'function') {
+                saveProfileHomeRowPrefs(null);
+            }
+        } catch (eProf) {}
+        if (uid) {
+            try { sessionStorage.removeItem(getHubSwrStorageKey(uid)); } catch (e1) {}
+            try { sessionStorage.removeItem(HUB_SWR_KEY_PREFIX + normalizeGuid(uid)); } catch (e2) {}
+        }
+        state.libraryViewData = {};
+        if (state.hubData) {
+            state.hubData.loaded = false;
+        }
+        if (auth && auth.userId && auth.token) {
+            loadCinemaHubData(false);
+        }
+    }
+
     function getHubSwrStorageKey(userId) {
         var pid = (state.activeProfile && state.activeProfile.id) ? state.activeProfile.id : 'default';
         return HUB_SWR_CACHE_PREFIX + normalizeGuid(userId) + '_' + pid;
@@ -1221,27 +1361,56 @@
     function applyHubBootstrapPayload(boot, silentRefresh, saveToSwrCache, userIdForCache) {
         var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (arr) { return arr || []; };
         var kidsActive = typeof isKidsProfileActive === 'function' && isKidsProfileActive();
+        var homePrefs = normalizeUserHomePreferences(boot.userHomePreferences);
 
         stampServerIdOnItems(boot.allMovies);
         stampServerIdOnItems(boot.allSeries);
         stampServerIdOnItems(boot.resumeItems);
+        stampServerIdOnItems(boot.resumeAudioItems);
+        stampServerIdOnItems(boot.resumeBookItems);
         stampServerIdOnItems(boot.nextUpItems);
         stampServerIdOnItems(boot.favoriteItems);
         stampServerIdOnItems(boot.collectionsItems);
         stampServerIdOnItems(boot.filteredHeroPool);
 
+        var mappedLibLatest = [];
+        if (Array.isArray(boot.libraryLatest)) {
+            boot.libraryLatest.forEach(function (entry) {
+                if (!entry || !entry.id) {
+                    return;
+                }
+                stampServerIdOnItems(entry.items);
+                var cleanLibItems = filterLatestPlayedIfConfigured(
+                    dedupeMediaItems(kFilter(entry.items || [])),
+                    homePrefs.hidePlayedInLatest
+                );
+                if (cleanLibItems.length > 0) {
+                    mappedLibLatest.push({
+                        id: entry.id,
+                        name: entry.name || 'Library',
+                        collectionType: entry.collectionType || '',
+                        items: cleanLibItems.slice(0, 20)
+                    });
+                }
+            });
+        }
+
+        state.hubData.userHomePreferences = homePrefs;
         state.hubData.allMovies = dedupeMediaItems(kFilter(boot.allMovies || []));
         state.hubData.allSeries = dedupeMediaItems(kFilter(boot.allSeries || []));
-        state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
-        state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
-        state.hubData.rawHeroItems = dedupeMediaItems([].concat(state.hubData.recentMovies, state.hubData.recentSeries)).slice(0, 15);
+        state.hubData.recentMovies = filterLatestPlayedIfConfigured(state.hubData.allMovies, homePrefs.hidePlayedInLatest).slice(0, 18);
+        state.hubData.recentSeries = filterLatestPlayedIfConfigured(state.hubData.allSeries, homePrefs.hidePlayedInLatest).slice(0, 18);
+        state.hubData.rawHeroItems = dedupeMediaItems([].concat(state.hubData.allMovies.slice(0, 18), state.hubData.allSeries.slice(0, 18))).slice(0, 15);
         state.hubData.rawTop10Items = [];
         state.hubData.resumeItems = dedupeMediaItems(kFilter(boot.resumeItems || []));
+        state.hubData.resumeAudioItems = kidsActive ? [] : dedupeMediaItems(boot.resumeAudioItems || []);
+        state.hubData.resumeBookItems = kidsActive ? [] : dedupeMediaItems(boot.resumeBookItems || []);
         state.hubData.nextUpItems = dedupeMediaItems(kFilter(boot.nextUpItems || []));
         state.hubData.favoriteItems = dedupeMediaItems(kFilter(boot.favoriteItems || []));
         state.hubData.collectionsItems = dedupeMediaItems(kFilter(boot.collectionsItems || []));
         state.hubData.filteredHeroPool = dedupeMediaItems(kFilter(boot.filteredHeroPool || []));
-        state.hubData.views = Array.isArray(boot.views) ? boot.views : [];
+        state.hubData.views = sortViewsByOrderedIds(Array.isArray(boot.views) ? boot.views : [], homePrefs.orderedViews);
+        state.hubData.libraryLatest = mappedLibLatest;
         state.hubData.popularScores = (boot.popularScores && typeof boot.popularScores === 'object') ? boot.popularScores : {};
 
         var rawMoviesTotal = Number(boot.totalMoviesCount) || 0;
@@ -1308,20 +1477,25 @@
             if (!snap || typeof snap !== 'object' || Date.now() - (Number(snap.ts) || 0) > 30 * 60 * 1000) {
                 return false;
             }
+            var snapHomePrefs = normalizeUserHomePreferences(snap.userHomePreferences);
             state.hubData.userId = userId;
+            state.hubData.userHomePreferences = snapHomePrefs;
             state.hubData.rawHeroItems = Array.isArray(snap.rawHeroItems) ? snap.rawHeroItems : [];
             state.hubData.resumeItems = Array.isArray(snap.resumeItems) ? snap.resumeItems : [];
+            state.hubData.resumeAudioItems = Array.isArray(snap.resumeAudioItems) ? snap.resumeAudioItems : [];
+            state.hubData.resumeBookItems = Array.isArray(snap.resumeBookItems) ? snap.resumeBookItems : [];
             state.hubData.nextUpItems = Array.isArray(snap.nextUpItems) ? snap.nextUpItems : [];
             state.hubData.favoriteItems = Array.isArray(snap.favoriteItems) ? snap.favoriteItems : [];
             state.hubData.allMovies = Array.isArray(snap.allMovies) ? snap.allMovies : [];
             state.hubData.allSeries = Array.isArray(snap.allSeries) ? snap.allSeries : [];
-            state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
-            state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
+            state.hubData.recentMovies = filterLatestPlayedIfConfigured(state.hubData.allMovies, snapHomePrefs.hidePlayedInLatest).slice(0, 18);
+            state.hubData.recentSeries = filterLatestPlayedIfConfigured(state.hubData.allSeries, snapHomePrefs.hidePlayedInLatest).slice(0, 18);
             state.hubData.collectionsItems = Array.isArray(snap.collectionsItems) ? snap.collectionsItems : [];
+            state.hubData.libraryLatest = Array.isArray(snap.libraryLatest) ? snap.libraryLatest : [];
             state.hubData.totalMoviesCount = Number(snap.totalMoviesCount) || state.hubData.allMovies.length;
             state.hubData.totalSeriesCount = Number(snap.totalSeriesCount) || state.hubData.allSeries.length;
             state.hubData.totalCollectionsCount = Number(snap.totalCollectionsCount) || state.hubData.collectionsItems.length;
-            state.hubData.views = Array.isArray(snap.views) ? snap.views : [];
+            state.hubData.views = sortViewsByOrderedIds(Array.isArray(snap.views) ? snap.views : [], snapHomePrefs.orderedViews);
             state.hubData.popularScores = (snap.popularScores && typeof snap.popularScores === 'object') ? snap.popularScores : {};
             recomputeHubDerivedLists();
             state.hubData.loaded = true;
@@ -1339,13 +1513,19 @@
             var d = state.hubData;
             sessionStorage.setItem(HUB_SWR_KEY_PREFIX + normalizeGuid(userId), JSON.stringify({
                 ts: Date.now(),
+                userHomePreferences: d.userHomePreferences || null,
                 rawHeroItems: (d.rawHeroItems || []).slice(0, 15),
                 resumeItems: (d.resumeItems || []).slice(0, 12),
+                resumeAudioItems: (d.resumeAudioItems || []).slice(0, 12),
+                resumeBookItems: (d.resumeBookItems || []).slice(0, 12),
                 nextUpItems: (d.nextUpItems || []).slice(0, 12),
                 favoriteItems: (d.favoriteItems || []).slice(0, 24),
                 allMovies: (d.allMovies || []).slice(0, 48),
                 allSeries: (d.allSeries || []).slice(0, 48),
                 collectionsItems: (d.collectionsItems || []).slice(0, 36),
+                libraryLatest: (d.libraryLatest || []).map(function (le) {
+                    return { id: le.id, name: le.name, collectionType: le.collectionType, items: (le.items || []).slice(0, 16) };
+                }),
                 totalMoviesCount: d.totalMoviesCount || 0,
                 totalSeriesCount: d.totalSeriesCount || 0,
                 totalCollectionsCount: d.totalCollectionsCount || 0,
@@ -1404,20 +1584,34 @@
         var fields = 'Overview,Genres,PrimaryImageAspectRatio,DateCreated';
         var kFilter = typeof filterItemsForKidsMode === 'function' ? filterItemsForKidsMode : function (arr) { return arr || []; };
 
-        // Stage 1: Fast above-the-fold queries (Hero, Continue Watching, Next Up, Navigation Views) so initial paint never waits on full library scans
+        // Stage 1: Fast above-the-fold queries (Hero, Continue Watching, Next Up, Navigation Views & Home DisplayPreferences) so initial paint never waits on full library scans
         var pHero = fetchUserItems(uid, 'IncludeItemTypes=Movie,Series&Recursive=true&Limit=15&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields);
         var pResume = fetchResumeItems(uid, fields);
         var pNextUp = apiFetch('/Shows/NextUp?userId=' + uid + '&Limit=12&Fields=' + fields).catch(function () { return { Items: [] }; });
         var pViews = fetchUserViews(uid);
+        var pDispPrefs = apiFetch('/DisplayPreferences/usersettings?userId=' + uid + '&client=emby').catch(function () { return null; });
+        var pUserDoc = apiFetch('/Users/' + uid).catch(function () { return null; });
 
-        Promise.all([pHero, pResume, pNextUp, pViews]).then(function (stage1) {
+        Promise.all([pHero, pResume, pNextUp, pViews, pDispPrefs, pUserDoc]).then(function (stage1) {
             if (state.hubLoadSeq !== reqSeq || normalizeGuid(getJellyfinAuthContext().userId) !== normalizeGuid(auth.userId)) {
                 return null;
             }
+            var rawDisp = stage1[4] || null;
+            var rawUserCfg = (stage1[5] && stage1[5].Configuration) || {};
+            var parsedSec = parseCustomPrefsHomeSectionsJs(rawDisp && (rawDisp.CustomPrefs || rawDisp.customPrefs));
+            var fbHomePrefs = normalizeUserHomePreferences({
+                hasCustomHomeSections: parsedSec.hasCustomHomeSections,
+                homeSections: parsedSec.homeSections,
+                orderedViews: rawUserCfg.OrderedViews || rawUserCfg.orderedViews || [],
+                latestItemsExcludes: rawUserCfg.LatestItemsExcludes || rawUserCfg.latestItemsExcludes || [],
+                myMediaExcludes: rawUserCfg.MyMediaExcludes || rawUserCfg.myMediaExcludes || [],
+                hidePlayedInLatest: Boolean(rawUserCfg.HidePlayedInLatest || rawUserCfg.hidePlayedInLatest)
+            });
+            state.hubData.userHomePreferences = fbHomePrefs;
             state.hubData.rawHeroItems = kFilter((stage1[0] && stage1[0].Items) || []);
             state.hubData.resumeItems = kFilter((stage1[1] && stage1[1].Items) || []);
             state.hubData.nextUpItems = kFilter((stage1[2] && stage1[2].Items) || []);
-            state.hubData.views = (stage1[3] && stage1[3].Items) || [];
+            state.hubData.views = sortViewsByOrderedIds((stage1[3] && stage1[3].Items) || [], fbHomePrefs.orderedViews);
             if (!state.hubData.rawTop10Items || !state.hubData.rawTop10Items.length) {
                 state.hubData.rawTop10Items = state.hubData.rawHeroItems.slice(0, 10);
             }
@@ -1447,11 +1641,12 @@
                 return null;
             }
             var kidsActive = typeof isKidsProfileActive === 'function' && isKidsProfileActive();
+            var fbPrefs = state.hubData.userHomePreferences || normalizeUserHomePreferences(null);
             state.hubData.favoriteItems = kFilter((results[0] && results[0].Items) || []);
             state.hubData.allMovies = kFilter((results[1] && results[1].Items) || []);
             state.hubData.allSeries = kFilter((results[2] && results[2].Items) || []);
-            state.hubData.recentMovies = state.hubData.allMovies.slice(0, 18);
-            state.hubData.recentSeries = state.hubData.allSeries.slice(0, 18);
+            state.hubData.recentMovies = filterLatestPlayedIfConfigured(state.hubData.allMovies, fbPrefs.hidePlayedInLatest).slice(0, 18);
+            state.hubData.recentSeries = filterLatestPlayedIfConfigured(state.hubData.allSeries, fbPrefs.hidePlayedInLatest).slice(0, 18);
             state.hubData.collectionsItems = kFilter((results[3] && results[3].Items) || []);
             var rawMoviesTotal = Number(results[1] && results[1].TotalRecordCount) || 0;
             var rawSeriesTotal = Number(results[2] && results[2].TotalRecordCount) || 0;
@@ -1467,8 +1662,47 @@
                 : Math.max(rawCollectionsTotal, state.hubData.collectionsItems.length);
             state.hubData.popularScores = (results[4] && results[4].scores) || {};
             state.hubData.filteredHeroPool = [];
+            state.hubData.libraryLatest = [];
 
             var extraPromises = [];
+
+            if (fbPrefs.hasCustomHomeSections || fbPrefs.orderedViews.length > 0) {
+                var latestExcludeMap = {};
+                fbPrefs.latestItemsExcludes.forEach(function (exId) { latestExcludeMap[normalizeGuid(exId)] = true; });
+                var videoViews = (state.hubData.views || []).filter(function (v) {
+                    if (!v || !v.Id || latestExcludeMap[normalizeGuid(v.Id)]) {
+                        return false;
+                    }
+                    var ct = String(v.CollectionType || '').toLowerCase();
+                    return !(ct === 'music' || ct === 'books' || ct === 'audiobooks' || ct === 'photos' || ct === 'playlists' || ct === 'livetv');
+                });
+                if (videoViews.length > 0) {
+                    extraPromises.push(
+                        Promise.all(videoViews.map(function (vv) {
+                            var ct = String(vv.CollectionType || '').toLowerCase();
+                            var iTypes = ct === 'movies' ? 'Movie' : (ct === 'tvshows' ? 'Series' : (ct === 'boxsets' ? 'BoxSet' : 'Movie,Series,Video'));
+                            var latestFilter = fbPrefs.hidePlayedInLatest ? '&Filters=IsUnplayed' : '';
+                            return fetchUserItems(uid, 'ParentId=' + encodeURIComponent(vv.Id) + '&Recursive=true&IncludeItemTypes=' + iTypes + latestFilter + '&Limit=20&SortBy=DateCreated,SortName&SortOrder=Descending&Fields=' + fields)
+                                .then(function (r) { return { view: vv, items: (r && r.Items) || [] }; })
+                                .catch(function () { return { view: vv, items: [] }; });
+                        })).then(function (libLatestList) {
+                            var builtLatest = [];
+                            libLatestList.forEach(function (entry) {
+                                var cleaned = filterLatestPlayedIfConfigured(dedupeMediaItems(kFilter(entry.items)), fbPrefs.hidePlayedInLatest).slice(0, 20);
+                                if (cleaned.length > 0) {
+                                    builtLatest.push({
+                                        id: entry.view.Id,
+                                        name: entry.view.Name || 'Library',
+                                        collectionType: String(entry.view.CollectionType || '').toLowerCase(),
+                                        items: cleaned
+                                    });
+                                }
+                            });
+                            state.hubData.libraryLatest = builtLatest;
+                        })
+                    );
+                }
+            }
 
             var heroLibs = (state.config && Array.isArray(state.config.heroLibraryIds)) ? state.config.heroLibraryIds : [];
             if (heroLibs.length > 0) {

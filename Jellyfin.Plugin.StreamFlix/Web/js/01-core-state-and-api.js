@@ -1,6 +1,6 @@
 /* ==========================================================================
    STREAMFLIX — Netflix-style UI for Jellyfin: server-verified Google & OIDC SSO,
-   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.3.2)
+   "Who's watching?" profiles, Guest Passes & Seerr (v0.9.3.3)
    ========================================================================== */
 (function () {
     'use strict';
@@ -10,7 +10,7 @@
     }
     window.__STREAMFLIX_BOOTSTRAPPED__ = true;
 
-    var VERSION = '0.9.3.2';
+    var VERSION = '0.9.3.3';
     // Household session issued by the server ({ token, authKind, providerName, email, username, userId, name, picture, isAdmin, guestPassId, lockedProfileId, expiresAt })
     var GOOGLE_KEY = 'streamflix_session_v7';
     var ADMIN_AUTH_KEY = 'streamflix_admin_auth_v1';
@@ -238,7 +238,11 @@
             totalMoviesCount: 0,
             totalSeriesCount: 0,
             totalCollectionsCount: 0,
-            views: []
+            views: [],
+            userHomePreferences: null,
+            libraryLatest: [],
+            resumeAudioItems: [],
+            resumeBookItems: []
         },
         heroIndex: 0,
         heroTimer: null,
@@ -1256,16 +1260,22 @@
         profile_unlinked: 'SF-PROF-301',
         auth_failed: 'SF-PROF-302',
         user_disabled: 'SF-PROF-303',
+        google_lock: 'SF-PROF-304',
         google_locked: 'SF-PROF-304',
         google_lock_forbidden: 'SF-PROF-304',
         admin_link_forbidden: 'SF-PROF-305',
         link_change_forbidden: 'SF-PROF-305',
         invalid_link: 'SF-PROF-306',
+        admin_profile_required: 'SF-PROF-307',
+        profile_account_mismatch: 'SF-PROF-307',
+        profile_protection_required: 'SF-PROF-307',
         pin_required: 'SF-PIN-310',
         adult_pin_required: 'SF-PIN-311',
         pin_invalid: 'SF-PIN-312',
         pin_locked: 'SF-PIN-313',
         seerr_forbidden: 'SF-SEERR-401',
+        seerr_permission_denied: 'SF-SEERR-401',
+        seerr_cancel_forbidden: 'SF-SEERR-401',
         seerr_unreachable: 'SF-SEERR-402',
         seerr_timeout: 'SF-SEERR-403',
         seerr_request_failed: 'SF-SEERR-404',
@@ -1278,12 +1288,17 @@
         guest_handoff_missing: 'SF-GUEST-502',
         guest_locked: 'SF-GUEST-503',
         guest_pass_restricted: 'SF-GUEST-504',
+        guest_pass_permission_required: 'SF-GUEST-504',
         guest_profile_locked: 'SF-GUEST-504',
         guest_admin_forbidden: 'SF-GUEST-505',
         admin_required: 'SF-ADMIN-601',
         room_not_found: 'SF-WP-622',
         host_only: 'SF-WP-621',
-        watch_party_disabled: 'SF-WP-621'
+        watch_party_disabled: 'SF-WP-621',
+        watchparty_disabled: 'SF-WP-621',
+        kids_forbidden: 'SF-WP-621',
+        invalid_item_id: 'SF-REQ-740',
+        item_not_found: 'SF-REQ-744'
     };
 
     function resolveStreamFlixErrorCode(status, symbolicCode, path) {
@@ -1302,10 +1317,10 @@
             return (status === 401 || status === 403) ? 'SF-OIDC-205' : 'SF-OIDC-204';
         }
         if (p.indexOf('/guest') !== -1) {
-            return status === 429 ? 'SF-GUEST-503' : 'SF-GUEST-502';
+            return status === 429 ? 'SF-GUEST-503' : (status === 403 ? 'SF-GUEST-504' : 'SF-GUEST-502');
         }
         if (p.indexOf('/watchparty') !== -1) {
-            return status === 404 ? 'SF-WP-622' : 'SF-WP-620';
+            return status === 404 ? 'SF-WP-622' : (status === 403 ? 'SF-WP-621' : 'SF-WP-620');
         }
         if (p.indexOf('/profiles') !== -1) {
             if (status === 409) { return 'SF-PROF-301'; }

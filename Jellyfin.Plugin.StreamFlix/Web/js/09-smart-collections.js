@@ -149,21 +149,45 @@
         return out;
     }
 
+    function collectLibraryLatestItems(d) {
+        var out = [];
+        var list = (d && Array.isArray(d.libraryLatest)) ? d.libraryLatest : [];
+        list.forEach(function (entry) {
+            if (entry && Array.isArray(entry.items)) {
+                entry.items.forEach(function (it) {
+                    if (it && it.Id) {
+                        out.push(it);
+                    }
+                });
+            }
+        });
+        return out;
+    }
+
     function bindInteractiveCardsInContainer(containerEl, extraItemsList, onAfterPlay) {
         if (!containerEl) {
             return;
         }
         var d = state.hubData || {};
         var itemMap = {};
+        var liveChannelPrograms = [];
+        if (state.liveTvData && Array.isArray(state.liveTvData.channels)) {
+            state.liveTvData.channels.forEach(function (ch) {
+                if (ch && ch.CurrentProgram && ch.CurrentProgram.Id) {
+                    liveChannelPrograms.push(ch.CurrentProgram);
+                }
+            });
+        }
         [
-            d.heroItems, d.resumeItems, d.nextUpItems, d.top10Items,
-            d.favoriteItems, d.recentMovies, d.recentSeries,
+            d.heroItems, d.resumeItems, d.resumeAudioItems || [], d.resumeBookItems || [], d.nextUpItems, d.top10Items,
+            d.favoriteItems, d.recentMovies, d.recentSeries, collectLibraryLatestItems(d),
             d.allMovies, d.allSeries, d.collectionsItems,
             state.searchResults || [], (state.browseFilter && state.browseFilter.items) || [],
             (state.libraryBrowser && state.libraryBrowser.items) || [], collectLibraryViewCachedItems(),
             (state.liveTvData && state.liveTvData.channels) || [],
             (state.liveTvData && state.liveTvData.onNow) || [],
             (state.liveTvData && state.liveTvData.recordings) || [],
+            liveChannelPrograms,
             (state.liveTvEpg && state.liveTvEpg.programs) || [],
             (state.hotTabExtra && state.hotTabExtra.upcomingEpisodes) || [],
             personalRowItems(), extraItemsList || []
@@ -171,10 +195,14 @@
             (arr || []).forEach(function (it) {
                 if (it && it.Id) {
                     // The same title can sit in several rows; keep the copy that knows how far in you are
-                    var prev = itemMap[it.Id];
+                    var normKey = normalizeGuid(it.Id);
+                    var prev = itemMap[it.Id] || (normKey ? itemMap[normKey] : null);
                     var prevPct = prev && prev.UserData && prev.UserData.PlayedPercentage;
                     if (!prevPct || (it.UserData && it.UserData.PlayedPercentage)) {
                         itemMap[it.Id] = it;
+                        if (normKey) {
+                            itemMap[normKey] = it;
+                        }
                     }
                 }
             });
@@ -211,8 +239,27 @@
 
         Array.prototype.forEach.call(containerEl.querySelectorAll('[data-item-id]'), function (card) {
             var itemId = card.getAttribute('data-item-id');
-            var item = itemMap[itemId] || findCachedItemById(itemId) || { Id: itemId };
+            var normCardId = normalizeGuid(itemId);
+            var item = itemMap[itemId] || (normCardId ? itemMap[normCardId] : null) || findCachedItemById(itemId) || { Id: itemId };
             card.__bfxItem = item;
+            var isNativeReaderOrAudioItem = Boolean(
+                item && (item.Type === 'Book' || item.Type === 'Audio' || item.Type === 'AudioBook')
+            );
+            var openNativeItemRoute = function () {
+                var srv = item.ServerId || (state.config && state.config.serverId) || '';
+                window.location.hash = '#/details?id=' + encodeURIComponent(item.Id) + (srv ? ('&serverId=' + encodeURIComponent(srv)) : '');
+            };
+            var openCardDetail = function () {
+                if (isNativeReaderOrAudioItem && item.Id) {
+                    openNativeItemRoute();
+                    return;
+                }
+                if (!item.Name && item.Id && typeof openHeroDetailModalById === 'function') {
+                    openHeroDetailModalById(item.Id);
+                } else {
+                    openHeroDetailModal(item);
+                }
+            };
 
             card.addEventListener('click', function (ev) {
                 var actionBtn = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
@@ -220,6 +267,10 @@
                     ev.stopPropagation();
                     var act = actionBtn.getAttribute('data-action');
                     if (act === 'play') {
+                        if (isNativeReaderOrAudioItem && item.Id) {
+                            openNativeItemRoute();
+                            return;
+                        }
                         if (typeof onAfterPlay === 'function') {
                             onAfterPlay();
                         }
@@ -231,16 +282,16 @@
                     } else if (act === 'remove-resume') {
                         removeFromContinueWatching(item);
                     } else if (act === 'info') {
-                        openHeroDetailModal(item);
+                        openCardDetail();
                     }
                     return;
                 }
-                openHeroDetailModal(item);
+                openCardDetail();
             });
             card.addEventListener('keydown', function (ev) {
                 if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === card) {
                     ev.preventDefault();
-                    openHeroDetailModal(item);
+                    openCardDetail();
                 }
             });
         });
@@ -529,17 +580,118 @@
         saveJson(HOME_ROW_PREF_PREFIX + pid, prefs || null);
     }
 
+    var JELLYFIN_HOME_SECTION_MAP = {
+        smalllibrarytiles: 'mymedia',
+        librarybuttons: 'mymedia',
+        resume: 'resume',
+        nextup: 'nextup',
+        latestmedia: 'latestmedia',
+        livetv: 'livetv',
+        resumeaudio: 'resumeaudio',
+        resumebook: 'resumebook',
+        activerecordings: 'activerecordings'
+    };
+
+    var STREAMFLIX_CURATED_BONUS_ROWS = [
+        'personal',
+        'top10',
+        'mylist',
+        'acclaimed',
+        'gems',
+        'collections',
+        'watchagain'
+    ];
+
     function getEffectiveHomeRowPlan() {
         var prof = getProfileHomeRowPrefs();
         var cfg = state.config || {};
-        var rawOrder = prof && Array.isArray(prof.order)
-            ? prof.order
-            : (Array.isArray(cfg.homeRowOrder) ? cfg.homeRowOrder : []);
+        var homePrefs = (state.hubData && state.hubData.userHomePreferences) || null;
         var rawHidden = prof && Array.isArray(prof.hiddenRows)
             ? prof.hiddenRows
             : (Array.isArray(cfg.homeHiddenRows) ? cfg.homeHiddenRows : []);
+
+        var allKnownRowIds = {
+            mymedia: true,
+            resume: true,
+            nextup: true,
+            latestmedia: true,
+            livetv: true,
+            resumeaudio: true,
+            resumebook: true,
+            activerecordings: true,
+            personal: true,
+            top10: true,
+            mylist: true,
+            acclaimed: true,
+            movies: true,
+            series: true,
+            gems: true,
+            collections: true,
+            watchagain: true
+        };
+
+        var hiddenMap = {};
+        rawHidden.forEach(function (id) {
+            var clean = String(id || '').trim().toLowerCase();
+            if (allKnownRowIds[clean]) {
+                hiddenMap[clean] = true;
+            }
+        });
+
+        // Honor Jellyfin User Settings -> Home (homesection0..homesection9) whenever configured by the user
+        // and not overridden by a newer explicit profile modal customization.
+        if (!prof && homePrefs && homePrefs.hasCustomHomeSections && Array.isArray(homePrefs.homeSections) && homePrefs.homeSections.length > 0) {
+            var jfOrder = [];
+            var jfSeen = {};
+            homePrefs.homeSections.forEach(function (sec) {
+                var cleanSec = String(sec || '').trim().toLowerCase();
+                if (!cleanSec || cleanSec === 'none') {
+                    return;
+                }
+                var mapped = JELLYFIN_HOME_SECTION_MAP[cleanSec];
+                if (mapped && !jfSeen[mapped]) {
+                    jfSeen[mapped] = true;
+                    jfOrder.push(mapped);
+                }
+            });
+
+            // Append StreamFlix curated discovery rows after the user's configured Jellyfin Home Sections,
+            // preserving any Admin homeRowOrder relative priority among those curated rows.
+            var bonusAllowed = {};
+            STREAMFLIX_CURATED_BONUS_ROWS.forEach(function (b) { bonusAllowed[b] = true; });
+            (Array.isArray(cfg.homeRowOrder) ? cfg.homeRowOrder : []).forEach(function (id) {
+                var c = String(id || '').trim().toLowerCase();
+                if (bonusAllowed[c] && !jfSeen[c]) {
+                    jfSeen[c] = true;
+                    jfOrder.push(c);
+                }
+            });
+            STREAMFLIX_CURATED_BONUS_ROWS.forEach(function (b) {
+                if (!jfSeen[b]) {
+                    jfSeen[b] = true;
+                    jfOrder.push(b);
+                }
+            });
+
+            return {
+                order: jfOrder,
+                hiddenMap: hiddenMap,
+                isDefaultOrder: false,
+                usesJellyfinSections: true
+            };
+        }
+
+        var rawOrder = prof && Array.isArray(prof.order)
+            ? prof.order
+            : (Array.isArray(cfg.homeRowOrder) ? cfg.homeRowOrder : []);
         var allowedMap = {};
         CANONICAL_HOME_ROW_SPECS.forEach(function (r) { allowedMap[r.id] = true; });
+        allowedMap.mymedia = true;
+        allowedMap.latestmedia = true;
+        allowedMap.resumebook = true;
+        allowedMap.resumeaudio = true;
+        allowedMap.activerecordings = true;
+
         var seen = {};
         var order = [];
         rawOrder.forEach(function (id) {
@@ -555,18 +707,41 @@
                 order.push(r.id);
             }
         });
-        var hiddenMap = {};
-        rawHidden.forEach(function (id) {
-            var clean = String(id || '').trim().toLowerCase();
-            if (allowedMap[clean]) {
-                hiddenMap[clean] = true;
-            }
-        });
+
+        // If the user configured Jellyfin's Library Order (OrderedViews) without custom homesection* overrides or Admin homeRowOrder,
+        // replace the generic merged New Movies / New Shows rows with per-library "Recently Added in {Library}" in exact OrderedViews order!
+        var hasUserOrderedViews = Boolean(
+            !prof
+            && rawOrder.length === 0
+            && homePrefs
+            && Array.isArray(homePrefs.orderedViews)
+            && homePrefs.orderedViews.length > 0
+            && state.hubData
+            && Array.isArray(state.hubData.libraryLatest)
+            && state.hubData.libraryLatest.length > 0
+        );
+        if (hasUserOrderedViews && !hiddenMap.movies && !hiddenMap.series) {
+            var replacedLatest = false;
+            var mappedOrder = [];
+            order.forEach(function (rid) {
+                if (rid === 'movies' || rid === 'series') {
+                    if (!replacedLatest) {
+                        replacedLatest = true;
+                        mappedOrder.push('latestmedia');
+                    }
+                } else {
+                    mappedOrder.push(rid);
+                }
+            });
+            order = mappedOrder;
+        }
+
         var defSeq = CANONICAL_HOME_ROW_SPECS.map(function (r) { return r.id; }).join(',');
         return {
             order: order,
             hiddenMap: hiddenMap,
-            isDefaultOrder: order.join(',') === defSeq
+            isDefaultOrder: order.join(',') === defSeq,
+            usesJellyfinSections: false
         };
     }
 
@@ -695,11 +870,36 @@
         }
 
         var pills = [{ id: 'all', label: 'Home', hide: false }];
-        if (!hiddenBuiltInMap.series && !suppressBuiltIn.series) {
-            pills.push({ id: 'series', label: 'Shows', hide: !d.allSeries.length });
+        var moviesBeforeSeries = false;
+        if (d.userHomePreferences && Array.isArray(d.userHomePreferences.orderedViews) && d.userHomePreferences.orderedViews.length > 0) {
+            var firstMoviesPos = -1;
+            var firstSeriesPos = -1;
+            eligibleViews.forEach(function (v, idx) {
+                var k = matchBuiltInKindForView(v);
+                if (k === 'movies' && firstMoviesPos === -1) {
+                    firstMoviesPos = idx;
+                } else if (k === 'series' && firstSeriesPos === -1) {
+                    firstSeriesPos = idx;
+                }
+            });
+            if (firstMoviesPos !== -1 && (firstSeriesPos === -1 || firstMoviesPos < firstSeriesPos)) {
+                moviesBeforeSeries = true;
+            }
         }
-        if (!hiddenBuiltInMap.movies && !suppressBuiltIn.movies) {
-            pills.push({ id: 'movies', label: 'Movies', hide: !d.allMovies.length });
+        if (moviesBeforeSeries) {
+            if (!hiddenBuiltInMap.movies && !suppressBuiltIn.movies) {
+                pills.push({ id: 'movies', label: 'Movies', hide: !d.allMovies.length });
+            }
+            if (!hiddenBuiltInMap.series && !suppressBuiltIn.series) {
+                pills.push({ id: 'series', label: 'Shows', hide: !d.allSeries.length });
+            }
+        } else {
+            if (!hiddenBuiltInMap.series && !suppressBuiltIn.series) {
+                pills.push({ id: 'series', label: 'Shows', hide: !d.allSeries.length });
+            }
+            if (!hiddenBuiltInMap.movies && !suppressBuiltIn.movies) {
+                pills.push({ id: 'movies', label: 'Movies', hide: !d.allMovies.length });
+            }
         }
         if (!hiddenBuiltInMap.hot) {
             pills.push({ id: 'hot', label: 'New & Popular', hide: !(d.allMovies.length || d.allSeries.length) });
@@ -833,7 +1033,13 @@
 
         var rowHostEl = m.modal.querySelector('#bfx-prof-home-rows-list');
         var liveTvOnNowAllowed = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
-        var rowTitleMap = {};
+        var rowTitleMap = {
+            mymedia: 'My Media',
+            latestmedia: 'Recently Added Media (by Library Order)',
+            resumebook: 'Continue Reading',
+            resumeaudio: 'Continue Listening',
+            activerecordings: 'Active Recordings'
+        };
         CANONICAL_HOME_ROW_SPECS.forEach(function (r) { rowTitleMap[r.id] = r.label; });
         var renderModalHomeRows = function () {
             if (!rowHostEl) {
@@ -2865,7 +3071,84 @@
             var becauseRow = function (b, idx) {
                 return b ? buildRowHtml('because-' + idx, 'Because you watched <span class="bfx-row-em">' + escapeHtml(b.seed.name) + '</span>', b.items.map(buildPosterCardHtml).join(''), { className: 'streamflix-row-personal' }) : '';
             };
+            var resolveMyMediaCardArtUrl = function (view) {
+                if (!view || !view.Id) {
+                    return '';
+                }
+                if (view.ImageTags && view.ImageTags.Primary) {
+                    return apiBase() + '/Items/' + encodeURIComponent(view.Id) + '/Images/Primary?maxWidth=640&quality=85';
+                }
+                if (Array.isArray(view.BackdropImageTags) && view.BackdropImageTags.length > 0) {
+                    return apiBase() + '/Items/' + encodeURIComponent(view.Id) + '/Images/Backdrop/0?maxWidth=640&quality=85';
+                }
+                var normVid = normalizeGuid(view.Id);
+                var latestList = Array.isArray(d.libraryLatest) ? d.libraryLatest : [];
+                for (var li = 0; li < latestList.length; li++) {
+                    if (latestList[li] && normalizeGuid(latestList[li].id) === normVid && Array.isArray(latestList[li].items) && latestList[li].items.length > 0) {
+                        var sample = latestList[li].items[0];
+                        return getItemBackdropUrl(sample, 640) || getItemPosterUrl(sample, 480);
+                    }
+                }
+                return '';
+            };
+            var buildMyMediaCardHtml = function (view) {
+                var ct = String((view && view.CollectionType) || '').toLowerCase();
+                var icoName = (ct === 'tvshows' || ct === 'livetv') ? 'tv' : (ct === 'boxsets' ? 'sliders' : 'film');
+                var artUrl = safeCssUrl(resolveMyMediaCardArtUrl(view));
+                var bgHtml = artUrl
+                    ? '<div class="bfx-mymedia-bg" style="background-image:url(\'' + artUrl + '\');"></div>'
+                    : '';
+                var actionAttr = '';
+                if (ct === 'livetv') {
+                    actionAttr = 'data-cat-link="livetv"';
+                } else if (ct === 'music' || ct === 'books' || ct === 'audiobooks' || ct === 'photos' || ct === 'playlists') {
+                    var srv = view.ServerId || (state.config && state.config.serverId) || '';
+                    var nativeHref = '#/list.html?topParentId=' + encodeURIComponent(view.Id) + (srv ? ('&serverId=' + encodeURIComponent(srv)) : '');
+                    actionAttr = 'data-native-lib-href="' + escapeHtml(nativeHref) + '"';
+                } else {
+                    actionAttr = 'data-cat-link="' + escapeHtml('lib:' + view.Id) + '"';
+                }
+                return ''
+                    + '<button type="button" class="bfx-mymedia-card" data-mymedia-id="' + escapeHtml(view.Id) + '" ' + actionAttr + '>'
+                    + bgHtml
+                    + '  <div class="bfx-mymedia-scrim"></div>'
+                    + '  <div class="bfx-mymedia-inner">'
+                    + '    <span class="bfx-mymedia-badge" aria-hidden="true">' + icon(icoName) + '</span>'
+                    + '    <span class="bfx-mymedia-title">' + escapeHtml(view.Name || 'Library') + '</span>'
+                    + '  </div>'
+                    + '</button>';
+            };
             var homeRowBuilders = {
+                mymedia: function () {
+                    var allViews = Array.isArray(d.views) ? d.views : [];
+                    if (allViews.length === 0) {
+                        return '';
+                    }
+                    var myMediaExcludeMap = {};
+                    if (d.userHomePreferences && Array.isArray(d.userHomePreferences.myMediaExcludes)) {
+                        d.userHomePreferences.myMediaExcludes.forEach(function (exId) {
+                            myMediaExcludeMap[normalizeGuid(exId)] = true;
+                        });
+                    }
+                    var kidsOn = typeof isKidsProfileActive === 'function' && isKidsProfileActive();
+                    var ltvAllowed = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile() && !isNavBuiltInHidden('livetv');
+                    var visibleMyMediaViews = allViews.filter(function (v) {
+                        if (!v || !v.Id || !v.Name || myMediaExcludeMap[normalizeGuid(v.Id)]) {
+                            return false;
+                        }
+                        var ct = String(v.CollectionType || '').toLowerCase();
+                        if (ct === 'livetv' && !ltvAllowed) {
+                            return false;
+                        }
+                        if (kidsOn && (ct === 'music' || ct === 'books' || ct === 'audiobooks' || ct === 'photos' || ct === 'playlists' || ct === 'livetv')) {
+                            return false;
+                        }
+                        return true;
+                    });
+                    return visibleMyMediaViews.length > 0
+                        ? buildRowHtml('mymedia', rowTitle('My Media'), visibleMyMediaViews.map(buildMyMediaCardHtml).join(''), { className: 'streamflix-row-wide bfx-row-mymedia' })
+                        : '';
+                },
                 resume: function () {
                     return d.resumeItems.length > 0
                         ? buildRowHtml('resume', rowTitle('Continue Watching for ' + profileName), d.resumeItems.map(function (it) { return buildWideCardHtml(it, { removable: true }); }).join(''), { className: 'streamflix-row-wide' })
@@ -2874,6 +3157,62 @@
                 nextup: function () {
                     return d.nextUpItems.length > 0
                         ? buildRowHtml('nextup', rowTitle('Next Up'), d.nextUpItems.map(buildWideCardHtml).join(''), { className: 'streamflix-row-wide', link: 'series' })
+                        : '';
+                },
+                latestmedia: function () {
+                    var latestOut = '';
+                    var libSlices = Array.isArray(d.libraryLatest) ? d.libraryLatest : [];
+                    if (libSlices.length > 0) {
+                        libSlices.forEach(function (lib) {
+                            if (lib && lib.id && Array.isArray(lib.items) && lib.items.length > 0) {
+                                latestOut += buildRowHtml(
+                                    'latest-' + lib.id,
+                                    rowTitle('Recently Added in ' + (lib.name || 'Library')),
+                                    lib.items.map(buildPosterCardHtml).join(''),
+                                    { link: 'lib:' + lib.id }
+                                );
+                            }
+                        });
+                    } else {
+                        var exSet = {};
+                        if (d.userHomePreferences && Array.isArray(d.userHomePreferences.latestItemsExcludes)) {
+                            d.userHomePreferences.latestItemsExcludes.forEach(function (exId) { exSet[normalizeGuid(exId)] = true; });
+                        }
+                        var anyEligibleNotExcluded = getEligibleUserLibraryViews(d).length === 0
+                            || getEligibleUserLibraryViews(d).some(function (v) { return !exSet[normalizeGuid(v.Id)]; });
+                        if (anyEligibleNotExcluded) {
+                            if (d.recentMovies.length > 0) {
+                                latestOut += buildRowHtml('movies', rowTitle('New Movies'), d.recentMovies.map(buildPosterCardHtml).join(''), { link: 'movies' });
+                            }
+                            if (d.recentSeries.length > 0) {
+                                latestOut += buildRowHtml('series', rowTitle('New Shows'), d.recentSeries.map(buildPosterCardHtml).join(''), { link: 'series' });
+                            }
+                        }
+                    }
+                    return latestOut;
+                },
+                resumebook: function () {
+                    var books = Array.isArray(d.resumeBookItems) ? d.resumeBookItems : [];
+                    return books.length > 0
+                        ? buildRowHtml('resumebook', rowTitle('Continue Reading'), books.map(buildPosterCardHtml).join(''))
+                        : '';
+                },
+                resumeaudio: function () {
+                    var audio = Array.isArray(d.resumeAudioItems) ? d.resumeAudioItems : [];
+                    return audio.length > 0
+                        ? buildRowHtml('resumeaudio', rowTitle('Continue Listening'), audio.map(buildPosterCardHtml).join(''))
+                        : '';
+                },
+                activerecordings: function () {
+                    if (!(typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
+                        && state.liveTvData && Array.isArray(state.liveTvData.recordings))) {
+                        return '';
+                    }
+                    var activeRecs = state.liveTvData.recordings.filter(function (r) {
+                        return r && String(r.Status || '').toLowerCase() === 'inprogress';
+                    });
+                    return activeRecs.length > 0
+                        ? buildRowHtml('activerecordings', rowTitle('Active Recordings'), activeRecs.map(function (r) { return buildWideCardHtml(r); }).join(''), { className: 'streamflix-row-wide', link: 'livetv' })
                         : '';
                 },
                 livetv: function () {
@@ -3001,6 +3340,14 @@
                     state.libraryBrowser = null;
                     renderCinemaHubContents();
                     try { hub.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' }); } catch (e) {}
+                });
+            });
+            Array.prototype.forEach.call(rowsScope.querySelectorAll('[data-native-lib-href]'), function (btn) {
+                btn.addEventListener('click', function () {
+                    var href = btn.getAttribute('data-native-lib-href') || '';
+                    if (href) {
+                        window.location.hash = href;
+                    }
                 });
             });
             Array.prototype.forEach.call(rowsScope.querySelectorAll('[data-open-lib-browser="1"]'), function (btn) {
@@ -3694,8 +4041,11 @@
         img.src = url;
     }
 
+    var HERO_PREVIEW_MAX_PLAY_MS = 3000;
     var heroPreviewTimer = null;
     var heroYtWatchdogTimer = null;
+    var heroPlayCapTimer = null;
+    var heroFadeOutTimer = null;
     var activeHeroYtIframe = null;
     var heroYtMessageBound = false;
 
@@ -3746,11 +4096,13 @@
 
     function buildYouTubeRelaySrc(youtubeId, opts) {
         opts = opts || {};
+        var startSec = Number(opts.startSeconds) > 0 ? Math.floor(Number(opts.startSeconds)) : 0;
         return apiBase() + '/StreamFlix/Trailers/Embed/' + encodeURIComponent(youtubeId)
             + '?autoplay=' + (opts.autoplay === false ? '0' : '1')
             + '&mute=' + (opts.mute === false ? '0' : '1')
             + '&controls=' + (opts.controls ? '1' : '0')
-            + (opts.loop ? '&loop=1' : '');
+            + (opts.loop ? '&loop=1' : '')
+            + (startSec > 0 ? ('&start=' + startSec) : '');
     }
 
     function sendCommandToYouTubeRelay(iframeEl, cmd, args) {
@@ -3788,7 +4140,10 @@
         }
 
         var clientRemoteYt = extractClientRemoteYouTubeId(item);
-        var p = apiFetch('/StreamFlix/Trailers/Resolve?itemId=' + encodeURIComponent(lookupId))
+        var activeProfId = (state.activeProfile && state.activeProfile.id) ? String(state.activeProfile.id) : '';
+        var resolveUrl = '/StreamFlix/Trailers/Resolve?itemId=' + encodeURIComponent(lookupId)
+            + (activeProfId ? ('&profileId=' + encodeURIComponent(activeProfId)) : '');
+        var p = apiFetch(resolveUrl)
             .then(function (res) {
                 var desc = null;
                 if (res && res.ok && res.kind === 'youtube' && res.youtubeId && /^[A-Za-z0-9_-]{11}$/.test(res.youtubeId)) {
@@ -3811,6 +4166,41 @@
 
         state.heroTrailerInFlight[normKey] = p;
         return p;
+    }
+
+    function scheduleHeroPreviewPlayCap(targetId) {
+        if (heroPlayCapTimer || heroFadeOutTimer) {
+            return;
+        }
+        heroPlayCapTimer = setTimeout(function () {
+            heroPlayCapTimer = null;
+            var curHero = document.getElementById('streamflix-hero-billboard');
+            if (!curHero || curHero.getAttribute('data-hero-item') !== targetId) {
+                stopHeroVideoPreview(true);
+                return;
+            }
+            if (activeHeroYtIframe) {
+                sendCommandToYouTubeRelay(activeHeroYtIframe, 'mute', []);
+                var ytWrap = activeHeroYtIframe.parentNode;
+                if (ytWrap && ytWrap.classList) {
+                    ytWrap.classList.remove('is-playing');
+                }
+            }
+            var vid = curHero.querySelector('video.bfx-hero-preview-video');
+            if (vid) {
+                vid.muted = true;
+                vid.classList.remove('is-playing');
+            }
+            var muteBtn = document.getElementById('streamflix-hero-mute-btn');
+            if (muteBtn) {
+                muteBtn.classList.add('is-hidden');
+            }
+            heroFadeOutTimer = setTimeout(function () {
+                heroFadeOutTimer = null;
+                stopHeroVideoPreview(true);
+                restartHeroTimer();
+            }, 650);
+        }, HERO_PREVIEW_MAX_PLAY_MS);
     }
 
     function ensureHeroYouTubeMessageListener() {
@@ -3838,22 +4228,23 @@
                     state.heroVideoActive = true;
                     state.heroVideoItemId = targetId;
                     var wrap = activeHeroYtIframe.parentNode;
-                    if (wrap && wrap.classList) {
+                    if (wrap && wrap.classList && !heroFadeOutTimer) {
                         wrap.classList.add('is-playing');
                     }
                     curHero.classList.add('is-video-playing');
                     var shouldMute = Boolean(state.heroPreviewMuted !== false);
-                    if (!shouldMute) {
+                    if (!shouldMute && !heroFadeOutTimer) {
                         sendCommandToYouTubeRelay(activeHeroYtIframe, 'unMute', []);
                         sendCommandToYouTubeRelay(activeHeroYtIframe, 'setVolume', [100]);
                     }
                     var muteBtn = document.getElementById('streamflix-hero-mute-btn');
-                    if (muteBtn) {
+                    if (muteBtn && !heroFadeOutTimer) {
                         muteBtn.classList.remove('is-hidden');
                         muteBtn.innerHTML = icon(shouldMute ? 'volumeOff' : 'volume');
                         muteBtn.title = shouldMute ? 'Unmute preview' : 'Mute preview';
                         muteBtn.setAttribute('aria-label', muteBtn.title);
                     }
+                    scheduleHeroPreviewPlayCap(targetId);
                 } else if (d.state === 0) {
                     stopHeroVideoPreview(true);
                     restartHeroTimer();
@@ -3872,6 +4263,14 @@
         if (heroYtWatchdogTimer) {
             clearTimeout(heroYtWatchdogTimer);
             heroYtWatchdogTimer = null;
+        }
+        if (heroPlayCapTimer) {
+            clearTimeout(heroPlayCapTimer);
+            heroPlayCapTimer = null;
+        }
+        if (heroFadeOutTimer) {
+            clearTimeout(heroFadeOutTimer);
+            heroFadeOutTimer = null;
         }
         if (!endedNaturally) {
             state.heroTrailerAttemptedSlide = '';
@@ -3982,7 +4381,7 @@
                     ifr.setAttribute('tabindex', '-1');
                     ifr.setAttribute('aria-hidden', 'true');
                     ifr.setAttribute('title', (desc.title || item.Name || 'Trailer') + ' Preview');
-                    ifr.src = buildYouTubeRelaySrc(desc.youtubeId, { autoplay: true, mute: true, controls: false });
+                    ifr.src = buildYouTubeRelaySrc(desc.youtubeId, { autoplay: true, mute: true, controls: false, startSeconds: 10 });
                     activeHeroYtIframe = ifr;
                     wrap.appendChild(ifr);
                     bgStack.appendChild(wrap);
@@ -4026,6 +4425,7 @@
                             muteBtn.classList.remove('is-hidden');
                             muteBtn.innerHTML = icon(vid.muted ? 'volumeOff' : 'volume');
                         }
+                        scheduleHeroPreviewPlayCap(targetId);
                     });
                     vid.addEventListener('ended', onCleanup);
                     vid.addEventListener('error', onCleanup);
