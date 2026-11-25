@@ -147,6 +147,16 @@
     function buildCinemaHubToggleCardHtml() {
         var brand = escapeHtml(getBrandName());
         var hubOn = state.cinemaHubEnabled !== false;
+        var visPrefs = typeof getEffectiveVisualPrefs === 'function'
+            ? getEffectiveVisualPrefs()
+            : { preset: 'netflix', density: 'standard' };
+        var presetLabelMap = {
+            netflix: 'Netflix Classic',
+            oled: 'OLED Pure Black',
+            glass: 'Cinema Glass',
+            midnight: 'Prime Midnight'
+        };
+        var activePresetLabel = presetLabelMap[visPrefs.preset] || 'Netflix Classic';
         return ''
             + '<div class="bfx-prefs-feature-card" data-bfx-hub-card="1">'
             + '  <div class="bfx-prefs-feature-ico">' + icon('home') + '</div>'
@@ -164,8 +174,11 @@
             + '<div class="bfx-prefs-feature-card" data-bfx-customize-nav="1" role="button" tabindex="0" style="cursor:pointer;margin-top:10px;">'
             + '  <div class="bfx-prefs-feature-ico">' + icon('sliders') + '</div>'
             + '  <div class="bfx-prefs-feature-copy">'
-            + '    <div class="bfx-prefs-feature-title-row"><span class="bfx-prefs-feature-title">Navigation Bar Items</span></div>'
-            + '    <div class="bfx-prefs-feature-desc">Select which built-in categories and Jellyfin libraries appear in the top navigation bar for this profile.</div>'
+            + '    <div class="bfx-prefs-feature-title-row">'
+            + '      <span class="bfx-prefs-feature-title">Appearance, Navigation &amp; Home Layout</span>'
+            + '      <span class="bfx-prefs-status-pill is-on">' + escapeHtml(activePresetLabel) + '</span>'
+            + '    </div>'
+            + '    <div class="bfx-prefs-feature-desc">Choose a visual theme preset, poster card size, top-bar categories, and Home screen row order for this profile.</div>'
             + '  </div>'
             + '  <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
             + '</div>';

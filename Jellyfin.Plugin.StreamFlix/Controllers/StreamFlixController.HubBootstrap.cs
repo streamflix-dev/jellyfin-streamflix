@@ -82,65 +82,6 @@ public partial class StreamFlixController
         return Ok(payload);
     }
 
-    [HttpGet("Profiles/Activity")]
-    [AllowAnonymous]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<object>> GetProfileWatchActivity([FromQuery] string? profileId = null)
-    {
-        SetNoStoreSecurityHeaders();
-        var config = Config;
-        var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        if (!HasHouseholdAccess(config, caller))
-        {
-            return GoogleRequired(config);
-        }
-
-        await EnsureCallerJellyfinProfileIfNeededAsync(config, caller).ConfigureAwait(false);
-        if (caller.JellyfinUser == null)
-        {
-            return StatusCode(401, new { code = "jellyfin_auth_required", message = "Active Jellyfin user session is required." });
-        }
-
-        StreamFlixProfileConfig? profile = null;
-        if (IsGuestSession(caller))
-        {
-            profile = FindProfile(config, caller.Session?.LockedProfileId);
-        }
-        else if (IsEffectiveActiveAdmin(caller))
-        {
-            profile = FindProfile(config, profileId);
-            if (profile == null)
-            {
-                var adminUid = caller.JellyfinUser.Id.ToString("N");
-                profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
-                    .FirstOrDefault(p => string.Equals(p.JellyfinUserId, adminUid, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-        else
-        {
-            var callerUid = caller.JellyfinUser.Id.ToString("N");
-            var requested = FindProfile(config, profileId);
-            if (requested != null && string.Equals(requested.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase))
-            {
-                profile = requested;
-            }
-            else
-            {
-                profile = (config.Profiles ?? new List<StreamFlixProfileConfig>())
-                    .FirstOrDefault(p => string.Equals(p.JellyfinUserId, callerUid, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-
-        var activity = JellyfinCompat.BuildProfileWatchActivity(
-            _libraryManager,
-            _userDataManager,
-            caller.JellyfinUser,
-            _appHost.SystemId,
-            profile?.AllowedLibraryIds);
-
-        return Ok(activity);
-    }
-
     [HttpGet("AdminConfig/Export")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]

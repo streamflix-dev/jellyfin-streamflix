@@ -71,9 +71,9 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/v09-account-menu.jpg" alt="StreamFlix Account Pill Menu and Profile Switcher" />
+      <img src="docs/screenshots/v09-account-menu.jpg" alt="StreamFlix Compact Account Pill Menu and Profile Switcher" />
       <br />
-      <sub><b>9. Streamlined Account Menu</b> — Instant profile switching, Cast, 6-digit Quick Connect, Watch Together, Watch Activity, Appearance &amp; Settings</sub>
+      <sub><b>9. Compact Account Menu</b> — Fast profile switching, Cast, Quick Connect, Watch Together, Media Requests &amp; Settings</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/title-details.jpg" alt="StreamFlix 2-Column Editorial Title Details Modal" />
@@ -82,46 +82,41 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center" valign="top">
+    <td colspan="2" align="center">
       <img src="docs/screenshots/v099-visual-presets.jpg" alt="StreamFlix Visual Presets, Card Density and Layout Customizer" />
       <br />
-      <sub><b>11. Visual Presets &amp; Card Density</b> — 1-click themes (<i>Netflix Classic</i>, <i>OLED Pure Black</i>, <i>Cinema Glass</i>, <i>Prime Midnight</i>), card sizes &amp; row order</sub>
-    </td>
-    <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/v099-watch-activity.jpg" alt="StreamFlix Per-Profile Watch Activity Summary" />
-      <br />
-      <sub><b>12. Per-Profile Watch Activity</b> — Private, locally computed hours streamed, movies &amp; shows finished, favorite genres &amp; recent history</sub>
+      <sub><b>11. Visual Presets &amp; Card Density (in Settings)</b> — 1-click themes (<i>Netflix Classic</i>, <i>OLED Pure Black</i>, <i>Cinema Glass</i>, <i>Prime Midnight</i>), card sizes &amp; row order</sub>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
       <img src="docs/screenshots/top-10-row.jpg" alt="StreamFlix Top 10 Row" />
       <br />
-      <sub><b>13. Top 10 in StreamFlix Today</b> — Configurable server rankings with bold <code>#1</code>&ndash;<code>#10</code> badges &amp; rank numerals</sub>
+      <sub><b>12. Top 10 in StreamFlix Today</b> — Configurable server rankings with bold <code>#1</code>&ndash;<code>#10</code> badges &amp; rank numerals</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/player-controls.jpg" alt="StreamFlix Video Player Controls and Skip Intro Pill" />
       <br />
-      <sub><b>14. Netflix-Style Video Player &amp; Skip Intro Pill</b> — Frosted-glass Skip Intro / Credits pill (Intro Skipper &amp; MediaSegments), Episodes drawer &amp; track popover</sub>
+      <sub><b>13. Netflix-Style Video Player &amp; Skip Intro Pill</b> — Frosted-glass Skip Intro / Credits pill (Intro Skipper &amp; MediaSegments), Episodes drawer &amp; track popover</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/player-paused.jpg" alt="StreamFlix Video Player Pause Overlay" />
       <br />
-      <sub><b>15. &ldquo;You're Watching&rdquo; Pause Screen</b> — ClearLogo artwork, runtime &amp; synopsis overlay while paused</sub>
+      <sub><b>14. &ldquo;You're Watching&rdquo; Pause Screen</b> — ClearLogo artwork, runtime &amp; synopsis overlay while paused</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/edit-profile.jpg" alt="StreamFlix Edit Profile Modal" />
       <br />
-      <sub><b>16. Profile Customization &amp; Kids Bedtime</b> — 64 avatars, 14 accent colors, maturity ratings, Kids-only Bedtime Window, SSO lock &amp; PIN</sub>
+      <sub><b>15. Profile Customization &amp; Kids Bedtime</b> — 64 avatars, 14 accent colors, maturity ratings, Kids-only Bedtime Window, SSO lock &amp; PIN</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/v09-admin-console.jpg" alt="StreamFlix Tabbed Admin Dashboard Console" />
       <br />
-      <sub><b>17. 7-Tab Plugin Administration</b> — Streamlined console for Profiles, Sign-In &amp; SSO, Active Devices, Guest Passes, Home &amp; Hero, and Seerr</sub>
+      <sub><b>16. 7-Tab Plugin Administration</b> — Streamlined console for Profiles, Sign-In &amp; SSO, Active Devices, Guest Passes, Home &amp; Hero, and Seerr</sub>
     </td>
   </tr>
 </table>
@@ -141,11 +136,11 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 - **Multi-auth profile locks & randomized plugin passwords.** Protect any profile with a **4–8 digit PIN** (with target-scoped brute-force lockout) and/or lock it to a **Google email, OIDC email/username/`sub`, or Jellyfin username** — displaying a matching provider badge on the profile tile. Dedicated Jellyfin users created by StreamFlix receive a cryptographically randomized 256-bit password automatically (while manually created Jellyfin accounts are never modified), secrets stay masked and strictly server-side, and plugin configuration is mirrored atomically to persistent Jellyfin storage.
 - **Tabbed Admin Console, Active Devices manager & JSON Config Backup.** Manage everything from the 7-tab **Dashboard → Plugins → StreamFlix** console (`All Settings`, `Profiles`, `Sign-In & SSO`, `Active Devices`, `Guest Passes`, `Home & Hero`, `Seerr`), inspect live device playback/profile status, sign out individual or all devices, and export/import sanitized **Configuration & Profile Backups** in 1 click.
 
-### Real Multi-User Profiles, Dedicated Kids Mode, Watch Activity & Watch Together
-- **Separate history & private Watch Activity per profile.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, Jellyfin Home section order (`OrderedViews`), and parental controls** completely independent — plus a private, zero-telemetry **Watch Activity** summary (*Time Streamed*, *Movies Finished*, *Episodes & Shows*, *Favorite Genres*, and *Recently Watched*) computed locally on your server.
+### Real Multi-User Profiles, Dedicated Kids Mode & Watch Together
+- **Separate history for everyone.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, Jellyfin Home section order (`OrderedViews`), and parental controls** completely independent.
 - **Dedicated Kids Profile Mode, Kids Bedtime Window & Parental Exit Lock.** Activating a Kids profile launches a child-safe experience with a **`KIDS`** header badge, interactive **Kids World filter bubbles**, defense-in-depth maturity ceiling enforcement across Hero, rows, search, and *Surprise Me* alongside Jellyfin's server-side `MaxParentalAgeRating`, an optional **Kids Bedtime Window** (*"Time for Bed 🌙"* screen with tonight-only Adult PIN unlock), and a **Parental Exit Lock** when leaving Kids mode.
 - **Server-Authoritative Watch Together with 1-Click Guest Invites.** Host or join real-time synced watch parties powered by StreamFlix's server-authoritative sync engine (play, pause, seek, drift correction, and automatic episode transitions) from any **Title Details** modal, the **Account Pill Menu**, or the **Video Player OSD** — surfacing a live room badge only while actively connected. Choose **Everyone Controls** vs **Host Only**, **Start at 0:00** vs **Resume**, share 6-character room codes or `?watchparty=` household links, or generate a **6-hour Guest Pass + Watch Party** combo link so friends without a Jellyfin login jump straight into your stream in sync.
-- **1-Click Visual Presets, Card Density & Redesigned User Settings.** Personalize server defaults or individual profiles with 4 curated **Visual Presets** (`Netflix Classic`, `OLED Pure Black`, `Cinema Glass`, `Prime Midnight`) and 3 **Card Density** sizes (`Compact`, `Standard`, `Large`) inside **Appearance & Layout**, alongside StreamFlix's non-clipping dark-glass **Settings** hub and mobile **Client Settings** bridge.
+- **1-Click Visual Presets, Card Density & Redesigned User Settings.** Personalize server defaults or individual profiles inside **Settings → Appearance, Navigation & Home Layout** with 4 curated **Visual Presets** (`Netflix Classic`, `OLED Pure Black`, `Cinema Glass`, `Prime Midnight`) and 3 **Card Density** sizes (`Compact`, `Standard`, `Large`), alongside StreamFlix's non-clipping dark-glass **Settings** hub and mobile **Client Settings** bridge.
 - **Customizable branding, avatars, accents, Cast & Quick Connect.** Customize the upper-left brand wordmark, pick from 64 categorized icons and 14 accent colors (with one-click Shuffle), reorder profiles freely, launch **Cast**, and authorize Smart TVs or apps directly from the Account Pill Menu's 6-character **Quick Connect** modal.
 
 ### Cinematic Home, Editorial Details, Live TV EPG, Music Mini-Player & Seerr

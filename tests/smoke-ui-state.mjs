@@ -1551,19 +1551,6 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
                         totalCollectionsCount: 0,
                     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
                 }
-                if (u.includes('/StreamFlix/Profiles/Activity')) {
-                    return new Response(JSON.stringify({
-                        userId: prof99.jellyfinUserId,
-                        moviesWatchedCount: 18,
-                        episodesWatchedCount: 72,
-                        uniqueSeriesWatchedCount: 6,
-                        inProgressCount: 1,
-                        favoritesCount: 5,
-                        totalWatchMinutes: 3690,
-                        topGenres: [{ name: 'Sci-Fi', count: 14, pct: 100 }],
-                        recentlyWatched: [seriesItem99],
-                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-                }
                 if (u.includes('/Shows/') && u.includes('/Episodes')) {
                     return new Response(JSON.stringify({
                         Items: [
@@ -1614,16 +1601,17 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         const hub99 = doc99.getElementById('streamflix-cinema-hub');
         assert.ok(hub99, 'Cinema hub must mount for v0.9.9 suite');
 
-        // 3. Watch Activity Modal via Account Dropdown
+        // 3. Compact Account Dropdown (no Watch Activity or Appearance & Layout in menu; Settings + side-by-side Admin/Dashboard)
         const profBtn99 = doc99.getElementById('streamflix-header-profile-btn');
         assert.ok(profBtn99, 'Header profile button must mount');
         profBtn99.click();
-        const actMenuBtn = doc99.getElementById('streamflix-dd-watch-activity');
-        assert.ok(actMenuBtn, 'Account dropdown must expose Watch Activity entry');
-        actMenuBtn.click();
-        await new Promise((r) => setTimeout(r, 75));
-        const actBody = doc99.getElementById('bfx-activity-body');
-        assert.ok(actBody && /61h 30m/.test(actBody.innerHTML) && /Sci-Fi/.test(actBody.innerHTML), 'Watch Activity modal must render computed watch hours and top genres');
+        assert.equal(doc99.getElementById('streamflix-dd-watch-activity'), null, 'Watch Activity must be removed from Account Dropdown');
+        assert.equal(doc99.getElementById('streamflix-dd-appearance'), null, 'Appearance & Layout must be moved out of Account Dropdown into Settings');
+        const settingsBtn99 = doc99.getElementById('streamflix-dd-user-prefs');
+        assert.ok(settingsBtn99 && />Settings</.test(settingsBtn99.innerHTML), 'Account dropdown must expose concise Settings item');
+        assert.ok(doc99.getElementById('streamflix-dd-plugin-settings') && doc99.getElementById('streamflix-dd-dashboard'), 'Admin account dropdown must expose side-by-side StreamFlix & Dashboard buttons');
+        assert.doesNotMatch(combinedJs, /Profiles\/Activity|openWatchActivityModal/, 'Watch Activity client/API hooks must be completely removed');
+        assert.match(combinedJs, /data-bfx-customize-nav="1"[\s\S]*?Appearance, Navigation &amp; Home Layout/, 'User Settings must expose Appearance, Navigation & Home Layout card');
 
         // 4. Persistent Music & Audiobook Glass Mini-Player + Skip Intro Pill regex & OSD checks
         assert.match(combinedJs, /id\s*=\s*'bfx-audio-miniplayer'|bfx-audio-miniplayer/, 'Persistent glass audio mini-player must be wired');
@@ -1631,7 +1619,7 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         assert.match(combinedJs, /IntroTimestamps/, 'Intro Skipper v1 endpoint must be supported in Skip Intro engine');
         assert.match(combinedJs, /\/MediaSegments\//, 'Jellyfin 10.10+/12 MediaSegments endpoint must be supported in Skip Intro engine');
         assert.match(combinedJs, /streamflix-osd-skip-pill/, 'Upgraded frosted-glass OSD Skip Intro pill must be wired');
-        console.log('[PASS] v0.9.9 Visual Presets, Rich Detail Badges, Decluttered Editorial Modal, Skip Intro Pill, Audio Mini-Player & Watch Activity verified');
+        console.log('[PASS] v0.9.9 Visual Presets, Rich Detail Badges, Decluttered Editorial Modal, Compact Account Menu, Settings Appearance Card, Skip Intro Pill & Audio Mini-Player verified');
     }
 }
 

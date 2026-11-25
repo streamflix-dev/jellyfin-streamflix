@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.9.1",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.1 Release Candidate (Dev Test Channel): Move Appearance, Visual Presets & Home Layout into User Settings (#/mypreferencesmenu), remove Watch Activity, and shrink & declutter the Account Dropdown menu (256px compact footprint, smaller avatars/tiles, side-by-side Admin/Dashboard shortcuts).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.1_12.0.0.zip",
+        "checksum": "7a5e400d6f5d4032a57917fdcba107a9",
+        "timestamp": "2026-11-25T21:39:30Z"
+      },
+      {
+        "version": "0.9.9.1",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.9.1 Release Candidate (Dev Test Channel): Move Appearance, Visual Presets & Home Layout into User Settings (#/mypreferencesmenu), remove Watch Activity, and shrink & declutter the Account Dropdown menu (256px compact footprint, smaller avatars/tiles, side-by-side Admin/Dashboard shortcuts).",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.1_10.11.0.zip",
+        "checksum": "7f37364f5f4344b2962ed57c36d2ae3c",
+        "timestamp": "2026-11-25T21:39:30Z"
+      },
+      {
+        "version": "0.9.9.1",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.9.1 Release Candidate (Dev Test Channel): Move Appearance, Visual Presets & Home Layout into User Settings (#/mypreferencesmenu), remove Watch Activity, and shrink & declutter the Account Dropdown menu (256px compact footprint, smaller avatars/tiles, side-by-side Admin/Dashboard shortcuts).",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.1_10.9.0.zip",
+        "checksum": "25d9018ffc053ef21aef2bc13bf9157b",
+        "timestamp": "2026-11-25T21:39:30Z"
+      },
+      {
         "version": "0.9.9.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.0 Release Candidate (Dev Test Channel): Declutter and polish Title Details into a 2-column editorial layout with a More Options popover, custom micro-tooltips, thin dark scrollbars, and Series Shuffle; add configurable Rich Detail Quality Badges (4K UHD, Dolby Vision, HDR10+, Dolby Atmos, DTS:X, 7.1/5.1, AV1, CC, Critic %, Studio); add Skip Intro & Credits Pill supporting Jellyfin MediaSegments, Intro Skipper v1/v2, and MKV chapters; add 1-click Visual Presets (Netflix Classic, OLED Pure Black, Cinema Glass, Prime Midnight) and Card Density; add persistent Music & Audiobook Glass Mini-Player and Per-Profile Watch Activity summary; remove header notification bell icon and streamline Account Menu & top navigation.",
         "targetAbi": "12.0.0.0",
