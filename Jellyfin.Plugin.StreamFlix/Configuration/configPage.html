@@ -705,6 +705,52 @@
                         </div>
 
                         <div class="bfx-subbox" style="margin:0 0 16px;">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <div class="bfx-subbox-title" style="margin:0;">Rich Detail Quality Badges &amp; Skip Intro Pill</div>
+                                <span class="bfx-pill ok" id="DetailBadgesStatusPill">Enabled</span>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableRichDetailBadges" name="EnableRichDetailBadges" type="checkbox" is="emby-checkbox" checked />
+                                    <span>Show rich quality badges in Detail Modals (<code>4K</code>, <code>HDR10</code>, <code>Dolby Vision</code>, <code>Atmos</code>, <code>5.1</code>/<code>7.1</code> &amp; Studio chips)</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Automatically inspects Jellyfin <code>MediaStreams</code> to display crisp technical video/audio badges, critic scores, and studio tags inside Title Detail Modals. Uncheck for a minimal metadata row.</div>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:10px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableSkipIntro" name="EnableSkipIntro" type="checkbox" is="emby-checkbox" checked />
+                                    <span>Enable Skip Intro / Recap / Credits pill (MediaSegments, Intro Skipper plugin &amp; chapters)</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Displays an animated glass <strong>Skip Intro</strong> / <strong>Skip Recap</strong> / <strong>Skip Credits</strong> pill with live segment countdown and <code>S</code> shortcut during playback whenever Jellyfin 10.10+/12 MediaSegments, the Intro Skipper plugin, or chapter markers are present.</div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" style="margin:0 0 16px;">
+                            <div class="bfx-subbox-title" style="margin:0 0 8px;">Default Visual Preset &amp; Card Density</div>
+                            <div class="bfx-grid-2">
+                                <div class="selectContainer" style="margin:0;">
+                                    <label class="selectLabel" for="VisualPreset">Server Visual Preset</label>
+                                    <select is="emby-select" id="VisualPreset" class="emby-select-withcolor emby-select">
+                                        <option value="netflix">Netflix Classic (#141414)</option>
+                                        <option value="oled">OLED Pure Black (#000000)</option>
+                                        <option value="glass">Cinema Frosted Glass</option>
+                                        <option value="midnight">Prime Midnight Slate</option>
+                                    </select>
+                                    <div class="fieldDescription">Default theme across profiles (individual profiles can also override their own theme &amp; card size).</div>
+                                </div>
+                                <div class="selectContainer" style="margin:0;">
+                                    <label class="selectLabel" for="CardDensity">Default Poster Card Size</label>
+                                    <select is="emby-select" id="CardDensity" class="emby-select-withcolor emby-select">
+                                        <option value="compact">Compact (More titles per row)</option>
+                                        <option value="standard">Standard (Balanced)</option>
+                                        <option value="large">Large (Cinema showcase)</option>
+                                    </select>
+                                    <div class="fieldDescription">Controls default poster and wide carousel card dimensions on Home and browse rows.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" style="margin:0 0 16px;">
                             <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
                                 <div>
                                     <div class="bfx-subbox-title" style="margin:0;">Home Page Row Order &amp; Visibility</div>
@@ -1478,10 +1524,13 @@
                     var enableGuestPasses = $('#EnableGuestPasses').checked;
                     var enableLiveTv = $('#EnableLiveTv').checked;
                     var enableHeroTrailer = $('#EnableHeroTrailerPreview').checked;
+                    var enableRichBadges = $('#EnableRichDetailBadges').checked;
+                    var enableSkipIntro = $('#EnableSkipIntro').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
 
                     setPill('LiveTvStatusPill', enableLiveTv ? 'ok' : '', enableLiveTv ? 'Enabled' : 'Off');
                     setPill('HeroTrailerStatusPill', enableHeroTrailer ? 'ok' : '', enableHeroTrailer ? 'Enabled' : 'Off');
+                    setPill('DetailBadgesStatusPill', (enableRichBadges || enableSkipIntro) ? 'ok' : '', (enableRichBadges && enableSkipIntro) ? 'All Active' : (enableRichBadges ? 'Badges Only' : (enableSkipIntro ? 'Skip Pill Only' : 'Minimal')));
 
                     var enableSeerr = $('#EnableSeerr').checked;
                     var seerrHasUrl = Boolean($('#SeerrUrl').value.trim());
@@ -2691,6 +2740,8 @@
                     '#EnableGuestPasses',
                     '#EnableLiveTv',
                     '#EnableHeroTrailerPreview',
+                    '#EnableRichDetailBadges',
+                    '#EnableSkipIntro',
                     '#ShowLibrariesInNav',
                     '#ShowHeroAdvanced',
                     '#EnableSeerr'
@@ -2870,6 +2921,10 @@
                     $('#EnableWatchTogether').checked = cfg.enableWatchTogether !== false;
                     $('#EnableLiveTv').checked = Boolean(cfg.enableLiveTv);
                     $('#EnableHeroTrailerPreview').checked = cfg.enableHeroTrailerPreview !== false;
+                    $('#EnableRichDetailBadges').checked = cfg.enableRichDetailBadges !== false;
+                    $('#EnableSkipIntro').checked = cfg.enableSkipIntro !== false;
+                    $('#VisualPreset').value = cfg.visualPreset || 'netflix';
+                    $('#CardDensity').value = cfg.cardDensity || 'standard';
                     normalizeAdminHomeRowState(cfg.homeRowOrder, cfg.homeHiddenRows);
                     renderHomeRowsEditor();
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
@@ -3008,6 +3063,10 @@
                         heroContentType: $('#HeroContentType').value || 'all',
                         heroLibraryIds: getCheckedHeroLibraryIds(),
                         enableHeroTrailerPreview: $('#EnableHeroTrailerPreview').checked,
+                        enableRichDetailBadges: $('#EnableRichDetailBadges').checked,
+                        enableSkipIntro: $('#EnableSkipIntro').checked,
+                        visualPreset: $('#VisualPreset').value || 'netflix',
+                        cardDensity: $('#CardDensity').value || 'standard',
                         homeRowOrder: getHomeRowOrderForSave(),
                         homeHiddenRows: getHomeHiddenRowsForSave(),
                         showLibrariesInNav: $('#ShowLibrariesInNav').checked,

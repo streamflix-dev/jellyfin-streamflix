@@ -828,45 +828,101 @@ body.bfx-active:not(.bfx-native-phone-download) .btnDownload {
     display: none !important;
 }
 
-/* Track Selector Pills & Credits inside .streamflix-detail-modal ('The Devil Wears Prada 2' style) */
+/* Track Selector Pills & Thin Dark Scrollbars inside Modals */
+.streamflix-detail-scroll,
+.streamflix-modal,
+.bfx-mediainfo-scroll,
+#streamflix-account-dropdown {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.streamflix-detail-scroll::-webkit-scrollbar,
+.streamflix-modal::-webkit-scrollbar,
+.bfx-mediainfo-scroll::-webkit-scrollbar,
+#streamflix-account-dropdown::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.streamflix-detail-scroll::-webkit-scrollbar-track,
+.streamflix-modal::-webkit-scrollbar-track,
+.bfx-mediainfo-scroll::-webkit-scrollbar-track,
+#streamflix-account-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+.streamflix-detail-scroll::-webkit-scrollbar-thumb,
+.streamflix-modal::-webkit-scrollbar-thumb,
+.bfx-mediainfo-scroll::-webkit-scrollbar-thumb,
+#streamflix-account-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+}
+.streamflix-detail-scroll::-webkit-scrollbar-thumb:hover,
+.streamflix-modal::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+body.streamflix-modal-open {
+    overflow: hidden !important;
+}
+
 .streamflix-modal-tracks-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin: 0 0 18px 0;
+    gap: 8px;
+    margin: 14px 0 4px 0;
 }
 .streamflix-modal-track-pill {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 36px;
+    height: 34px;
     padding: 0 12px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 12.5px;
     color: #e5e5e5;
+    transition: border-color 0.16s ease, background 0.16s ease;
+}
+.streamflix-modal-track-pill:hover,
+.streamflix-modal-track-pill:focus-within {
+    background: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.24);
 }
 .streamflix-modal-track-pill .track-label {
     font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--streamflix-red);
+    color: rgba(255, 255, 255, 0.52);
+    flex-shrink: 0;
+}
+.streamflix-modal-track-pill .track-static-val {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
 }
 .streamflix-modal-track-pill select {
-    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.68)' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 2px center;
     border: none;
     color: #fff;
+    font-family: inherit;
     font-size: 12.5px;
-    font-weight: 700;
+    font-weight: 600;
+    padding: 0 22px 0 0;
     outline: none;
     cursor: pointer;
-    max-width: 220px;
+    max-width: 240px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 .streamflix-modal-track-pill select option {
-    background: #181818;
+    background: #18181c;
     color: #fff;
 }
 

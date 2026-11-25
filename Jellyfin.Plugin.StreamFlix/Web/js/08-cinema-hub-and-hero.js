@@ -1457,9 +1457,6 @@
                 loadPersonalRows(false);
             }
         }, 1200);
-        if (typeof refreshNotificationsSilently === 'function') {
-            refreshNotificationsSilently();
-        }
     }
 
     var HUB_SWR_KEY_PREFIX = 'streamflix_hub_swr_v2_';
@@ -3138,10 +3135,10 @@
         var isPlayed = item.UserData && item.UserData.Played;
         return ''
             + '<div class="streamflix-card-quick-btns">'
-            + '  <button type="button" class="streamflix-qbtn play" data-action="play" title="Play" aria-label="Play">' + icon('play') + '</button>'
-            + '  <button type="button" class="streamflix-qbtn' + (isFav ? ' active' : '') + '" data-action="fav" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="My List">' + icon(isFav ? 'check' : 'plus') + '</button>'
-            + (withPlayed ? '  <button type="button" class="streamflix-qbtn' + (isPlayed ? ' active' : '') + '" data-action="played" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>' : '')
-            + '  <button type="button" class="streamflix-qbtn streamflix-qbtn-end" data-action="info" title="Details" aria-label="Details">' + icon('chevronDown') + '</button>'
+            + '  <button type="button" class="streamflix-qbtn play" data-action="play" aria-label="Play">' + icon('play') + '</button>'
+            + '  <button type="button" class="streamflix-qbtn' + (isFav ? ' active' : '') + '" data-action="fav" aria-label="' + (isFav ? 'Remove from My List' : 'Add to My List') + '">' + icon(isFav ? 'check' : 'plus') + '</button>'
+            + (withPlayed ? '  <button type="button" class="streamflix-qbtn' + (isPlayed ? ' active' : '') + '" data-action="played" aria-label="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '">' + icon('eye') + '</button>' : '')
+            + '  <button type="button" class="streamflix-qbtn streamflix-qbtn-end" data-action="info" aria-label="More Info">' + icon('chevronDown') + '</button>'
             + '</div>';
     }
 

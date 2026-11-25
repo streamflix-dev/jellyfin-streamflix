@@ -111,125 +111,7 @@ body.bfx-active .MuiToolbar-root a[href="/web/#/home.html"]:not([href*="tab="]) 
     #streamflix-header-profile-btn { padding: 4px 7px 4px 4px !important; gap: 5px !important; }
 }
 
-/* ---------- Notification Bell & Dropdown + Hero Muted Video Preview ---------- */
-#streamflix-header-bell-btn {
-    position: fixed;
-    top: 7px;
-    right: 170px;
-    z-index: 9991;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border-radius: 12px;
-    background: rgba(18, 18, 22, 0.42);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.88);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
-    transition: background 0.2s ease, border-color 0.2s ease, transform 0.16s ease;
-}
-#streamflix-header-bell-btn:hover,
-#streamflix-header-bell-btn.open {
-    background: rgba(255, 255, 255, 0.13);
-    border-color: rgba(255, 255, 255, 0.24);
-    color: #fff;
-}
-#streamflix-header-bell-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-#streamflix-header-bell-btn .bfx-icon { width: 19px; height: 19px; }
-.bfx-bell-badge {
-    position: absolute;
-    top: -3px;
-    right: -3px;
-    min-width: 17px;
-    height: 17px;
-    padding: 0 4px;
-    border-radius: 999px;
-    background: var(--streamflix-red, #E50914);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 17px;
-    text-align: center;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
-}
-#streamflix-notif-dropdown {
-    position: fixed;
-    top: 56px;
-    right: 68px;
-    width: 340px;
-    max-width: calc(100vw - 28px);
-    max-height: calc(100vh - 76px);
-    max-height: min(480px, calc(100vh - 76px));
-    z-index: 9999;
-    background: rgba(20, 20, 24, 0.96);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-.bfx-notif-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 13px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 14px;
-    font-weight: 800;
-    color: #fff;
-}
-.bfx-notif-list {
-    overflow-y: auto;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.bfx-notif-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 8px 10px;
-    border: none;
-    border-radius: 10px;
-    background: transparent;
-    color: #fff;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-.bfx-notif-row:hover,
-.bfx-notif-row:focus-visible {
-    background: rgba(255, 255, 255, 0.09);
-    outline: none;
-}
-.bfx-notif-thumb {
-    width: 42px;
-    height: 60px;
-    flex: 0 0 42px;
-    border-radius: 6px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.bfx-notif-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bfx-notif-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.bfx-notif-tag { font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
-.bfx-notif-tag.is-ready { color: #46d369; }
-.bfx-notif-tag.is-new { color: var(--streamflix-red, #E50914); }
-.bfx-notif-title { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bfx-notif-sub { font-size: 11.5px; color: rgba(255, 255, 255, 0.65); line-height: 1.3; }
-.bfx-notif-empty { padding: 26px 16px; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.58); }
-
+/* ---------- Hero Muted Video Preview ---------- */
 video.bfx-hero-preview-video {
     position: absolute;
     top: 0;
@@ -475,34 +357,35 @@ video.bfx-modal-trailer-video {
     color: var(--bfx-text-2);
 }
 .bfx-dd-prof-manage .bfx-dd-prof-av .bfx-icon { width: 20px; height: 20px; }
-.streamflix-dd-divider { margin: 5px 8px; background: var(--bfx-hairline); }
+.streamflix-dd-divider { margin: 4px 8px; background: var(--bfx-hairline); }
 .streamflix-dd-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 9px 10px;
-    border-radius: 11px;
+    gap: 11px;
+    padding: 7px 11px;
+    border-radius: 9px;
     color: rgba(255, 255, 255, 0.88);
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 500;
-    min-height: 42px;
+    min-height: 36px;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 .streamflix-dd-item:hover,
-.streamflix-dd-item:focus-visible { background: rgba(255, 255, 255, 0.08); outline: none; }
+.streamflix-dd-item:focus-visible { background: rgba(255, 255, 255, 0.08); color: #ffffff; outline: none; }
 .bfx-dd-ico {
-    width: 32px;
-    height: 32px;
+    width: 22px;
+    height: 22px;
     flex: none;
-    border-radius: 9px;
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.07);
-    color: #fff;
-    transition: background 0.15s ease;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+    transition: color 0.15s ease;
 }
 .bfx-dd-ico .bfx-icon { width: 17px; height: 17px; }
-.streamflix-dd-item:hover .bfx-dd-ico { background: rgba(255, 255, 255, 0.13); }
+.streamflix-dd-item:hover .bfx-dd-ico { color: #ffffff; }
 .bfx-dd-label {
     flex: 1;
     min-width: 0;
@@ -511,7 +394,7 @@ video.bfx-modal-trailer-video {
     line-height: 1.25;
 }
 .bfx-dd-label small {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 400;
     color: var(--bfx-text-3);
     margin-top: 1px;
@@ -520,10 +403,10 @@ video.bfx-modal-trailer-video {
     text-overflow: ellipsis;
 }
 #streamflix-dd-quick-connect .bfx-dd-ico {
-    background: linear-gradient(135deg, #7b5cff 0%, #00a4dc 100%);
+    color: #93c5fd;
 }
 .streamflix-dd-item.danger { color: #ff7a80; }
-.streamflix-dd-item.danger .bfx-dd-ico { background: rgba(229, 9, 20, 0.14); color: #ff7a80; }
+.streamflix-dd-item.danger .bfx-dd-ico { background: transparent; color: #ff7a80; }
 .streamflix-dd-item.danger:hover { background: rgba(229, 9, 20, 0.12); color: #ff9aa0; }
 .bfx-switch {
     position: relative;

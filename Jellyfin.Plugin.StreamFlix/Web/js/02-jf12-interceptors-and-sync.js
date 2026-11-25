@@ -1297,6 +1297,12 @@
 
         var prevEnableHeroTrailer = prevCfg.enableHeroTrailerPreview !== false;
         var nextEnableHeroTrailer = cfg.enableHeroTrailerPreview !== false;
+        var nextEnableRichBadges = cfg.enableRichDetailBadges !== false;
+        var nextEnableSkipIntro = cfg.enableSkipIntro !== false;
+        var rawPreset = String(cfg.visualPreset || 'netflix').trim().toLowerCase();
+        var nextVisualPreset = (rawPreset === 'oled' || rawPreset === 'glass' || rawPreset === 'midnight') ? rawPreset : 'netflix';
+        var rawDensity = String(cfg.cardDensity || 'standard').trim().toLowerCase();
+        var nextCardDensity = (rawDensity === 'compact' || rawDensity === 'large') ? rawDensity : 'standard';
         var nextHomeRowOrder = Array.isArray(cfg.homeRowOrder)
             ? cfg.homeRowOrder.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
             : [];
@@ -1368,6 +1374,10 @@
             heroContentType: nextHeroType,
             heroLibraryIds: nextHeroLibs,
             enableHeroTrailerPreview: nextEnableHeroTrailer,
+            enableRichDetailBadges: nextEnableRichBadges,
+            enableSkipIntro: nextEnableSkipIntro,
+            visualPreset: nextVisualPreset,
+            cardDensity: nextCardDensity,
             homeRowOrder: nextHomeRowOrder,
             homeHiddenRows: nextHomeHiddenRows,
             showLibrariesInNav: nextShowLibsInNav,

@@ -164,6 +164,10 @@ public class PluginConfiguration : BasePluginConfiguration
         HeroContentType = "all";
         HeroLibraryIds = new List<string>();
         EnableHeroTrailerPreview = true;
+        EnableRichDetailBadges = true;
+        EnableSkipIntro = true;
+        VisualPreset = "netflix";
+        CardDensity = "standard";
         MigratedHeroYouTubeTrailers = false;
         HomeRowOrder = new List<string>();
         HomeHiddenRows = new List<string>();
@@ -314,6 +318,26 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether muted official YouTube trailer previews play on the Home Hero Billboard after resting on a slide.
     /// </summary>
     public bool EnableHeroTrailerPreview { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether rich technical quality badges (4K, HDR10, Dolby Vision, Atmos, 5.1/7.1, Critic score, Studio chips) are shown in Title Detail Modals.
+    /// </summary>
+    public bool EnableRichDetailBadges { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Skip Intro / Skip Recap / Skip Credits pill (Jellyfin MediaSegments, Intro Skipper plugin, and chapter markers) is enabled in the video player.
+    /// </summary>
+    public bool EnableSkipIntro { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the default visual theme preset (<c>netflix</c>, <c>oled</c>, <c>glass</c>, or <c>midnight</c>).
+    /// </summary>
+    public string VisualPreset { get; set; } = "netflix";
+
+    /// <summary>
+    /// Gets or sets the default poster/carousel card density (<c>compact</c>, <c>standard</c>, or <c>large</c>).
+    /// </summary>
+    public string CardDensity { get; set; } = "standard";
 
     /// <summary>
     /// Gets or sets a value indicating whether the one-time v0.9.3.1 YouTube Hero Trailer default migration has been applied.

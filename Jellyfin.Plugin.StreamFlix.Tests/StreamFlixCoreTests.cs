@@ -525,4 +525,39 @@ public class StreamFlixCoreTests
             },
             customParsed.Sections);
     }
+
+    [Theory]
+    [InlineData("oled", "oled")]
+    [InlineData("  GLASS ", "glass")]
+    [InlineData("Midnight", "midnight")]
+    [InlineData("netflix", "netflix")]
+    [InlineData("invalid_theme", "netflix")]
+    [InlineData("", "netflix")]
+    [InlineData(null, "netflix")]
+    public void NormalizeVisualPreset_ValidatesAndFallsBackToNetflix(string? input, string expected)
+    {
+        Assert.Equal(expected, StreamFlixController.NormalizeVisualPreset(input));
+    }
+
+    [Theory]
+    [InlineData("compact", "compact")]
+    [InlineData("  LARGE ", "large")]
+    [InlineData("Standard", "standard")]
+    [InlineData("huge", "standard")]
+    [InlineData("", "standard")]
+    [InlineData(null, "standard")]
+    public void NormalizeCardDensity_ValidatesAndFallsBackToStandard(string? input, string expected)
+    {
+        Assert.Equal(expected, StreamFlixController.NormalizeCardDensity(input));
+    }
+
+    [Fact]
+    public void PluginConfiguration_DefaultsForV099Features_AreEnabledAndStandard()
+    {
+        var cfg = new PluginConfiguration();
+        Assert.True(cfg.EnableRichDetailBadges);
+        Assert.True(cfg.EnableSkipIntro);
+        Assert.Equal("netflix", cfg.VisualPreset);
+        Assert.Equal("standard", cfg.CardDensity);
+    }
 }

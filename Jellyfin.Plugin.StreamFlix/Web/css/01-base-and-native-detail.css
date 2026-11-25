@@ -1465,3 +1465,91 @@ body.bfx-active .navMenuOption-selected {
     background: var(--streamflix-red);
     width: 36px;
 }
+
+/* ==========================================================================
+   6. Visual Theme Presets (Netflix / OLED Pure Black / Cinema Glass / Midnight)
+      & Poster Card Density (Compact / Standard / Large)
+   ========================================================================== */
+body.bfx-active[data-bfx-preset="oled"],
+body.bfx-active[data-bfx-preset="oled"] .backgroundContainer,
+body.bfx-active[data-bfx-preset="oled"] #indexPage,
+body.bfx-active[data-bfx-preset="oled"] #streamflix-cinema-hub {
+    --streamflix-bg: #000000;
+    --streamflix-card: #08080a;
+    background-color: #000000 !important;
+}
+body.bfx-active[data-bfx-preset="oled"] .streamflix-subnav {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.45) 100%) !important;
+}
+body.bfx-active[data-bfx-preset="oled"] .streamflix-detail-modal,
+body.bfx-active[data-bfx-preset="oled"] .streamflix-modal,
+body.bfx-active[data-bfx-preset="oled"] #streamflix-account-dropdown {
+    background-color: #070709 !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+body.bfx-active[data-bfx-preset="glass"],
+body.bfx-active[data-bfx-preset="glass"] .backgroundContainer,
+body.bfx-active[data-bfx-preset="glass"] #indexPage {
+    --streamflix-bg: #090d16;
+    --streamflix-card: #121a2b;
+    background-color: #090d16 !important;
+    background-image: radial-gradient(ellipse 90% 540px at 50% 0%, rgba(56, 189, 248, 0.08) 0%, rgba(99, 102, 241, 0.06) 42%, rgba(9, 13, 22, 0) 78%) !important;
+}
+body.bfx-active[data-bfx-preset="glass"] .streamflix-subnav {
+    background: linear-gradient(180deg, rgba(11, 17, 30, 0.88) 0%, rgba(11, 17, 30, 0.35) 100%) !important;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+body.bfx-active[data-bfx-preset="glass"] .streamflix-detail-modal,
+body.bfx-active[data-bfx-preset="glass"] .streamflix-modal,
+body.bfx-active[data-bfx-preset="glass"] #streamflix-account-dropdown {
+    background-color: rgba(16, 23, 38, 0.84) !important;
+    border-color: rgba(148, 163, 184, 0.24) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+}
+
+body.bfx-active[data-bfx-preset="midnight"],
+body.bfx-active[data-bfx-preset="midnight"] .backgroundContainer,
+body.bfx-active[data-bfx-preset="midnight"] #indexPage {
+    --streamflix-bg: #0b1120;
+    --streamflix-card: #131c31;
+    background-color: #0b1120 !important;
+}
+body.bfx-active[data-bfx-preset="midnight"] .streamflix-subnav {
+    background: linear-gradient(180deg, rgba(11, 17, 32, 0.94) 0%, rgba(11, 17, 32, 0.38) 100%) !important;
+}
+body.bfx-active[data-bfx-preset="midnight"] .streamflix-detail-modal,
+body.bfx-active[data-bfx-preset="midnight"] .streamflix-modal,
+body.bfx-active[data-bfx-preset="midnight"] #streamflix-account-dropdown {
+    background-color: #0f172a !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+/* Poster & Wide Card Density Modes (Desktop & Tablet; TV / Phone keep dedicated responsive sizing) */
+@media (min-width: 681px) {
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="compact"] .streamflix-carousel-track > .streamflix-poster-card {
+        flex: 0 0 150px;
+        width: 150px;
+    }
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="compact"] .streamflix-wide-card {
+        flex: 0 0 248px;
+        width: 248px;
+    }
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="compact"] .streamflix-grid {
+        grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+    }
+
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="large"] .streamflix-carousel-track > .streamflix-poster-card {
+        flex: 0 0 222px;
+        width: 222px;
+    }
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="large"] .streamflix-wide-card {
+        flex: 0 0 348px;
+        width: 348px;
+    }
+    body.bfx-active:not(.bfx-tv-mode)[data-bfx-density="large"] .streamflix-grid {
+        grid-template-columns: repeat(auto-fill, minmax(214px, 1fr));
+    }
+}

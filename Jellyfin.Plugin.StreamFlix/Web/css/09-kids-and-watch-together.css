@@ -1453,8 +1453,7 @@ html.bfx-no-flex-gap .streamflix-carousel-track > * + *,
 html.bfx-no-flex-gap .streamflix-dd-active-header > * + *,
 html.bfx-no-flex-gap .streamflix-google-btn > * + *,
 html.bfx-no-flex-gap .streamflix-oidc-btn > * + *,
-html.bfx-no-flex-gap .streamflix-pin-boxes > * + *,
-html.bfx-no-flex-gap .bfx-notif-row > * + * {
+html.bfx-no-flex-gap .streamflix-pin-boxes > * + * {
     margin-left: 12px;
 }
 html.bfx-no-flex-gap .streamflix-episode-row > * + * {

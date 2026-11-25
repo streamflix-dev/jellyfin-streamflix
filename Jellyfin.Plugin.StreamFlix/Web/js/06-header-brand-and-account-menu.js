@@ -39,6 +39,9 @@
                 document.body.classList.toggle('bfx-admin-route', adminRoute);
                 document.body.classList.toggle('bfx-classic-home', state.cinemaHubEnabled === false);
             }
+            if (typeof applyVisualPresetAndDensity === 'function') {
+                applyVisualPresetAndDensity();
+            }
 
             // Tag native Jellyfin top-left hamburger / drawer buttons so CSS hides them cleanly on StreamFlix views
             // while keeping them functional on Dashboard / Classic Jellyfin routes.
@@ -652,124 +655,6 @@
         }
     }
 
-    function getProfileSeenNotifMap() {
-        var pid = (state.activeProfile && state.activeProfile.id) || 'default';
-        return loadJson(NOTIF_SEEN_PREFIX + pid, {}) || {};
-    }
-
-    function markAllNotificationsSeen() {
-        var pid = (state.activeProfile && state.activeProfile.id) || 'default';
-        var seen = getProfileSeenNotifMap();
-        (state.notifications || []).forEach(function (n) {
-            if (n && n.key) {
-                seen[n.key] = 1;
-            }
-        });
-        var keys = Object.keys(seen);
-        if (keys.length > 250) {
-            var trimmed = {};
-            keys.slice(keys.length - 200).forEach(function (k) { trimmed[k] = 1; });
-            seen = trimmed;
-        }
-        saveJson(NOTIF_SEEN_PREFIX + pid, seen);
-        syncHeaderBellBadge();
-    }
-
-    function countUnreadNotifications() {
-        var seen = getProfileSeenNotifMap();
-        var unread = 0;
-        (state.notifications || []).forEach(function (n) {
-            if (n && n.key && !seen[n.key]) {
-                unread++;
-            }
-        });
-        return unread;
-    }
-
-    function syncHeaderBellBadge() {
-        var bellBtn = document.getElementById('streamflix-header-bell-btn');
-        if (!bellBtn) {
-            return;
-        }
-        var unread = countUnreadNotifications();
-        var badge = bellBtn.querySelector('.bfx-bell-badge');
-        if (unread > 0) {
-            if (!badge) {
-                badge = document.createElement('span');
-                badge.className = 'bfx-bell-badge';
-                bellBtn.appendChild(badge);
-            }
-            badge.textContent = unread > 9 ? '9+' : String(unread);
-        } else if (badge && badge.parentNode) {
-            badge.parentNode.removeChild(badge);
-        }
-    }
-
-    function refreshNotificationsSilently() {
-        var auth = getJellyfinAuthContext();
-        if (!auth || !auth.userId || !auth.token || !state.activeProfile) {
-            return;
-        }
-        var userScope = normalizeGuid(auth.userId) + ':' + (state.activeProfile.id || '');
-        if (state.notificationsLoading || state.notificationsLoadedForUser === userScope) {
-            syncHeaderBellBadge();
-            return;
-        }
-        state.notificationsLoading = true;
-        var pid = state.activeProfile.id || '';
-        var pSeerr = isCurrentProfileSeerrAllowed()
-            ? apiFetch('/StreamFlix/Seerr/Requests?profileId=' + encodeURIComponent(pid))
-                .then(function (r) { return (r && Array.isArray(r.requests)) ? r.requests : []; })
-                .catch(function () { return []; })
-            : Promise.resolve([]);
-
-        pSeerr.then(function (reqs) {
-            state.notificationsLoading = false;
-            state.notificationsLoadedForUser = userScope;
-            var items = [];
-            (reqs || []).forEach(function (req) {
-                if (!req || !req.title) {
-                    return;
-                }
-                var isAvail = Number(req.mediaStatus) === 5 || req.statusKey === 'available' || Boolean(req.jellyfinMediaId);
-                if (isAvail) {
-                    items.push({
-                        key: 'seerr_avail_' + (req.requestId || req.tmdbId),
-                        kind: 'seerr_ready',
-                        title: req.title,
-                        sub: 'Your requested title is now ready to watch!',
-                        posterUrl: req.posterUrl || '',
-                        jellyfinMediaId: req.jellyfinMediaId || '',
-                        seerrItem: req
-                    });
-                }
-            });
-
-            var d = state.hubData || {};
-            var sevenDaysAgo = Date.now() - (7 * 24 * 3600 * 1000);
-            var recentPool = dedupeMediaItems([].concat(d.recentMovies || [], d.recentSeries || [])).filter(function (it) {
-                var c = it && it.DateCreated ? Date.parse(it.DateCreated) : 0;
-                return c >= sevenDaysAgo;
-            }).slice(0, 6);
-            recentPool.forEach(function (it) {
-                items.push({
-                    key: 'new_lib_' + normalizeGuid(it.Id),
-                    kind: 'new_arrival',
-                    title: it.Name || 'New Arrival',
-                    sub: 'Added to ' + getBrandName() + (it.ProductionYear ? ' · ' + it.ProductionYear : ''),
-                    posterUrl: getItemPosterUrl(it, 160),
-                    jellyfinMediaId: it.Id,
-                    mediaItem: it
-                });
-            });
-
-            state.notifications = items.slice(0, 12);
-            syncHeaderBellBadge();
-        }).catch(function () {
-            state.notificationsLoading = false;
-        });
-    }
-
     function closeNotificationsDropdown() {
         state.notificationsOpen = false;
         var nd = document.getElementById('streamflix-notif-dropdown');
@@ -777,81 +662,126 @@
             nd.parentNode.removeChild(nd);
         }
         var bell = document.getElementById('streamflix-header-bell-btn');
-        if (bell) {
-            bell.classList.remove('open');
+        if (bell && bell.parentNode) {
+            bell.parentNode.removeChild(bell);
         }
     }
 
-    function toggleNotificationsDropdown() {
-        if (state.notificationsOpen && document.getElementById('streamflix-notif-dropdown')) {
-            closeNotificationsDropdown();
-            return;
+    function formatActivityDuration(totalMinutes) {
+        var mins = Math.max(0, Math.round(Number(totalMinutes) || 0));
+        if (mins < 60) {
+            return mins + 'm';
         }
-        closeAccountDropdown();
-        state.notificationsOpen = true;
-        var bell = document.getElementById('streamflix-header-bell-btn');
-        if (bell) {
-            bell.classList.add('open');
-        }
-        markAllNotificationsSeen();
+        var hrs = Math.floor(mins / 60);
+        var rem = mins % 60;
+        return rem > 0 ? (hrs + 'h ' + rem + 'm') : (hrs + 'h');
+    }
 
-        var list = state.notifications || [];
-        var rowsHtml = list.length > 0
-            ? list.map(function (n, idx) {
-                var badgeText = n.kind === 'seerr_ready' ? 'NOW AVAILABLE' : 'NEW ARRIVAL';
-                var badgeCls = n.kind === 'seerr_ready' ? 'is-ready' : 'is-new';
-                return ''
-                    + '<button type="button" class="bfx-notif-row" data-notif-idx="' + idx + '">'
-                    + '  <span class="bfx-notif-thumb">'
-                    + (n.posterUrl ? '<img src="' + escapeHtml(n.posterUrl) + '" alt="" loading="lazy" />' : icon('film'))
-                    + '  </span>'
-                    + '  <span class="bfx-notif-copy">'
-                    + '    <span class="bfx-notif-tag ' + badgeCls + '">' + badgeText + '</span>'
-                    + '    <span class="bfx-notif-title">' + escapeHtml(n.title) + '</span>'
-                    + '    <span class="bfx-notif-sub">' + escapeHtml(n.sub) + '</span>'
-                    + '  </span>'
-                    + '</button>';
-            }).join('')
-            : '<div class="bfx-notif-empty">No new arrivals or fulfilled requests right now.</div>';
-
-        var nd = document.createElement('div');
-        nd.id = 'streamflix-notif-dropdown';
-        nd.setAttribute('role', 'menu');
-        nd.innerHTML = ''
-            + '<div class="bfx-notif-head">'
-            + '  <span>Notifications</span>'
-            + (isCurrentProfileSeerrAllowed()
-                ? '<button type="button" class="streamflix-ghost-btn bfx-btn-xs" id="bfx-notif-open-seerr">Requests</button>'
-                : '')
+    function openWatchActivityModal() {
+        var active = state.activeProfile || { name: 'Profile', icon: '🎬', color: '#E50914' };
+        var pid = active.id || '';
+        var m = openModal(''
+            + '<div class="bfx-cs-head">'
+            + '  <div class="bfx-act-avatar" style="background:' + escapeHtml(active.color || '#E50914') + ';">' + escapeHtml(active.icon || '🎬') + '</div>'
+            + '  <div class="bfx-cs-head-copy">'
+            + '    <h2>' + escapeHtml(active.name || 'Profile') + ' &middot; Watch Activity</h2>'
+            + '    <p class="streamflix-modal-text">Private playback summary computed locally on your Jellyfin server.</p>'
+            + '  </div>'
             + '</div>'
-            + '<div class="bfx-notif-list">' + rowsHtml + '</div>';
-        document.body.appendChild(nd);
+            + '<div id="bfx-activity-body" class="bfx-activity-body">'
+            + '  <div class="streamflix-filter-loading" style="padding:28px 0;"><div class="streamflix-spinner-ring"></div><span>Calculating watch activity…</span></div>'
+            + '</div>'
+            + '<div class="streamflix-modal-actions">'
+            + '  <button type="button" class="streamflix-btn-primary" data-act-close="1">Done</button>'
+            + '</div>', { className: 'bfx-activity-modal' });
 
-        var seerrBtn = nd.querySelector('#bfx-notif-open-seerr');
-        if (seerrBtn) {
-            seerrBtn.addEventListener('click', function () {
-                closeNotificationsDropdown();
-                openSeerrRequestsModal();
-            });
+        var modalRoot = m.modal || m.el;
+        var closeBtn = modalRoot && modalRoot.querySelector ? modalRoot.querySelector('[data-act-close="1"]') : null;
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () { m.close(false); });
         }
-        Array.prototype.forEach.call(nd.querySelectorAll('[data-notif-idx]'), function (row) {
-            row.addEventListener('click', function () {
-                var entry = list[parseInt(row.getAttribute('data-notif-idx'), 10)];
-                closeNotificationsDropdown();
-                if (!entry) {
+
+        apiFetch('/StreamFlix/Profiles/Activity?profileId=' + encodeURIComponent(pid))
+            .then(function (act) {
+                var bodyEl = (modalRoot && modalRoot.querySelector && modalRoot.querySelector('#bfx-activity-body')) || document.getElementById('bfx-activity-body');
+                if (!bodyEl) {
                     return;
                 }
-                if (entry.mediaItem) {
-                    openHeroDetailModal(entry.mediaItem);
-                } else if (entry.jellyfinMediaId) {
-                    fetchFullItemDetails(entry.jellyfinMediaId).then(function (full) {
-                        if (full) { openHeroDetailModal(full); }
-                    }).catch(function () {});
-                } else if (entry.seerrItem && typeof openSeerrRequestModal === 'function') {
-                    openSeerrRequestModal(entry.seerrItem);
+                var movCount = Number(act && act.moviesWatchedCount) || 0;
+                var epCount = Number(act && act.episodesWatchedCount) || 0;
+                var serCount = Number(act && act.uniqueSeriesWatchedCount) || 0;
+                var inProg = Number(act && act.inProgressCount) || 0;
+                var favs = Number(act && act.favoritesCount) || 0;
+                var watchTime = formatActivityDuration(act && act.totalWatchMinutes);
+                var topGenres = (act && Array.isArray(act.topGenres)) ? act.topGenres : [];
+                var recent = (act && Array.isArray(act.recentlyWatched)) ? act.recentlyWatched : [];
+
+                var genresHtml = topGenres.length > 0
+                    ? ('<div class="bfx-act-section">'
+                        + '<div class="bfx-nav-cust-label">Favorite Genres</div>'
+                        + '<div class="bfx-act-genres">'
+                        + topGenres.map(function (g) {
+                            var pct = Math.min(100, Math.max(8, Number(g.pct) || 20));
+                            return ''
+                                + '<div class="bfx-act-genre-row">'
+                                + '  <div class="bfx-act-genre-head"><span>' + escapeHtml(g.name || 'Genre') + '</span><b>' + (Number(g.count) || 0) + ' titles</b></div>'
+                                + '  <div class="bfx-act-genre-bar"><i style="width:' + pct + '%;"></i></div>'
+                                + '</div>';
+                        }).join('')
+                        + '</div></div>')
+                    : '';
+
+                var recentHtml = recent.length > 0
+                    ? ('<div class="bfx-act-section">'
+                        + '<div class="bfx-nav-cust-label">Recently Watched</div>'
+                        + '<div class="bfx-act-recent-strip">'
+                        + recent.map(function (it, rIdx) {
+                            var pUrl = getItemPosterUrl(it, 240) || getItemBackdropUrl(it, 320);
+                            var sub = it.Type === 'Episode' && it.SeriesName
+                                ? (it.SeriesName + ' · S' + (it.ParentIndexNumber || 1) + ':E' + (it.IndexNumber || 1))
+                                : (it.ProductionYear ? String(it.ProductionYear) : '');
+                            return ''
+                                + '<button type="button" class="bfx-act-recent-card" data-act-rec-idx="' + rIdx + '">'
+                                + '  <div class="bfx-act-recent-art">'
+                                + (pUrl ? '<img src="' + escapeHtml(pUrl) + '" alt="" loading="lazy" />' : icon('film'))
+                                + '  </div>'
+                                + '  <div class="bfx-act-recent-title">' + escapeHtml(it.Name || 'Title') + '</div>'
+                                + (sub ? '<div class="bfx-act-recent-sub">' + escapeHtml(sub) + '</div>' : '')
+                                + '</button>';
+                        }).join('')
+                        + '</div></div>')
+                    : '';
+
+                bodyEl.innerHTML = ''
+                    + '<div class="bfx-act-kpi-grid">'
+                    + '  <div class="bfx-act-kpi"><span class="bfx-act-kpi-val">' + escapeHtml(watchTime) + '</span><span class="bfx-act-kpi-lbl">Time Streamed</span></div>'
+                    + '  <div class="bfx-act-kpi"><span class="bfx-act-kpi-val">' + movCount + '</span><span class="bfx-act-kpi-lbl">Movies Finished</span></div>'
+                    + '  <div class="bfx-act-kpi"><span class="bfx-act-kpi-val">' + epCount + '</span><span class="bfx-act-kpi-lbl">Episodes' + (serCount > 0 ? (' · ' + serCount + ' Shows') : '') + '</span></div>'
+                    + '  <div class="bfx-act-kpi"><span class="bfx-act-kpi-val">' + inProg + ' / ' + favs + '</span><span class="bfx-act-kpi-lbl">In Progress / My List</span></div>'
+                    + '</div>'
+                    + genresHtml
+                    + recentHtml
+                    + (!topGenres.length && !recent.length
+                        ? '<div class="streamflix-modal-text" style="text-align:center;padding:14px 0;">Start watching movies and shows on this profile to build your personal activity summary.</div>'
+                        : '');
+
+                Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-act-rec-idx]'), function (cBtn) {
+                    cBtn.addEventListener('click', function () {
+                        var item = recent[parseInt(cBtn.getAttribute('data-act-rec-idx'), 10)];
+                        if (item) {
+                            m.close(true);
+                            openHeroDetailModal(item);
+                        }
+                    });
+                });
+            })
+            .catch(function () {
+                var bodyEl = m.modal.querySelector('#bfx-activity-body');
+                if (bodyEl) {
+                    bodyEl.innerHTML = '<div class="streamflix-modal-text" style="padding:16px 0;">Unable to load watch activity right now.</div>';
                 }
             });
-        });
+        return m;
     }
 
     function closeAccountDropdown() {
@@ -960,17 +890,16 @@
         var wpCount = wpActiveGroup && typeof getActiveWatchPartyParticipantCount === 'function' ? getActiveWatchPartyParticipantCount() : 0;
         var wpTrailingHtml = wpActiveGroup
             ? ('<span class="bfx-dd-wp-live-pill"><span class="bfx-wp-pulse-dot" aria-hidden="true"></span><span>Live · ' + wpCount + '</span></span>')
-            : ('<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>');
+            : '';
         var wpSubLabel = wpActiveGroup
             ? ('In "' + (wpActiveGroup.name || wpActiveGroup.groupName || wpActiveGroup.GroupName || 'Watch Party') + '"' + (wpActiveGroup.roomId ? ' · ' + wpActiveGroup.roomId : ''))
-            : 'Synced watch parties & invite links';
+            : '';
 
-        var liveTvMenuEnabled = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile()
+        var liveTvMenuEnabled = state.cinemaHubEnabled === false
+            && typeof isLiveTvEnabledForCurrentProfile === 'function'
+            && isLiveTvEnabledForCurrentProfile()
             && !(state.liveTvData && state.liveTvData.forbidden);
         var showClientSettingsRow = !isGuest && !isKidsActive && shouldShowClientSettingsAction();
-        var clientSettingsSubLabel = hasNativeClientSettingsBridge()
-            ? 'App player, downloads & device options'
-            : 'Player quality, display & phone options';
 
         var showPhoneMyListTile = isPhoneSheet
             && state.cinemaHubEnabled !== false
@@ -978,8 +907,8 @@
         var tilesHtml = ''
             + (showPhoneMyListTile ? ddTile('streamflix-dd-mylist', 'bookmark', 'My List', 'Saved movies & shows', 'is-mylist') : '')
             + (canPhoneSurprise ? ddTile('streamflix-dd-surprise', 'shuffle', 'Surprise Me', 'Pick something great to watch', 'is-surprise') : '')
-            + (castBtnNative ? ddTile('streamflix-dd-cast', 'cast', castInfo.connected ? 'Casting' : 'Cast', castInfo.connected ? ('Connected to ' + (castInfo.deviceName || 'another device')) : 'Play on a TV, Chromecast or another device', 'is-cast' + (castInfo.connected ? ' is-live' : '')) : '')
-            + (!isGuest && !isKidsActive ? ddTile('streamflix-dd-quick-connect', 'tv', 'Quick Connect', 'Sign in on a TV or another device with a 6-digit code', 'is-qc') : '');
+            + (castBtnNative ? ddTile('streamflix-dd-cast', 'cast', castInfo.connected ? 'Casting' : 'Cast', castInfo.connected ? ('Connected to ' + (castInfo.deviceName || 'another device')) : 'Play on a TV or Chromecast', 'is-cast' + (castInfo.connected ? ' is-live' : '')) : '')
+            + (!isGuest && !isKidsActive ? ddTile('streamflix-dd-quick-connect', 'tv', 'Quick Connect', 'Sign in on a TV with a 6-digit code', 'is-qc') : '');
 
         var kidsLockNeeded = isKidsActive && typeof isKidsExitLockRequired === 'function' && isKidsExitLockRequired()
             && !(typeof getValidKidsExitSession === 'function' && getValidKidsExitSession());
@@ -1001,7 +930,7 @@
             + '    </div>'
             + '    <div class="streamflix-dd-active-sub">' + escapeHtml(accountSubLabel) + '</div>'
             + '  </div>'
-            + '  <button type="button" class="bfx-dd-close" id="streamflix-dd-close" title="Close" aria-label="Close menu">' + icon('chevronDown') + '</button>'
+            + '  <button type="button" class="bfx-dd-close" id="streamflix-dd-close" aria-label="Close menu">' + icon('chevronDown') + '</button>'
             + '</div>'
             + (isKidsActive && !isGuest
                 ? ('<div class="bfx-dd-kids-exit-wrap"><button type="button" class="bfx-dd-exit-kids-btn" id="streamflix-dd-exit-kids">'
@@ -1013,21 +942,24 @@
                 : (isKidsActive
                     ? (otherProfiles.length ? ('<div class="bfx-dd-profiles">' + quickProfilesHtml + '</div>') : '')
                     : ('<div class="bfx-dd-profiles">' + quickProfilesHtml
-                        + '<button type="button" class="bfx-dd-prof bfx-dd-prof-manage" id="streamflix-dd-manage-profiles" title="Manage profiles"><span class="bfx-dd-prof-av">' + icon('edit') + '</span><span class="bfx-dd-prof-name">Manage</span></button>'
+                        + '<button type="button" class="bfx-dd-prof bfx-dd-prof-manage" id="streamflix-dd-manage-profiles" aria-label="Manage profiles"><span class="bfx-dd-prof-av">' + icon('edit') + '</span><span class="bfx-dd-prof-name">Manage</span></button>'
                         + '</div>')))
             + (tilesHtml ? ('<div class="bfx-dd-tiles">' + tilesHtml + '</div>') : '')
             + (isKidsActive
-                ? ((isCurrentProfileSeerrAllowed() ? ('<div class="streamflix-dd-divider"></div>' + ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', 'Track requested movies & shows', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>')) : '')
+                ? ((isCurrentProfileSeerrAllowed() ? ('<div class="streamflix-dd-divider"></div>' + ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', '', '')) : '')
                     + (isGuest ? ('<div class="streamflix-dd-divider"></div>' + ddItem('streamflix-dd-signout', 'logout', 'Exit Guest Pass', '', 'danger')) : ''))
                 : ('<div class="streamflix-dd-divider"></div>'
-                    + (liveTvMenuEnabled ? ddItem('streamflix-dd-livetv', 'tv', 'Live TV', 'Live channels, On Now & TV Guide', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
+                    + (liveTvMenuEnabled ? ddItem('streamflix-dd-livetv', 'tv', 'Live TV', '', '') : '')
                     + (wpEnabled ? ddItem('streamflix-dd-watch-party', 'party', 'Watch Together', wpSubLabel, wpActiveGroup ? 'is-watchparty-live' : '', wpTrailingHtml) : '')
-                    + (!isGuest ? ddItem('streamflix-dd-user-prefs', 'sliders', 'Settings', 'Subtitles, playback & ' + getBrandName() + ' Home', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (showClientSettingsRow ? ddItem('streamflix-dd-client-settings', 'smartphone', 'Client Settings', clientSettingsSubLabel, 'is-client-settings', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (isCurrentProfileSeerrAllowed() ? ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', 'Track requested movies & shows', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (canManageGuests ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', 'Temporary invite links & QR', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (isAdmin ? ddItem('streamflix-dd-plugin-settings', 'sliders', getBrandName() + ' Settings', 'Auth, profiles, navigation & hero', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
-                    + (isAdmin ? ddItem('streamflix-dd-dashboard', 'gear', 'Dashboard', 'Jellyfin server administration', '', '<span class="bfx-dd-chev">' + icon('chevronRight') + '</span>') : '')
+                    + ddItem('streamflix-dd-watch-activity', 'flame', 'Watch Activity', '', '')
+                    + (isCurrentProfileSeerrAllowed() ? ddItem('streamflix-dd-seerr-requests', 'seerrIcon', 'Media Requests', '', '') : '')
+                    + (!isGuest ? ddItem('streamflix-dd-appearance', 'sliders', 'Appearance & Layout', '', '') : '')
+                    + (!isGuest ? '<div class="streamflix-dd-divider"></div>' : '')
+                    + (!isGuest ? ddItem('streamflix-dd-user-prefs', 'gear', 'Account & Playback Settings', '', '') : '')
+                    + (showClientSettingsRow ? ddItem('streamflix-dd-client-settings', 'smartphone', 'Client Settings', '', 'is-client-settings') : '')
+                    + (canManageGuests ? ddItem('streamflix-dd-guest-passes', 'ticket', 'Guest Passes', '', '') : '')
+                    + (isAdmin ? ddItem('streamflix-dd-plugin-settings', 'sliders', getBrandName() + ' Administration', '', '') : '')
+                    + (isAdmin ? ddItem('streamflix-dd-dashboard', 'grid', 'Server Dashboard', '', '') : '')
                     + '<div class="streamflix-dd-divider"></div>'
                     + ddItem('streamflix-dd-signout', 'logout', isGuest ? 'Exit Guest Pass' : 'Sign out', '', 'danger')));
 
@@ -1144,6 +1076,14 @@
         });
         bind('streamflix-dd-manage-profiles', function () {
             window.__STREAMFLIX_OPEN_PROFILE_PICKER__(true);
+        });
+        bind('streamflix-dd-watch-activity', function () {
+            openWatchActivityModal();
+        });
+        bind('streamflix-dd-appearance', function () {
+            if (typeof openNavCustomizeModal === 'function') {
+                openNavCustomizeModal();
+            }
         });
         bind('streamflix-dd-user-prefs', function () {
             window.location.hash = '#/mypreferencesmenu';
