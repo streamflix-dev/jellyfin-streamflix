@@ -1613,6 +1613,16 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         assert.doesNotMatch(combinedJs, /Profiles\/Activity|openWatchActivityModal/, 'Watch Activity client/API hooks must be completely removed');
         assert.match(combinedJs, /data-bfx-customize-nav="1"[\s\S]*?Appearance, Navigation &amp; Home Layout/, 'User Settings must expose Appearance, Navigation & Home Layout card');
 
+        // 3b. Organized & Decluttered User Settings Menu (#/mypreferencesmenu)
+        assert.match(combinedJs, /data-bfx-group="appearance"/, 'Settings menu must group Appearance & Home together');
+        assert.match(combinedJs, /data-bfx-group="playback"/, 'Settings menu must group Playback & Subtitles together');
+        assert.match(combinedJs, /data-bfx-group="display"/, 'Settings menu must group Display & Libraries together');
+        assert.match(combinedJs, /id="bfx-prefs-admin-group"/, 'Settings menu must consolidate Administration into a single unified group');
+        assert.match(combinedJs, /data-bfx-group="account"/, 'Settings menu must group Account & Session together');
+        assert.match(combinedJs, /Libraries & Home Sections/, 'Settings menu must clarify native Home row as Libraries & Home Sections');
+        assert.match(combinedJs, /Account & Password/, 'Settings menu must clarify native Profile row as Account & Password');
+        assert.match(combinedJs, /data-bfx-vis-preset-pill="1"/, 'Appearance row must live-sync active visual preset pill');
+
         // 4. Persistent Music & Audiobook Glass Mini-Player + Skip Intro Pill regex & OSD checks
         assert.match(combinedJs, /id\s*=\s*'bfx-audio-miniplayer'|bfx-audio-miniplayer/, 'Persistent glass audio mini-player must be wired');
         assert.match(combinedJs, /IntroSkipperSegments/, 'Intro Skipper v2 endpoint must be supported in Skip Intro engine');

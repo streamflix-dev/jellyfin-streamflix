@@ -1226,6 +1226,11 @@
                 saveProfileHomeRowPrefs(null);
                 saveProfileVisualPrefs(null);
                 applyVisualPresetAndDensity();
+                var effDefVis = getEffectiveVisualPrefs();
+                var defMap = { netflix: 'Netflix Classic', oled: 'OLED Pure Black', glass: 'Cinema Glass', midnight: 'Prime Midnight' };
+                Array.prototype.forEach.call(document.querySelectorAll('[data-bfx-vis-preset-pill="1"]'), function (p) {
+                    p.textContent = defMap[effDefVis.preset] || 'Netflix Classic';
+                });
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
@@ -1265,6 +1270,10 @@
                     density: draftDensity
                 });
                 applyVisualPresetAndDensity();
+                var savedMap = { netflix: 'Netflix Classic', oled: 'OLED Pure Black', glass: 'Cinema Glass', midnight: 'Prime Midnight' };
+                Array.prototype.forEach.call(document.querySelectorAll('[data-bfx-vis-preset-pill="1"]'), function (p) {
+                    p.textContent = savedMap[draftPreset] || 'Netflix Classic';
+                });
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
