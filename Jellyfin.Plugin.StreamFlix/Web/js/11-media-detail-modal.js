@@ -76,15 +76,21 @@
             }
         }
         var chNumLabel = (item.Number || item.ChannelNumber) ? ('CH ' + String(item.Number || item.ChannelNumber)) : '';
+        var typeBadgeMap = {
+            Recording: 'RECORDING',
+            Series: 'SERIES',
+            BoxSet: 'COLLECTION',
+            Episode: 'EPISODE',
+            MusicAlbum: 'ALBUM',
+            AudioBook: 'AUDIOBOOK',
+            Audio: 'AUDIO',
+            Book: 'BOOK'
+        };
         var typeBadge = item.Type === 'TvChannel'
             ? (chNumLabel ? ('LIVE TV · ' + chNumLabel) : 'LIVE TV')
             : (item.Type === 'Program'
                 ? (item.ChannelName ? ('ON TV · ' + item.ChannelName.toUpperCase()) : 'ON TV')
-                : (item.Type === 'Recording'
-                    ? 'RECORDING'
-                    : (item.Type === 'Series'
-                        ? 'SERIES'
-                        : (item.Type === 'BoxSet' ? 'COLLECTION' : (item.Type === 'Episode' ? 'EPISODE' : 'FILM')))));
+                : (typeBadgeMap[item.Type] || 'FILM'));
         var displayTitle = (item.Type === 'Episode' && item.SeriesName) ? item.SeriesName : (item.Name || 'Untitled');
         var formatShortProgTime = function (p) {
             if (!p || !p.StartDate) {

@@ -550,6 +550,15 @@
     function signOutHousehold(opts) {
         var options = (opts && typeof opts === 'object') ? opts : {};
         var token = getActiveToken();
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            try {
+                stopStreamFlixAudioMiniPlayer({ skipReport: Boolean(options.skipServerLogout || options.fromBroadcast) });
+            } catch (eMpOut) {}
+        }
+        if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDmOut) {}
+            state.activeDetailModal = null;
+        }
         if (!options.skipServerLogout
             && !options.fromBroadcast
             && typeof leaveWatchPartyRoom === 'function'

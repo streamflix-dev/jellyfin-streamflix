@@ -559,5 +559,19 @@ public class StreamFlixCoreTests
         Assert.True(cfg.EnableSkipIntro);
         Assert.Equal("netflix", cfg.VisualPreset);
         Assert.Equal("standard", cfg.CardDensity);
+        Assert.False(Plugin.HasMeaningfulUserConfig(cfg));
+
+        // Customizing any v0.9.9 setting marks configuration as meaningful for shadow backup persistence
+        var presetCfg = new PluginConfiguration { VisualPreset = "oled" };
+        Assert.True(Plugin.HasMeaningfulUserConfig(presetCfg));
+
+        var densityCfg = new PluginConfiguration { CardDensity = "large" };
+        Assert.True(Plugin.HasMeaningfulUserConfig(densityCfg));
+
+        var skipDisabledCfg = new PluginConfiguration { EnableSkipIntro = false };
+        Assert.True(Plugin.HasMeaningfulUserConfig(skipDisabledCfg));
+
+        var badgesDisabledCfg = new PluginConfiguration { EnableRichDetailBadges = false };
+        Assert.True(Plugin.HasMeaningfulUserConfig(badgesDisabledCfg));
     }
 }

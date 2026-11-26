@@ -1099,6 +1099,18 @@
             activated.accessToken = res.accessToken;
             activated.serverId = res.serverId || (state.config && state.config.serverId) || '';
 
+            // Stop any playing Audio Mini-Player or open Detail Modal before switching the active profile/token
+            if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+                stopStreamFlixAudioMiniPlayer();
+            }
+            if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+                try { state.activeDetailModal.close(true); } catch (eDm) {}
+                state.activeDetailModal = null;
+            }
+            if (document.body) {
+                document.body.classList.remove('streamflix-modal-open');
+            }
+
             saveActiveProfileState(activated, true);
 
             if (activated.isAdmin && activated.accessToken && activated.jellyfinUserId && !isGuestPassSession()) {
@@ -1154,6 +1166,9 @@
             }
             state.kidsWorld = 'all';
             ensureHeaderWidgets();
+            if (typeof applyVisualPresetAndDensity === 'function') {
+                applyVisualPresetAndDensity();
+            }
 
             // Reset Cinema Hub, search, browse filter, and per-user item/episode caches for the newly selected profile
             if (typeof cancelPendingSearch === 'function') {
@@ -1179,6 +1194,7 @@
             state.seerrSearchResults = null;
             if (typeof osdState !== 'undefined' && osdState) {
                 osdState.episodesCache = {};
+                osdState.segmentsCache = {};
             }
             state.hubData.userId = null;
             state.hubData.loaded = false;

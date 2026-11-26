@@ -1177,6 +1177,13 @@
         if (typeof stopHeroVideoPreview === 'function') {
             stopHeroVideoPreview(false);
         }
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            stopStreamFlixAudioMiniPlayer({ skipReport: true });
+        }
+        if (typeof osdState !== 'undefined' && osdState) {
+            osdState.episodesCache = {};
+            osdState.segmentsCache = {};
+        }
         state.itemCache = {};
         state.heroTrailerCache = {};
         state.heroTrailerInFlight = {};
@@ -1212,6 +1219,13 @@
     function handleHouseholdSessionLost() {
         var hadSession = Boolean(state.googleUser && state.googleUser.token);
         var wasGuest = isGuestPassSession();
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            stopStreamFlixAudioMiniPlayer({ skipReport: true });
+        }
+        if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDm) {}
+            state.activeDetailModal = null;
+        }
         clearHouseholdSession();
         var openAccess = isOpenWithoutLogin(state.config);
         if (!openAccess && typeof detachEndedWatchPartyCleanly === 'function') {
@@ -1454,6 +1468,15 @@
 
         if (typeof applyBrandAccentTheme === 'function') {
             applyBrandAccentTheme();
+        }
+        if (typeof applyVisualPresetAndDensity === 'function') {
+            applyVisualPresetAndDensity();
+        }
+        if (document.body && document.body.classList.contains('streamflix-nf-player')) {
+            document.body.classList.toggle('bfx-skip-pill-enabled', nextEnableSkipIntro);
+            if (!nextEnableSkipIntro && typeof hideOsdSkipPill === 'function') {
+                hideOsdSkipPill();
+            }
         }
 
         if (state.config.assetVersion) {

@@ -67,7 +67,8 @@
                 '#bfx-wp-osd-banner',
                 '#bfx-wp-autoplay-unlock',
                 '#streamflix-osd-skip-pill',
-                '#bfx-audio-miniplayer'
+                '#bfx-audio-miniplayer',
+                '#bfx-audio-engine'
             ].forEach(function (sel) {
                 var el = document.querySelector(sel);
                 if (el && el.parentNode) {

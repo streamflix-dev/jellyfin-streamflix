@@ -620,6 +620,10 @@
 
         // 1. Immediately close any open StreamFlix detail modal AND show the dark playback transition loader
         // so the card disappears right away instead of staying stuck on screen!
+        if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDmPlay) {}
+            state.activeDetailModal = null;
+        }
         var openModals = document.querySelectorAll('.streamflix-modal-backdrop');
         for (var m = 0; m < openModals.length; m++) {
             if (openModals[m].parentNode) {
@@ -628,12 +632,34 @@
         }
         document.body.classList.remove('streamflix-modal-open');
         hidePlaybackLoader();
+
+        if (itemObj && (itemObj.Type === 'Audio' || itemObj.Type === 'AudioBook' || itemObj.Type === 'MusicAlbum') && typeof playStreamFlixAudioItem === 'function') {
+            playStreamFlixAudioItem(itemObj);
+            return;
+        }
+        if (itemObj && itemObj.Type === 'Book') {
+            var bookSrv = itemObj.ServerId || resolveKnownServerId();
+            window.location.hash = '#/details?id=' + encodeURIComponent(targetId) + (bookSrv ? '&serverId=' + encodeURIComponent(bookSrv) : '');
+            return;
+        }
+
         showPlaybackLoader(isWpFollow ? 'Syncing Watch Party…' : 'Starting playback…');
 
         var hasCustomTracks = (audioStreamIndex !== undefined && audioStreamIndex !== null && audioStreamIndex !== '')
             || (subtitleStreamIndex !== undefined && subtitleStreamIndex !== null && subtitleStreamIndex !== '');
 
         resolvePlayableItem(itemObj || targetId).then(function (playableItem) {
+            if (playableItem && (playableItem.Type === 'Audio' || playableItem.Type === 'AudioBook' || playableItem.Type === 'MusicAlbum') && typeof playStreamFlixAudioItem === 'function') {
+                hidePlaybackLoader();
+                playStreamFlixAudioItem(playableItem);
+                return;
+            }
+            if (playableItem && playableItem.Type === 'Book') {
+                hidePlaybackLoader();
+                var resolvedBookSrv = playableItem.ServerId || resolveKnownServerId();
+                window.location.hash = '#/details?id=' + encodeURIComponent(playableItem.Id || targetId) + (resolvedBookSrv ? '&serverId=' + encodeURIComponent(resolvedBookSrv) : '');
+                return;
+            }
             var playableId = (playableItem && playableItem.Id) || targetId;
             state.lastPlayNormId = normalizeGuid(playableId);
             state.lastPlayRawTarget = playableItem || playableId;

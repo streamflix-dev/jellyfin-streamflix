@@ -311,6 +311,16 @@
     }
 
     function clearActiveProfileState(clearHouseholdDefault) {
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            try { stopStreamFlixAudioMiniPlayer({ skipReport: true }); } catch (eMp) {}
+        }
+        if (state && state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDm) {}
+            state.activeDetailModal = null;
+        }
+        if (typeof document !== 'undefined' && document.body && !document.querySelector('.streamflix-detail-modal')) {
+            document.body.classList.remove('streamflix-modal-open');
+        }
         state.activeProfile = null;
         saveSessionJson(TAB_PROFILE_KEY, null);
         try {

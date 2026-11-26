@@ -497,8 +497,12 @@ public partial class StreamFlixController
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList(),
                         SeerrRequestQuota = Math.Clamp(src.SeerrRequestQuota, -1, 500),
-                        BedtimeStart = NormalizeTimeString(src.BedtimeStart),
-                        BedtimeEnd = NormalizeTimeString(src.BedtimeEnd),
+                        BedtimeStart = src.IsKids && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeStart)) && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeEnd))
+                            ? NormalizeTimeString(src.BedtimeStart)
+                            : string.Empty,
+                        BedtimeEnd = src.IsKids && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeStart)) && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeEnd))
+                            ? NormalizeTimeString(src.BedtimeEnd)
+                            : string.Empty,
                         JellyfinUserId = prevProf?.JellyfinUserId,
                         JellyfinUsername = !string.IsNullOrWhiteSpace(src.JellyfinUsername) ? src.JellyfinUsername.Trim() : prevProf?.JellyfinUsername,
                         IsPluginCreatedJellyfinUser = prevProf?.IsPluginCreatedJellyfinUser ?? false,

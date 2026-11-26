@@ -1462,6 +1462,8 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         };
 
         let richBadgesCfg = true;
+        let visualPresetCfg = 'oled';
+        let cardDensityCfg = 'large';
         const loc99 = {
             href: 'https://jellyfin.example.com/web/index.html#/home',
             origin: 'https://jellyfin.example.com',
@@ -1481,8 +1483,8 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
             enableWatchTogether: true,
             enableRichDetailBadges: richBadgesCfg,
             enableSkipIntro: true,
-            visualPreset: 'oled',
-            cardDensity: 'large',
+            visualPreset: visualPresetCfg,
+            cardDensity: cardDensityCfg,
             profiles: [prof99],
         });
 
@@ -1629,6 +1631,22 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
         assert.match(combinedJs, /IntroTimestamps/, 'Intro Skipper v1 endpoint must be supported in Skip Intro engine');
         assert.match(combinedJs, /\/MediaSegments\//, 'Jellyfin 10.10+/12 MediaSegments endpoint must be supported in Skip Intro engine');
         assert.match(combinedJs, /streamflix-osd-skip-pill/, 'Upgraded frosted-glass OSD Skip Intro pill must be wired');
+        assert.doesNotMatch(combinedJs, /\/Download\?api_key=/, 'Audio & media Download fallback URLs must use native ?ApiKey= instead of legacy ?api_key=');
+        assert.match(css02, /body\.bfx-active\.streamflix-modal-open/, 'Modal scroll lock must be scoped to body.bfx-active.streamflix-modal-open');
+
+        // 5. Live PublicConfig visual preset refresh + Sign-Out cleanup of Audio Mini-Player & Detail Modal state
+        richBadgesCfg = false;
+        visualPresetCfg = 'midnight';
+        cardDensityCfg = 'compact';
+        await win99.__STREAMFLIX_REFRESH_CONFIG__();
+        await new Promise((r) => setTimeout(r, 35));
+        assert.equal(body99.getAttribute('data-bfx-preset'), 'midnight', 'Live PublicConfig refresh must immediately update data-bfx-preset on body');
+        assert.equal(body99.getAttribute('data-bfx-density'), 'compact', 'Live PublicConfig refresh must immediately update data-bfx-density on body');
+
+        win99.__STREAMFLIX_SIGN_OUT_LOCAL__(true);
+        assert.equal(doc99.getElementById('bfx-audio-miniplayer'), null, 'Household sign-out must remove #bfx-audio-miniplayer');
+        assert.equal(doc99.getElementById('bfx-audio-engine'), null, 'Household sign-out must remove #bfx-audio-engine');
+        assert.equal(body99.classList.contains('streamflix-modal-open'), false, 'Household sign-out must clear streamflix-modal-open class');
         console.log('[PASS] v0.9.9 Visual Presets, Rich Detail Badges, Decluttered Editorial Modal, Compact Account Menu, Settings Appearance Card, Skip Intro Pill & Audio Mini-Player verified');
     }
 }

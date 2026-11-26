@@ -860,7 +860,7 @@ body.bfx-active:not(.bfx-native-phone-download) .btnDownload {
 .streamflix-modal::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
-body.streamflix-modal-open {
+body.bfx-active.streamflix-modal-open {
     overflow: hidden !important;
 }
 
