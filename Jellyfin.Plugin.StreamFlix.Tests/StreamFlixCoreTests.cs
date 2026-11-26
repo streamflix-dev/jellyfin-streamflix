@@ -574,4 +574,43 @@ public class StreamFlixCoreTests
         var badgesDisabledCfg = new PluginConfiguration { EnableRichDetailBadges = false };
         Assert.True(Plugin.HasMeaningfulUserConfig(badgesDisabledCfg));
     }
+
+    [Fact]
+    public void DesktopRelayFlow_LaunchInfoAndNonConsumingStatusSurvivePollClaim()
+    {
+        var (stateId, pollSecret) = StreamFlixOidcService.CreateDesktopRelayFlow("prof_1", "smith@example.com");
+
+        var launchInfo = StreamFlixOidcService.TryGetPendingDesktopLaunchInfo(stateId);
+        Assert.True(launchInfo.Found);
+        Assert.Equal("smith@example.com", launchInfo.LoginHint);
+
+        var initialStatus = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("pending", initialStatus.Status);
+
+        var handoff = new StreamFlixOidcService.OidcHandoffPayload(
+            SessionToken: "secret_session_token_abc",
+            ProviderName: "Google",
+            Email: "smith@example.com",
+            Username: string.Empty,
+            Name: "Smith",
+            Picture: string.Empty,
+            ExpiresAt: DateTimeOffset.UtcNow.AddDays(30).ToString("O"),
+            PendingProfileId: "prof_1");
+        StreamFlixOidcService.StoreCompletedFlow(stateId, handoff, errorMessage: null);
+
+        // PeekDesktopRelayStatus must report completion without consuming JMP's one-time pollSecret
+        var peekBeforeClaim = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("complete", peekBeforeClaim.Status);
+        Assert.Equal("smith@example.com", peekBeforeClaim.Who);
+
+        // JMP desktop app claims the one-time flow with pollSecret
+        var claimed = StreamFlixOidcService.PollOrClaimFlow(stateId, pollSecret);
+        Assert.Equal("complete", claimed.Status);
+        Assert.Equal("secret_session_token_abc", claimed.Handoff?.SessionToken);
+
+        // Even after JMP claims & removes the flow, the browser launcher tab can still observe completion to auto-close
+        var peekAfterClaim = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("complete", peekAfterClaim.Status);
+        Assert.Equal("smith@example.com", peekAfterClaim.Who);
+    }
 }

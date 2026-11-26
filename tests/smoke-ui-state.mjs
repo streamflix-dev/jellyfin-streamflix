@@ -327,6 +327,8 @@ assert.match(css02, /@supports\s+not\s*\(aspect-ratio:\s*1\s*\/\s*1\)/, 'Card as
 assert.match(combinedJs, /function\s+canOpenExternalSystemBrowser\s*\(/, 'JMP external system-browser SSO detection helper must be present');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopBegin/, 'Desktop Google OAuth relay begin endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopPoll/, 'Desktop Google OAuth relay poll endpoint must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/DesktopLaunch\?kind=/, 'Single-history DesktopLaunch browser tab opener must be wired for reliable window.close()');
+assert.match(combinedJs, /streamflix_desktop_sso_v1/, 'BroadcastChannel auto-close notification for DesktopLaunch tab must be wired');
 assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto-closing desktop SSO browser tab helper must be wired');
 assert.match(combinedJs, /function\s+checkFlexGapSupport\s*\(/, 'Chromium 83 Flexbox gap runtime feature detection must be wired');
 const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'), 'utf8');

@@ -54,11 +54,13 @@
         if (typeof capturePendingWatchPartyFromUrl === 'function') {
             capturePendingWatchPartyFromUrl();
         }
-        // Strip the token from the address bar and history immediately
+        // Strip the token from the address bar without adding a session history entry (preserves window.close() eligibility)
         try {
             window.history.replaceState(null, document.title, window.location.pathname + '#/home');
         } catch (e) {
-            window.location.hash = '#/home';
+            if (!result.desktopRelayStateId) {
+                window.location.hash = '#/home';
+            }
         }
         return result;
     }
@@ -258,6 +260,14 @@
         });
     }
 
+    function buildDesktopLaunchUrl(kind, stateId) {
+        var retBase = (window.location && window.location.pathname) ? window.location.pathname : '/web/index.html';
+        return apiBase()
+            + '/StreamFlix/Auth/DesktopLaunch?kind=' + encodeURIComponent(kind || 'google')
+            + '&stateId=' + encodeURIComponent(stateId || '')
+            + '&returnWebBase=' + encodeURIComponent(retBase);
+    }
+
     function startGoogleOAuthRedirect(pendingProfileId, loginHint) {
         var clientId = state.config && state.config.googleClientId;
         if (!clientId) {
@@ -283,6 +293,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    returnWebBase: window.location.pathname || '/web/index.html',
                     pendingProfileId: pendingProfileId || '',
                     loginHint: loginHint || ''
                 })
@@ -291,15 +302,7 @@
                     throw new Error((res && res.message) || 'Could not start Google sign-in.');
                 }
                 savePendingGoogleDesktopFlow(res.stateId, res.pollSecret);
-                var extUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-                    + '?client_id=' + encodeURIComponent(clientId)
-                    + '&redirect_uri=' + encodeURIComponent(getGoogleRedirectUri())
-                    + '&response_type=token'
-                    + '&scope=' + encodeURIComponent('openid email profile')
-                    + '&state=' + encodeURIComponent('sf_jmp_' + res.stateId)
-                    + '&include_granted_scopes=true'
-                    + '&prompt=select_account'
-                    + (loginHint ? '&login_hint=' + encodeURIComponent(loginHint) : '');
+                var extUrl = buildDesktopLaunchUrl('google', res.stateId);
                 ensureDesktopAuthPollTimer();
                 window.NativeShell.openUrl(extUrl);
             }).catch(function (err) {
@@ -342,6 +345,25 @@
         window.location.assign(authUrl);
     }
 
+    function notifyDesktopLauncherCompleted(stateId, whoLabel, errorMsg) {
+        var payload = {
+            type: errorMsg ? 'desktop_sso_error' : 'desktop_sso_complete',
+            stateId: String(stateId || ''),
+            who: String(whoLabel || ''),
+            message: String(errorMsg || ''),
+            ts: Date.now()
+        };
+        try {
+            if (typeof BroadcastChannel === 'function') {
+                var bc = new BroadcastChannel('streamflix_desktop_sso_v1');
+                bc.postMessage(payload);
+            }
+        } catch (eBc) {}
+        try {
+            localStorage.setItem('streamflix_desktop_sso_done_v1', JSON.stringify(payload));
+        } catch (eLs) {}
+    }
+
     function tryCloseCurrentBrowserTab() {
         try { window.close(); } catch (e1) {}
         try {
@@ -353,27 +375,37 @@
         try { window.close(); } catch (e3) {}
     }
 
-    function completeDesktopBrowserTabClose(whoLabel) {
+    function completeDesktopBrowserTabClose(whoLabel, stateId) {
         state.desktopRelayTabClosed = true;
+        notifyDesktopLauncherCompleted(stateId, whoLabel, '');
         tryCloseCurrentBrowserTab();
         setTimeout(tryCloseCurrentBrowserTab, 60);
+        setTimeout(tryCloseCurrentBrowserTab, 180);
 
         var subCopy = whoLabel
-            ? ('Signed in as <strong>' + escapeHtml(whoLabel) + '</strong>. Jellyfin Media Player has been unlocked automatically — you can close this browser tab.')
-            : 'Jellyfin Media Player has been unlocked automatically — you can close this browser tab.';
+            ? ('Signed in as <strong>' + escapeHtml(whoLabel) + '</strong>. Jellyfin Media Player has been unlocked automatically — closing this window…')
+            : 'Jellyfin Media Player has been unlocked automatically — closing this window…';
         var root = setGateView('desktop-complete', '', ''
             + '<div class="streamflix-center-stage">'
             + '  <div class="streamflix-auth-card" style="text-align:center;">'
             + '    <div class="streamflix-qc-badge streamflix-qc-success" style="margin:0 auto 16px auto;">' + icon('check') + '</div>'
             + '    <h1 style="font-size:24px;margin-bottom:10px;">Signed in to ' + escapeHtml(getBrandName()) + '</h1>'
-            + '    <p style="margin-bottom:22px;">' + subCopy + '</p>'
+            + '    <p id="streamflix-close-relay-copy" style="margin-bottom:22px;">' + subCopy + '</p>'
             + '    <button type="button" class="streamflix-btn-primary" id="streamflix-close-relay-tab-btn" style="width:100%;">Close Tab</button>'
+            + '    <div id="streamflix-close-relay-hint" style="margin-top:12px;font-size:12.5px;color:rgba(255,255,255,0.56);min-height:18px;"></div>'
             + '  </div>'
             + '</div>');
         var closeBtn = root && root.querySelector('#streamflix-close-relay-tab-btn');
+        var hintEl = root && root.querySelector('#streamflix-close-relay-hint');
         if (closeBtn) {
             closeBtn.addEventListener('click', function () {
                 tryCloseCurrentBrowserTab();
+                setTimeout(function () {
+                    if (!window.closed && hintEl) {
+                        var shortcut = (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || '')) ? '⌘W' : 'Ctrl+W';
+                        hintEl.textContent = 'Your browser prevented closing this tab automatically — press ' + shortcut + ' to close it.';
+                    }
+                }, 160);
             });
         }
     }
@@ -394,13 +426,17 @@
             state.verifyingGoogle = false;
             if (!res || !res.verified || !res.sessionToken) {
                 takePendingProfileId();
+                if (desktopRelayStateId) {
+                    notifyDesktopLauncherCompleted(desktopRelayStateId, '', (res && res.message) || 'Google verification failed.');
+                    tryCloseCurrentBrowserTab();
+                }
                 renderGoogleAuthGate(null, (res && res.message) || 'Google verification failed.');
                 return null;
             }
 
             if (res.desktopRelayCompleted) {
                 takePendingProfileId();
-                completeDesktopBrowserTabClose(res.email || res.name || '');
+                completeDesktopBrowserTabClose(res.email || res.name || '', desktopRelayStateId);
                 return res;
             }
 
@@ -476,7 +512,9 @@
         try {
             window.history.replaceState(null, document.title, window.location.pathname + '#/home');
         } catch (e) {
-            window.location.hash = '#/home';
+            if (!isDesktop) {
+                window.location.hash = '#/home';
+            }
         }
         return {
             complete: okFlag === '1',
@@ -620,6 +658,11 @@
             if (res.stateId && res.pollSecret) {
                 savePendingOidcFlow(res.stateId, res.pollSecret);
             }
+            if (canOpenExternalSystemBrowser() && res.stateId) {
+                ensureDesktopAuthPollTimer();
+                window.NativeShell.openUrl(buildDesktopLaunchUrl('oidc', res.stateId));
+                return;
+            }
             navigateExternalNoReferrer(res.authorizeUrl);
         }).catch(function (err) {
             state.startingOidcRedirect = false;
@@ -671,7 +714,7 @@
     function completeOidcHandoff(oidcCb) {
         if (oidcCb && oidcCb.desktopRelay && oidcCb.complete && !oidcCb.error) {
             takePendingProfileId();
-            completeDesktopBrowserTabClose('');
+            completeDesktopBrowserTabClose('', oidcCb.stateId || '');
             return Promise.resolve(null);
         }
         state.verifyingGoogle = true;

@@ -201,12 +201,76 @@ public partial class StreamFlixController
             return StatusCode(403, new { code = "google_disabled", message = "Google Sign-In is not enabled on this server." });
         }
 
-        var (stateId, pollSecret) = StreamFlixOidcService.CreateDesktopRelayFlow(request?.PendingProfileId);
+        var (stateId, pollSecret) = StreamFlixOidcService.CreateDesktopRelayFlow(request?.PendingProfileId, request?.LoginHint);
         return Ok(new
         {
             stateId,
             pollSecret,
         });
+    }
+
+    [HttpGet("Auth/DesktopRelayStatus")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<object> GetDesktopRelayStatus([FromQuery] string? stateId = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var statusEntry = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        return Ok(new
+        {
+            status = statusEntry.Status,
+            who = statusEntry.Who,
+            message = statusEntry.ErrorMessage,
+        });
+    }
+
+    [HttpGet("Auth/DesktopLaunch")]
+    [AllowAnonymous]
+    public ContentResult LaunchDesktopSsoTab(
+        [FromQuery] string? kind = null,
+        [FromQuery] string? stateId = null,
+        [FromQuery] string? returnWebBase = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var cleanKind = (kind ?? "google").Trim().ToLowerInvariant();
+        var cleanState = (stateId ?? string.Empty).Trim().ToLowerInvariant();
+        var safeWebBase = ResolveSafeRelativeWebPath(returnWebBase);
+        var info = StreamFlixOidcService.TryGetPendingDesktopLaunchInfo(cleanState);
+
+        if (!info.Found)
+        {
+            return Content(
+                BuildDesktopLauncherHtml(config, cleanState, string.Empty, string.Empty, string.Empty, "Sign-in session expired. Start sign-in again from Jellyfin Media Player."),
+                "text/html; charset=utf-8");
+        }
+
+        if (string.Equals(cleanKind, "oidc", StringComparison.Ordinal))
+        {
+            if (!StreamFlixOidcService.IsConfigured(config) || string.IsNullOrWhiteSpace(info.AuthRedirectUrl))
+            {
+                return Content(
+                    BuildDesktopLauncherHtml(config, cleanState, string.Empty, string.Empty, string.Empty, "OpenID Connect sign-in is not available on this server."),
+                    "text/html; charset=utf-8");
+            }
+
+            var providerLabel = StreamFlixOidcService.GetDisplayProviderName(config);
+            return Content(
+                BuildDesktopLauncherHtml(config, cleanState, providerLabel, info.AuthRedirectUrl, safeWebBase, null),
+                "text/html; charset=utf-8");
+        }
+
+        var googleClientId = (config.GoogleClientId ?? string.Empty).Trim();
+        if (!config.EnableGoogleSignIn || string.IsNullOrEmpty(googleClientId))
+        {
+            return Content(
+                BuildDesktopLauncherHtml(config, cleanState, string.Empty, string.Empty, string.Empty, "Google Sign-In is not enabled on this server."),
+                "text/html; charset=utf-8");
+        }
+
+        return Content(
+            BuildDesktopLauncherHtml(config, cleanState, "Google", string.Empty, safeWebBase, null, googleClientId, info.LoginHint),
+            "text/html; charset=utf-8");
     }
 
     [HttpPost("Auth/GoogleDesktopPoll")]
@@ -927,6 +991,11 @@ public partial class StreamFlixController
             }
 
             StreamFlixOidcService.StoreCompletedFlow(statePayload.StateId, null, friendly);
+            if (statePayload.DesktopRelay)
+            {
+                return Content(BuildDesktopRelayPopupCompleteHtml(config, string.Empty, statePayload.StateId, friendly), "text/html; charset=utf-8");
+            }
+
             return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: friendly, stateId: statePayload.StateId));
         }
 
@@ -950,6 +1019,11 @@ public partial class StreamFlixController
                     : (!string.IsNullOrWhiteSpace(identity.Username) ? identity.Username : identity.Subject);
                 var denyMsg = $"{who} isn't on the approved OIDC allowlist for this StreamFlix server. Ask the owner to add it in Dashboard → Plugins → StreamFlix.";
                 StreamFlixOidcService.StoreCompletedFlow(statePayload.StateId, null, denyMsg);
+                if (statePayload.DesktopRelay)
+                {
+                    return Content(BuildDesktopRelayPopupCompleteHtml(config, string.Empty, statePayload.StateId, denyMsg), "text/html; charset=utf-8");
+                }
+
                 return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: denyMsg, stateId: statePayload.StateId));
             }
 
@@ -973,6 +1047,12 @@ public partial class StreamFlixController
 
             StreamFlixOidcService.StoreCompletedFlow(statePayload.StateId, handoffPayload, errorMessage: null);
 
+            if (statePayload.DesktopRelay)
+            {
+                var whoSuccess = verifiedEmail ?? (!string.IsNullOrWhiteSpace(identity.Username) ? identity.Username : identity.Name);
+                return Content(BuildDesktopRelayPopupCompleteHtml(config, whoSuccess ?? string.Empty, statePayload.StateId, null), "text/html; charset=utf-8");
+            }
+
             var signedHandoff = StreamFlixSessionService.SignShortLivedPayload(
                 config,
                 StreamFlixOidcService.HandoffTokenPurpose,
@@ -995,6 +1075,11 @@ public partial class StreamFlixController
         {
             _logger.LogWarning(ex, "StreamFlix: OIDC callback verification failed.");
             StreamFlixOidcService.StoreCompletedFlow(statePayload.StateId, null, ex.Message);
+            if (statePayload.DesktopRelay)
+            {
+                return Content(BuildDesktopRelayPopupCompleteHtml(config, string.Empty, statePayload.StateId, ex.Message), "text/html; charset=utf-8");
+            }
+
             return Redirect(BuildOidcReturnUrl(safeWebBase, errorMessage: ex.Message, stateId: statePayload.StateId, desktopRelay: statePayload.DesktopRelay));
         }
     }
@@ -1343,6 +1428,362 @@ public partial class StreamFlixController
             Path = GetCookieBasePath(),
             IsEssential = true,
         });
+    }
+
+    private string BuildDesktopLauncherHtml(
+        PluginConfiguration config,
+        string stateId,
+        string providerLabel,
+        string directAuthUrl,
+        string safeWebBase,
+        string? initialError,
+        string? googleClientId = null,
+        string? loginHint = null)
+    {
+        var brand = string.IsNullOrWhiteSpace(config.CustomBrandName) ? "StreamFlix" : config.CustomBrandName.Trim();
+        var accent = NormalizeSafeHexColor(config.CustomAccentColor);
+        var encBrand = System.Net.WebUtility.HtmlEncode(brand);
+        var encBrandUpper = System.Net.WebUtility.HtmlEncode(brand.ToUpperInvariant());
+        var encProvider = System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(providerLabel) ? "Single Sign-On" : providerLabel);
+        var basePath = Request.PathBase.HasValue ? Request.PathBase.Value.TrimEnd('/') : string.Empty;
+        var statusEndpoint = $"{basePath}/StreamFlix/Auth/DesktopRelayStatus?stateId={Uri.EscapeDataString(stateId)}";
+
+        var jsState = JsonSerializer.Serialize(stateId);
+        var jsDirectUrl = JsonSerializer.Serialize(directAuthUrl ?? string.Empty);
+        var jsSafeWebBase = JsonSerializer.Serialize(safeWebBase ?? "/web/index.html");
+        var jsGoogleClientId = JsonSerializer.Serialize(googleClientId ?? string.Empty);
+        var jsLoginHint = JsonSerializer.Serialize(loginHint ?? string.Empty);
+        var jsStatusUrl = JsonSerializer.Serialize(statusEndpoint);
+        var jsInitialErr = JsonSerializer.Serialize(initialError ?? string.Empty);
+        var jsProvider = JsonSerializer.Serialize(string.IsNullOrWhiteSpace(providerLabel) ? "Single Sign-On" : providerLabel);
+        var jsBrandUpper = JsonSerializer.Serialize(brand.ToUpperInvariant());
+
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""utf-8"" />
+<meta name=""viewport"" content=""width=device-width, initial-scale=1"" />
+<title>Sign in to {encBrand}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  html, body {{
+    margin: 0; padding: 0; min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, rgba(229,9,20,0.16), transparent 52%), #0d0d10;
+    color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }}
+  .sf-card {{
+    width: 100%; max-width: 440px; background: rgba(20,20,25,0.96);
+    border: 1px solid rgba(255,255,255,0.10); border-radius: 18px;
+    padding: 34px 32px 28px; text-align: center;
+    box-shadow: 0 28px 80px rgba(0,0,0,0.68);
+  }}
+  .sf-brand {{
+    display: inline-block; font-weight: 900; font-size: 13px; letter-spacing: 0.2em;
+    color: {accent}; margin-bottom: 18px;
+  }}
+  .sf-badge {{
+    width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 18px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.42); color: #4ade80;
+    box-shadow: 0 0 28px rgba(34,197,94,0.25);
+  }}
+  .sf-badge.err {{ background: rgba(239,68,68,0.16); border-color: rgba(239,68,68,0.42); color: #f87171; box-shadow: none; }}
+  h1 {{ margin: 0 0 10px; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #fff; }}
+  p {{ margin: 0 0 24px; font-size: 14.5px; line-height: 1.55; color: rgba(255,255,255,0.72); }}
+  p strong {{ color: #fff; }}
+  .sf-btn {{
+    width: 100%; height: 46px; border-radius: 11px; border: 0; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease;
+  }}
+  .sf-btn:active {{ transform: scale(0.985); }}
+  .sf-btn-primary {{ background: #fff; color: #111827; margin-bottom: 10px; }}
+  .sf-btn-primary:hover {{ background: #f3f4f6; }}
+  .sf-btn-accent {{ background: {accent}; color: #fff; margin-bottom: 10px; }}
+  .sf-btn-accent:hover {{ opacity: 0.92; }}
+  .sf-btn-ghost {{
+    background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+  }}
+  .sf-btn-ghost:hover {{ background: rgba(255,255,255,0.11); color: #fff; }}
+  .sf-hint {{ margin-top: 12px; font-size: 12.5px; color: rgba(255,255,255,0.52); min-height: 18px; }}
+  .hide {{ display: none !important; }}
+</style>
+</head>
+<body>
+  <div class=""sf-card"" id=""sf-card"">
+    <div class=""sf-brand"">{encBrandUpper}</div>
+    <div class=""sf-badge hide"" id=""sf-done-badge"">
+      <svg width=""28"" height=""28"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2.6"" stroke-linecap=""round"" stroke-linejoin=""round""><path d=""M5 12.5l4.5 4.5L19 7.5""/></svg>
+    </div>
+    <h1 id=""sf-title"">Continue to {encProvider}</h1>
+    <p id=""sf-desc"">Complete your sign-in to unlock <strong>{encBrand}</strong> in the desktop app. This browser tab will close automatically when finished.</p>
+    <button type=""button"" class=""sf-btn sf-btn-primary"" id=""sf-launch-btn"">Continue with {encProvider}</button>
+    <button type=""button"" class=""sf-btn sf-btn-ghost"" id=""sf-close-btn"">Close Tab</button>
+    <div class=""sf-hint"" id=""sf-hint""></div>
+  </div>
+<script>
+(function() {{
+  var stateId = {jsState};
+  var directAuthUrl = {jsDirectUrl};
+  var safeWebBase = {jsSafeWebBase};
+  var googleClientId = {jsGoogleClientId};
+  var loginHint = {jsLoginHint};
+  var statusUrl = {jsStatusUrl};
+  var initialErr = {jsInitialErr};
+  var providerName = {jsProvider};
+  var brandUpper = {jsBrandUpper};
+  var popupWin = null;
+  var finished = false;
+  var pollTimer = null;
+
+  var titleEl = document.getElementById('sf-title');
+  var descEl = document.getElementById('sf-desc');
+  var badgeEl = document.getElementById('sf-done-badge');
+  var launchBtn = document.getElementById('sf-launch-btn');
+  var closeBtn = document.getElementById('sf-close-btn');
+  var hintEl = document.getElementById('sf-hint');
+
+  function esc(s) {{
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/""/g, '&quot;');
+  }}
+
+  function buildAuthUrl() {{
+    if (directAuthUrl) return directAuthUrl;
+    if (!googleClientId) return '';
+    var redirectUri = window.location.origin + safeWebBase;
+    return 'https://accounts.google.com/o/oauth2/v2/auth'
+      + '?client_id=' + encodeURIComponent(googleClientId)
+      + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      + '&response_type=token'
+      + '&scope=' + encodeURIComponent('openid email profile')
+      + '&state=' + encodeURIComponent('sf_jmp_' + stateId)
+      + '&include_granted_scopes=true'
+      + '&prompt=select_account'
+      + (loginHint ? '&login_hint=' + encodeURIComponent(loginHint) : '');
+  }}
+
+  function tryCloseSelf(fromUserClick) {{
+    try {{ if (popupWin && !popupWin.closed) popupWin.close(); }} catch (e0) {{}}
+    try {{ window.close(); }} catch (e1) {{}}
+    try {{ var s = window.open('', '_self'); if (s) s.close(); }} catch (e2) {{}}
+    if (fromUserClick) {{
+      setTimeout(function() {{
+        if (!window.closed && hintEl) {{
+          var shortcut = /Mac|iPhone|iPad/i.test(navigator.platform || '') ? '⌘W' : 'Ctrl+W';
+          hintEl.textContent = 'Your browser kept this tab open — press ' + shortcut + ' to close it.';
+        }}
+      }}, 160);
+    }}
+  }}
+
+  function showCompletedAndAutoClose(who) {{
+    if (finished) return;
+    finished = true;
+    if (pollTimer) {{ clearInterval(pollTimer); pollTimer = null; }}
+    tryCloseSelf(false);
+    setTimeout(function() {{ tryCloseSelf(false); }}, 60);
+    setTimeout(function() {{ tryCloseSelf(false); }}, 180);
+
+    badgeEl.classList.remove('hide', 'err');
+    titleEl.textContent = 'Signed in to ' + brandUpper;
+    descEl.innerHTML = (who ? ('Signed in as <strong>' + esc(who) + '</strong>. ') : '')
+      + 'Jellyfin Media Player has been unlocked automatically — you can close this browser tab.';
+    launchBtn.classList.add('hide');
+    closeBtn.className = 'sf-btn sf-btn-accent';
+    closeBtn.focus();
+  }}
+
+  function showErrorState(msg) {{
+    if (finished) return;
+    finished = true;
+    if (pollTimer) {{ clearInterval(pollTimer); pollTimer = null; }}
+    try {{ if (popupWin && !popupWin.closed) popupWin.close(); }} catch (e0) {{}}
+    badgeEl.innerHTML = '!';
+    badgeEl.style.fontSize = '24px';
+    badgeEl.style.fontWeight = '900';
+    badgeEl.classList.remove('hide');
+    badgeEl.classList.add('err');
+    titleEl.textContent = 'Sign-in could not finish';
+    descEl.textContent = msg || 'Please return to Jellyfin Media Player and try again.';
+    launchBtn.classList.add('hide');
+    closeBtn.className = 'sf-btn sf-btn-accent';
+  }}
+
+  function openPopupFlow() {{
+    var targetUrl = buildAuthUrl();
+    if (!targetUrl) {{
+      showErrorState('Sign-in URL is not available.');
+      return false;
+    }}
+    var w = 520, h = 660;
+    var left = Math.max(0, Math.round((window.screen.width - w) / 2));
+    var top = Math.max(0, Math.round((window.screen.height - h) / 2));
+    try {{
+      popupWin = window.open(targetUrl, 'sf_desktop_sso_' + stateId.slice(0, 8), 'popup=1,width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+    }} catch (e) {{
+      popupWin = null;
+    }}
+    if (popupWin) {{
+      try {{ popupWin.focus(); }} catch (ef) {{}}
+      titleEl.textContent = 'Completing sign-in…';
+      descEl.innerHTML = 'Finish signing in with <strong>' + esc(providerName) + '</strong> in the popup window. Both windows will close automatically as soon as you finish.';
+      launchBtn.textContent = 'Reopen ' + providerName + ' Window';
+      hintEl.textContent = '';
+      return true;
+    }}
+    return false;
+  }}
+
+  closeBtn.addEventListener('click', function() {{ tryCloseSelf(true); }});
+  launchBtn.addEventListener('click', function() {{ openPopupFlow(); }});
+
+  if (initialErr) {{
+    showErrorState(initialErr);
+    return;
+  }}
+
+  try {{
+    if (typeof BroadcastChannel === 'function') {{
+      var bc = new BroadcastChannel('streamflix_desktop_sso_v1');
+      bc.onmessage = function(ev) {{
+        var d = ev && ev.data;
+        if (d && (!d.stateId || d.stateId === stateId)) {{
+          if (d.type === 'desktop_sso_complete') showCompletedAndAutoClose(d.who || '');
+          else if (d.type === 'desktop_sso_error') showErrorState(d.message || '');
+        }}
+      }};
+    }}
+  }} catch (eBc) {{}}
+
+  window.addEventListener('storage', function(ev) {{
+    if (!ev || ev.key !== 'streamflix_desktop_sso_done_v1' || !ev.newValue) return;
+    try {{
+      var d = JSON.parse(ev.newValue);
+      if (d && (!d.stateId || d.stateId === stateId)) {{
+        if (d.type === 'desktop_sso_complete') showCompletedAndAutoClose(d.who || '');
+        else if (d.type === 'desktop_sso_error') showErrorState(d.message || '');
+      }}
+    }} catch (eSt) {{}}
+  }});
+
+  pollTimer = setInterval(function() {{
+    if (finished || !stateId) return;
+    fetch(statusUrl, {{ cache: 'no-store', credentials: 'same-origin' }})
+      .then(function(r) {{ return r.ok ? r.json() : null; }})
+      .then(function(res) {{
+        if (!res || !res.status || res.status === 'pending') return;
+        if (res.status === 'complete') showCompletedAndAutoClose(res.who || '');
+        else if (res.status === 'error') showErrorState(res.message || '');
+      }})
+      .catch(function() {{}});
+  }}, 650);
+
+  if (!openPopupFlow()) {{
+    try {{ launchBtn.focus(); }} catch (eF) {{}}
+  }}
+}})();
+</script>
+</body>
+</html>";
+    }
+
+    private static string BuildDesktopRelayPopupCompleteHtml(PluginConfiguration config, string whoLabel, string stateId, string? errorMessage)
+    {
+        var brand = string.IsNullOrWhiteSpace(config.CustomBrandName) ? "StreamFlix" : config.CustomBrandName.Trim();
+        var accent = NormalizeSafeHexColor(config.CustomAccentColor);
+        var encBrandUpper = System.Net.WebUtility.HtmlEncode(brand.ToUpperInvariant());
+        var encWho = System.Net.WebUtility.HtmlEncode(whoLabel ?? string.Empty);
+        var encErr = System.Net.WebUtility.HtmlEncode(errorMessage ?? string.Empty);
+        var isErr = !string.IsNullOrWhiteSpace(errorMessage);
+        var jsPayload = JsonSerializer.Serialize(new
+        {
+            type = isErr ? "desktop_sso_error" : "desktop_sso_complete",
+            stateId = stateId ?? string.Empty,
+            who = whoLabel ?? string.Empty,
+            message = errorMessage ?? string.Empty,
+            ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+
+        var heading = isErr ? "Sign-in could not finish" : $"Signed in to {encBrandUpper}";
+        var bodyCopy = isErr
+            ? encErr
+            : ((string.IsNullOrEmpty(encWho) ? string.Empty : $"Signed in as <strong>{encWho}</strong>. ")
+                + "Jellyfin Media Player has been unlocked automatically — closing this window…");
+
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""utf-8"" />
+<meta name=""viewport"" content=""width=device-width, initial-scale=1"" />
+<title>{heading}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  html, body {{
+    margin: 0; padding: 0; min-height: 100vh; background: #0d0d10; color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }}
+  .sf-card {{
+    width: 100%; max-width: 420px; background: #16161b; border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 18px; padding: 32px 28px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.65);
+  }}
+  h1 {{ margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #fff; }}
+  p {{ margin: 0 0 22px; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.74); }}
+  p strong {{ color: #fff; }}
+  button {{
+    width: 100%; height: 44px; border-radius: 10px; border: 0; cursor: pointer;
+    background: {accent}; color: #fff; font: inherit; font-size: 14.5px; font-weight: 700;
+  }}
+  .sf-hint {{ margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.5); min-height: 16px; }}
+</style>
+</head>
+<body>
+  <div class=""sf-card"">
+    <h1>{heading}</h1>
+    <p>{bodyCopy}</p>
+    <button type=""button"" id=""sf-close"">Close Window</button>
+    <div class=""sf-hint"" id=""sf-hint""></div>
+  </div>
+<script>
+(function() {{
+  var msg = {jsPayload};
+  try {{ if (typeof BroadcastChannel === 'function') new BroadcastChannel('streamflix_desktop_sso_v1').postMessage(msg); }} catch (e1) {{}}
+  try {{ localStorage.setItem('streamflix_desktop_sso_done_v1', JSON.stringify(msg)); }} catch (e2) {{}}
+  function closeNow(manual) {{
+    try {{ window.close(); }} catch (e3) {{}}
+    try {{ var s = window.open('', '_self'); if (s) s.close(); }} catch (e4) {{}}
+    if (manual) {{
+      setTimeout(function() {{
+        var h = document.getElementById('sf-hint');
+        if (!window.closed && h) {{
+          h.textContent = 'Press ' + (/Mac|iPhone|iPad/i.test(navigator.platform || '') ? '⌘W' : 'Ctrl+W') + ' to close this tab.';
+        }}
+      }}, 150);
+    }}
+  }}
+  document.getElementById('sf-close').addEventListener('click', function() {{ closeNow(true); }});
+  closeNow(false);
+  setTimeout(function() {{ closeNow(false); }}, 50);
+  setTimeout(function() {{ closeNow(false); }}, 180);
+}})();
+</script>
+</body>
+</html>";
+    }
+
+    private static string NormalizeSafeHexColor(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim();
+        if (s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit))
+        {
+            return s;
+        }
+
+        return "#E50914";
     }
 
     private static bool IsSafeHostHeader(string raw)

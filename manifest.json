@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.9.4",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_12.0.0.zip",
+        "checksum": "f5aec244cb3e8c245d412f9404b83c55",
+        "timestamp": "2026-11-26T04:18:49Z"
+      },
+      {
+        "version": "0.9.9.4",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_10.11.0.zip",
+        "checksum": "ab04971a7e66c82568b0af59b66fc629",
+        "timestamp": "2026-11-26T04:18:49Z"
+      },
+      {
+        "version": "0.9.9.4",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_10.9.0.zip",
+        "checksum": "5226f8c325fa072ad7c5c55564d7215c",
+        "timestamp": "2026-11-26T04:18:49Z"
+      },
+      {
         "version": "0.9.9.3",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.3 Release Candidate (Dev Test Channel): Reorganize & declutter both Dashboard Plugin Settings (Profiles, Appearance & Home, Sign-In & SSO, Features & Requests, Active Devices, System & Backup) and User Settings (#/mypreferencesmenu grouped sections), plus config recovery & playback isolation hardening.",
         "targetAbi": "12.0.0.0",
