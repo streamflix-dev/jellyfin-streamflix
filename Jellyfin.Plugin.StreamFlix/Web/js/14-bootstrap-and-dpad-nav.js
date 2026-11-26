@@ -1449,6 +1449,9 @@
         if (typeof capturePendingWatchPartyFromUrl === 'function') {
             capturePendingWatchPartyFromUrl();
         }
+        if (typeof capturePendingTvPairFromUrl === 'function') {
+            capturePendingTvPairFromUrl();
+        }
         var guestCb = extractGuestCallbackFromUrl();
         var oidcCb = guestCb ? null : extractOidcCallbackFromUrl();
         var oauth = (guestCb || oidcCb) ? null : extractGoogleOAuthResultFromUrl();

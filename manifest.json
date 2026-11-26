@@ -9,6 +9,30 @@
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
+        "version": "0.9.10.1",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.10.1 Release Candidate (Dev Test Channel): Add Scan-to-Sign-In Smart TV / Google TV QR pairing (/StreamFlix/Auth/TvPair), Exact-Credits Next Episode & Movie Up Next recommendation card powered by MediaSegments / Intro Skipper, and transparent SurfaceView hooks for native ExoPlayer TV clients.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.10.1_12.0.0.zip",
+        "checksum": "24d71a5fc7551090edfcfac6b4b991cd",
+        "timestamp": "2026-11-26T21:45:18Z"
+      },
+      {
+        "version": "0.9.10.1",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.10.1 Release Candidate (Dev Test Channel): Add Scan-to-Sign-In Smart TV / Google TV QR pairing (/StreamFlix/Auth/TvPair), Exact-Credits Next Episode & Movie Up Next recommendation card powered by MediaSegments / Intro Skipper, and transparent SurfaceView hooks for native ExoPlayer TV clients.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.10.1_10.11.0.zip",
+        "checksum": "95557703c1cee9490e05588ca7f51ad7",
+        "timestamp": "2026-11-26T21:45:18Z"
+      },
+      {
+        "version": "0.9.10.1",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.10.1 Release Candidate (Dev Test Channel): Add Scan-to-Sign-In Smart TV / Google TV QR pairing (/StreamFlix/Auth/TvPair), Exact-Credits Next Episode & Movie Up Next recommendation card powered by MediaSegments / Intro Skipper, and transparent SurfaceView hooks for native ExoPlayer TV clients.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.10.1_10.9.0.zip",
+        "checksum": "4a9208b2dfdc2397d0837d7e80ddd348",
+        "timestamp": "2026-11-26T21:45:18Z"
+      },
+      {
         "version": "0.9.10.0",
         "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- **Skip Intro & Credits Support (`Intro Skipper` & `MediaSegments`)**: Automatically detects intro, recap, preview, commercial, and credits segments across Jellyfin 10.10+/12 `MediaSegments`, the **Intro Skipper** plugin (v1 & v2 endpoints), and MKV chapter markers — surfacing a frosted-glass Skip pill with live progress fill, countdown timer, `S` keyboard shortcut, `×` dismiss, and Smart TV D-pad focus.\n- **1-Click Visual Presets & Poster Card Density**: Personalize server defaults or individual profiles inside **Settings → Appearance & Home** with 4 curated themes (`Netflix Classic`, `OLED Pure Black`, `Cinema Glass`, `Prime Midnight`) and 3 card density sizes (`Compact`, `Standard`, `Large`).\n- **2-Column Editorial Title Details, Quality Badges & Audio Mini-Player**: Redesigned *More Info* modal with optional `4K UHD` / `Dolby Vision` / `HDR10+` / `Dolby Atmos` / `DTS:X` / `AV1` / `CC` / Critic `%` / Studio badges, `⋯` More Options menu, TV Series **Shuffle**, and a persistent frosted-glass **Music & Audiobook Mini-Player** while browsing.\n- **Reorganized 6-Tab Dashboard Console, Grouped User Settings & Touch Polish**: Organized **Dashboard → Plugins → StreamFlix** into 6 focused tabs (`Profiles`, `Appearance & Home`, `Sign-In & SSO`, `Features & Requests`, `Active Devices`, `System & Backup`), grouped `#/mypreferencesmenu` into clean sections, streamlined the Account Menu, and restored crisp desktop & enlarged smartphone touch sizing.\n- **Auto-Closing Windows / Desktop SSO Browser Tab**: Signing in with Google or Custom OIDC from Jellyfin Media Player / Jellyfin Desktop on Windows now automatically closes both the auth popup and external browser tab via `/StreamFlix/Auth/DesktopLaunch` and fixes the **Close Tab** button.",
         "targetAbi": "12.0.0.0",

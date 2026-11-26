@@ -613,4 +613,47 @@ public class StreamFlixCoreTests
         Assert.Equal("complete", peekAfterClaim.Status);
         Assert.Equal("smith@example.com", peekAfterClaim.Who);
     }
+
+    [Fact]
+    public void TvPairService_BeginApproveAndOneTimePollClaim_WorksEndToEnd()
+    {
+        var started = StreamFlixTvPairService.BeginPair("https://cinema.example.com");
+        Assert.Equal(7, started.Code.Length);
+        Assert.Contains("-", started.Code);
+        Assert.Contains("<svg", started.QrSvg);
+        Assert.True(StreamFlixTvPairService.IsCodePending(started.Code, out var formatted));
+        Assert.Equal(started.Code, formatted);
+
+        var pendingPoll = StreamFlixTvPairService.PollPair(started.PairId, started.PollSecret);
+        Assert.Equal("pending", pendingPoll.Status);
+
+        // Wrong secret must be rejected without consuming the pending code
+        var badSecretPoll = StreamFlixTvPairService.PollPair(started.PairId, "wrong_secret_value_0123456789abcdef");
+        Assert.Equal("invalid", badSecretPoll.Status);
+        Assert.True(StreamFlixTvPairService.IsCodePending(started.Code, out _));
+
+        // Approve using unhyphenated lowercase code
+        var rawEntered = started.Code.Replace("-", string.Empty).ToLowerInvariant();
+        var approvedSession = new StreamFlixTvPairService.TvPairApprovedSession(
+            SessionToken: "tv_session_tok_xyz",
+            AuthKind: "google",
+            ProviderName: string.Empty,
+            Email: "smith@example.com",
+            Username: string.Empty,
+            UserId: string.Empty,
+            Name: "smith@example.com",
+            Picture: string.Empty,
+            IsAdmin: true,
+            ExpiresAt: DateTimeOffset.UtcNow.AddDays(30));
+        Assert.True(StreamFlixTvPairService.ApprovePair(rawEntered, approvedSession));
+        Assert.False(StreamFlixTvPairService.IsCodePending(started.Code, out _));
+
+        // First TV poll claims the session; second poll sees expired (one-time claim)
+        var completePoll = StreamFlixTvPairService.PollPair(started.PairId, started.PollSecret);
+        Assert.Equal("complete", completePoll.Status);
+        Assert.Equal("tv_session_tok_xyz", completePoll.Session?.SessionToken);
+
+        var replayPoll = StreamFlixTvPairService.PollPair(started.PairId, started.PollSecret);
+        Assert.Equal("expired", replayPoll.Status);
+    }
 }

@@ -329,6 +329,11 @@ assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopBegin/, 'Desktop Goog
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopPoll/, 'Desktop Google OAuth relay poll endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/DesktopLaunch\?kind=/, 'Single-history DesktopLaunch browser tab opener must be wired for reliable window.close()');
 assert.match(combinedJs, /streamflix_desktop_sso_v1/, 'BroadcastChannel auto-close notification for DesktopLaunch tab must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Begin/, 'Smart TV Scan-to-Sign-In QR Begin endpoint must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Poll/, 'Smart TV Scan-to-Sign-In QR Poll endpoint must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Approve/, 'Smart TV Scan-to-Sign-In QR Approve endpoint must be wired');
+assert.match(combinedJs, /function\s+getExactOutroCreditsStartSec\s*\(/, 'Exact-credits Next Episode & Movie Up Next segment detector must be wired');
+assert.match(combinedJs, /osdState\.nextMovieRec/, 'Movie credits Up Next recommendation state must be wired');
 assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto-closing desktop SSO browser tab helper must be wired');
 assert.match(combinedJs, /function\s+checkFlexGapSupport\s*\(/, 'Chromium 83 Flexbox gap runtime feature detection must be wired');
 const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'), 'utf8');

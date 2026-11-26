@@ -855,6 +855,9 @@
                     clearLocalJellyfinAuth();
                 }
 
+                if (typeof completePendingTvPairApprovalIfAny === 'function') {
+                    completePendingTvPairApprovalIfAny();
+                }
                 var pendingId = takePendingProfileId();
                 return fetchPublicConfig().then(function () {
                     var pending = pendingId ? findProfileById(pendingId) : null;
@@ -929,6 +932,27 @@
             ? ('<button type="button" class="streamflix-admin-fallback-link streamflix-guest-pass-link" id="streamflix-expand-guest-pass">'
                 + icon('ticket') + '<span>Have a Guest Pass?</span>'
                 + '</button>')
+            : '';
+
+        var isTvGate = (typeof detectTvEnvironment === 'function' && detectTvEnvironment())
+            || (typeof isTvOrDpadActive === 'function' && isTvOrDpadActive());
+        var isPhoneGate = !isTvGate && (typeof detectPhoneEnvironment === 'function' && detectPhoneEnvironment());
+        var showQrSidePanel = !state.guestPassExpanded && !state.adminLoginExpanded && (ssoEnabled || stdEnabled) && (isTvGate || Boolean(state.tvQrExpanded));
+        var qrToggleFootBtnHtml = (!isPhoneGate && !isTvGate && (ssoEnabled || stdEnabled))
+            ? ('<button type="button" class="streamflix-admin-fallback-link" id="streamflix-toggle-tv-qr">'
+                + icon('qr') + '<span>' + (state.tvQrExpanded ? 'Hide Phone QR' : 'Scan with Phone') + '</span>'
+                + '</button>')
+            : '';
+        var tvQrPanelHtml = showQrSidePanel
+            ? (''
+                + '<div class="streamflix-tv-qr-panel">'
+                + '  <div class="streamflix-auth-kicker">Instant Sign-In</div>'
+                + '  <h2>Scan with Phone</h2>'
+                + '  <div class="streamflix-tv-qr-box" id="streamflix-tv-qr-svg"><span class="streamflix-inline-spinner"></span></div>'
+                + '  <div class="streamflix-tv-qr-code-pill" id="streamflix-tv-qr-code">' + escapeHtml((state.tvPairData && state.tvPairData.code) || '•••-•••') + '</div>'
+                + '  <p class="streamflix-tv-qr-sub" id="streamflix-tv-qr-status">Point your phone camera at the QR code to unlock ' + escapeHtml(getBrandName()) + ' without typing.</p>'
+                + '  <button type="button" class="streamflix-link-btn" id="streamflix-refresh-tv-qr">Refresh QR code</button>'
+                + '</div>')
             : '';
 
         var effectiveStatus = statusText || (waitingExternalBrowser ? 'Complete sign-in in your browser — this app will unlock automatically…' : '');
@@ -1042,6 +1066,8 @@
             viewKey = 'auth-hybrid';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
+                + '  <div class="' + (showQrSidePanel ? 'streamflix-tv-auth-split' : 'streamflix-auth-single-wrap') + '">'
+                + tvQrPanelHtml
                 + '  <div class="streamflix-auth-card' + (busy ? ' streamflix-busy' : '') + '">'
                 + '    <h1>Sign in</h1>'
                 + '    <p>' + hybridLeadCopy + '</p>'
@@ -1055,7 +1081,10 @@
                     passwordPlaceholder: 'Password',
                     adminOnly: false
                 })
-                + (guestFootBtnHtml ? ('    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>') : '')
+                + ((guestFootBtnHtml || qrToggleFootBtnHtml)
+                    ? ('    <div class="streamflix-auth-foot streamflix-auth-foot-row">' + guestFootBtnHtml + qrToggleFootBtnHtml + '    </div>')
+                    : '')
+                + '  </div>'
                 + '  </div>'
                 + '</div>';
         } else if (!ssoEnabled && stdEnabled) {
@@ -1063,6 +1092,8 @@
             viewKey = 'auth-standard';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
+                + '  <div class="' + (showQrSidePanel ? 'streamflix-tv-auth-split' : 'streamflix-auth-single-wrap') + '">'
+                + tvQrPanelHtml
                 + '  <div class="streamflix-auth-card">'
                 + '    <h1>Sign in</h1>'
                 + '    <p>Sign in with your Jellyfin account to unlock ' + escapeHtml(getBrandName()) + ' on this device. You\'ll choose who\'s watching next.</p>'
@@ -1074,7 +1105,10 @@
                     passwordPlaceholder: 'Password',
                     adminOnly: false
                 })
-                + (guestFootBtnHtml ? ('    <div class="streamflix-auth-foot">' + guestFootBtnHtml + '</div>') : '')
+                + ((guestFootBtnHtml || qrToggleFootBtnHtml)
+                    ? ('    <div class="streamflix-auth-foot streamflix-auth-foot-row">' + guestFootBtnHtml + qrToggleFootBtnHtml + '    </div>')
+                    : '')
+                + '  </div>'
                 + '  </div>'
                 + '</div>';
         } else {
@@ -1087,14 +1121,17 @@
             viewKey = 'auth';
             stageHtml = ''
                 + '<div class="streamflix-center-stage">'
+                + '  <div class="' + (showQrSidePanel ? 'streamflix-tv-auth-split' : 'streamflix-auth-single-wrap') + '">'
+                + tvQrPanelHtml
                 + '  <div class="streamflix-auth-card' + (busy ? ' streamflix-busy' : '') + '">'
                 + '    <h1>Sign in</h1>'
                 + '    <p>' + ssoLeadCopy + '</p>'
                 + alertsHtml
                 + ssoButtonsHtml
-                + ((guestFootBtnHtml || adminFootBtnHtml)
-                    ? ('    <div class="streamflix-auth-foot streamflix-auth-foot-row">' + guestFootBtnHtml + adminFootBtnHtml + '    </div>')
+                + ((guestFootBtnHtml || qrToggleFootBtnHtml || adminFootBtnHtml)
+                    ? ('    <div class="streamflix-auth-foot streamflix-auth-foot-row">' + guestFootBtnHtml + qrToggleFootBtnHtml + adminFootBtnHtml + '    </div>')
                     : '')
+                + '  </div>'
                 + '  </div>'
                 + '</div>';
         }
@@ -1173,6 +1210,32 @@
                 state.guestPassExpanded = false;
                 renderGoogleAuthGate();
             });
+        }
+
+        var toggleTvQrBtn = root.querySelector('#streamflix-toggle-tv-qr');
+        if (toggleTvQrBtn) {
+            toggleTvQrBtn.addEventListener('click', function () {
+                state.tvQrExpanded = !state.tvQrExpanded;
+                if (!state.tvQrExpanded && typeof stopTvPairSignInPolling === 'function') {
+                    stopTvPairSignInPolling();
+                }
+                renderGoogleAuthGate();
+            });
+        }
+
+        var refreshTvQrBtn = root.querySelector('#streamflix-refresh-tv-qr');
+        if (refreshTvQrBtn) {
+            refreshTvQrBtn.addEventListener('click', function () {
+                if (typeof startOrRefreshTvPairQr === 'function') {
+                    startOrRefreshTvPairQr(true);
+                }
+            });
+        }
+
+        if (showQrSidePanel && typeof startOrRefreshTvPairQr === 'function') {
+            startOrRefreshTvPairQr(false);
+        } else if (!showQrSidePanel && typeof stopTvPairSignInPolling === 'function') {
+            stopTvPairSignInPolling();
         }
 
         var guestForm = root.querySelector('#streamflix-guest-redeem-form');

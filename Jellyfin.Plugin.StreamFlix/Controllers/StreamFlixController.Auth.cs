@@ -273,6 +273,181 @@ public partial class StreamFlixController
             "text/html; charset=utf-8");
     }
 
+    [HttpPost("Auth/TvPair/Begin")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<object> BeginTvQrSignIn([FromBody] BeginTvPairRequest? request = null)
+    {
+        SetNoStoreSecurityHeaders();
+        var lockKey = "tvpair_begin|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
+        if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
+        {
+            var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
+            return StatusCode(429, new { code = "rate_limited", retryAfterSeconds = secs, message = "Too many QR pairing requests. Please wait a moment." });
+        }
+
+        var baseOriginAndPath = BuildExternalServerBaseUrl(request?.ClientOrigin);
+        var started = StreamFlixTvPairService.BeginPair(baseOriginAndPath);
+        return Ok(new
+        {
+            pairId = started.PairId,
+            code = started.Code,
+            pollSecret = started.PollSecret,
+            pairUrl = started.PairUrl,
+            qrSvg = started.QrSvg,
+            expiresAt = started.ExpiresAt,
+        });
+    }
+
+    [HttpPost("Auth/TvPair/Poll")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<object> PollTvQrSignIn([FromBody] PollTvPairRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        if (request == null || string.IsNullOrWhiteSpace(request.PairId) || string.IsNullOrWhiteSpace(request.PollSecret))
+        {
+            return BadRequest(new { status = "invalid", verified = false, message = "Missing pairId or pollSecret." });
+        }
+
+        var poll = StreamFlixTvPairService.PollPair(request.PairId, request.PollSecret);
+        if (!string.Equals(poll.Status, "complete", StringComparison.Ordinal) || poll.Session == null)
+        {
+            return Ok(new { status = poll.Status, verified = false });
+        }
+
+        var validated = StreamFlixSessionService.Validate(Config, poll.Session.SessionToken);
+        if (validated == null)
+        {
+            return StatusCode(401, new { status = "expired", verified = false, message = "Approved session expired." });
+        }
+
+        return Ok(new
+        {
+            status = "complete",
+            verified = true,
+            authKind = poll.Session.AuthKind,
+            providerName = poll.Session.ProviderName,
+            email = poll.Session.Email,
+            username = poll.Session.Username,
+            userId = poll.Session.UserId,
+            name = poll.Session.Name,
+            picture = poll.Session.Picture,
+            isAdmin = poll.Session.IsAdmin,
+            sessionToken = poll.Session.SessionToken,
+            expiresAt = poll.Session.ExpiresAt,
+        });
+    }
+
+    [HttpPost("Auth/TvPair/Approve")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Application.Json)]
+    public async Task<ActionResult<object>> ApproveTvQrSignIn([FromBody] ApproveTvPairRequest? request)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var caller = await GetCallerAsync(config).ConfigureAwait(false);
+        var hasDirectJellyfinUser = caller.IsJellyfinAuthenticated && caller.JellyfinUser != null;
+        if (!HasHouseholdAccess(config, caller) || IsGuestSession(caller) || (caller.Session == null && !hasDirectJellyfinUser))
+        {
+            return StatusCode(401, new { ok = false, code = "auth_required", message = "Sign in with your household account on this phone first to unlock the TV." });
+        }
+
+        var cleanCode = StreamFlixTvPairService.NormalizePairCode(request?.Code);
+        if (cleanCode.Length != 6)
+        {
+            return BadRequest(new { ok = false, code = "invalid_code", message = "Enter a valid 6-character TV pairing code." });
+        }
+
+        var lockKey = "tvpair_approve|" + StreamFlixSessionService.GetRateLimitClientKey(HttpContext);
+        if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
+        {
+            var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
+            return StatusCode(429, new { ok = false, code = "rate_limited", retryAfterSeconds = secs, message = "Too many attempts. Please wait and scan a fresh QR code." });
+        }
+
+        // Mint an independent household session token for the TV matching the approving phone's verified identity
+        StreamFlixSessionService.SessionInfo minted;
+        string tvSessionToken;
+        string resolvedEmail;
+        string resolvedUsername;
+        string resolvedUserId;
+        if (caller.Session != null)
+        {
+            var src = caller.Session;
+            var authKind = src.AuthKind ?? StreamFlixSessionService.AuthKindGoogle;
+            if (string.Equals(authKind, StreamFlixSessionService.AuthKindOidc, StringComparison.Ordinal))
+            {
+                minted = StreamFlixSessionService.IssueOidcSession(config, src.Email, src.Username ?? string.Empty, src.JellyfinUserId ?? src.Email ?? "oidc_tv", out tvSessionToken);
+            }
+            else if (string.Equals(authKind, StreamFlixSessionService.AuthKindJellyfin, StringComparison.Ordinal)
+                || string.Equals(authKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal))
+            {
+                minted = StreamFlixSessionService.IssueJellyfinSession(config, authKind, src.JellyfinUserId ?? string.Empty, src.Username ?? "User", out tvSessionToken);
+            }
+            else
+            {
+                minted = StreamFlixSessionService.Issue(config, src.Email ?? string.Empty, out tvSessionToken);
+            }
+
+            resolvedEmail = src.Email ?? string.Empty;
+            resolvedUsername = src.Username ?? string.Empty;
+            resolvedUserId = src.JellyfinUserId ?? string.Empty;
+        }
+        else
+        {
+            var jfKind = caller.IsAdmin ? StreamFlixSessionService.AuthKindJellyfinAdmin : StreamFlixSessionService.AuthKindJellyfin;
+            resolvedEmail = string.Empty;
+            resolvedUsername = caller.JellyfinUser!.Username ?? "User";
+            resolvedUserId = caller.JellyfinUser.Id.ToString("N");
+            minted = StreamFlixSessionService.IssueJellyfinSession(config, jfKind, resolvedUserId, resolvedUsername, out tvSessionToken);
+        }
+
+        var displayWho = !string.IsNullOrWhiteSpace(resolvedEmail)
+            ? resolvedEmail
+            : (!string.IsNullOrWhiteSpace(resolvedUsername) ? resolvedUsername : "Household Member");
+        var approvedPayload = new StreamFlixTvPairService.TvPairApprovedSession(
+            SessionToken: tvSessionToken,
+            AuthKind: minted.AuthKind,
+            ProviderName: string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindOidc, StringComparison.Ordinal) ? StreamFlixOidcService.GetDisplayProviderName(config) : string.Empty,
+            Email: resolvedEmail,
+            Username: resolvedUsername,
+            UserId: resolvedUserId,
+            Name: displayWho,
+            Picture: string.Empty,
+            IsAdmin: string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal) || caller.IsAdmin,
+            ExpiresAt: minted.ExpiresAt);
+
+        if (!StreamFlixTvPairService.ApprovePair(cleanCode, approvedPayload))
+        {
+            StreamFlixSessionService.RegisterLoginFailure(lockKey);
+            return StatusCode(404, new { ok = false, code = "code_expired", message = "That TV QR code has expired or was already used. Scan the new code shown on your TV." });
+        }
+
+        StreamFlixSessionService.ResetLoginFailures(lockKey);
+        return Ok(new
+        {
+            ok = true,
+            code = StreamFlixTvPairService.FormatDisplayCode(cleanCode),
+            who = displayWho,
+        });
+    }
+
+    [HttpGet("Auth/TvPair/{code}")]
+    [AllowAnonymous]
+    public ContentResult OpenTvPairMobilePage([FromRoute] string code)
+    {
+        SetNoStoreSecurityHeaders();
+        var config = Config;
+        var valid = StreamFlixTvPairService.IsCodePending(code, out var displayCode);
+        if (string.IsNullOrEmpty(displayCode))
+        {
+            displayCode = StreamFlixTvPairService.FormatDisplayCode(code);
+        }
+
+        return Content(BuildTvPairPhoneApprovalHtml(config, displayCode, valid), "text/html; charset=utf-8");
+    }
+
     [HttpPost("Auth/GoogleDesktopPoll")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Application.Json)]
@@ -1769,6 +1944,176 @@ public partial class StreamFlixController
   closeNow(false);
   setTimeout(function() {{ closeNow(false); }}, 50);
   setTimeout(function() {{ closeNow(false); }}, 180);
+}})();
+</script>
+</body>
+</html>";
+    }
+
+    private string BuildExternalServerBaseUrl(string? clientOriginHint)
+    {
+        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value.TrimEnd('/') : string.Empty;
+        if (!string.IsNullOrWhiteSpace(clientOriginHint)
+            && Uri.TryCreate(clientOriginHint.Trim(), UriKind.Absolute, out var hinted)
+            && (string.Equals(hinted.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(hinted.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            && IsSafeHostHeader(hinted.Authority))
+        {
+            return hinted.GetLeftPart(UriPartial.Authority) + pathBase;
+        }
+
+        var callbackUri = BuildAbsoluteOidcCallbackUri();
+        const string suffix = "/StreamFlix/Oidc/Callback";
+        return callbackUri.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            ? callbackUri.Substring(0, callbackUri.Length - suffix.Length)
+            : $"{Request.Scheme}://{Request.Host.Value}{pathBase}";
+    }
+
+    private string BuildTvPairPhoneApprovalHtml(PluginConfiguration config, string displayCode, bool isPending)
+    {
+        var brand = string.IsNullOrWhiteSpace(config.CustomBrandName) ? "StreamFlix" : config.CustomBrandName.Trim();
+        var accent = NormalizeSafeHexColor(config.CustomAccentColor);
+        var encBrand = System.Net.WebUtility.HtmlEncode(brand);
+        var encBrandUpper = System.Net.WebUtility.HtmlEncode(brand.ToUpperInvariant());
+        var encCode = System.Net.WebUtility.HtmlEncode(displayCode);
+        var basePath = Request.PathBase.HasValue ? Request.PathBase.Value.TrimEnd('/') : string.Empty;
+        var approveApi = $"{basePath}/StreamFlix/Auth/TvPair/Approve";
+        var webEntry = $"{basePath}/web/index.html";
+
+        var jsCode = JsonSerializer.Serialize(displayCode);
+        var jsApproveUrl = JsonSerializer.Serialize(approveApi);
+        var jsWebUrl = JsonSerializer.Serialize(webEntry);
+        var jsIsPending = isPending ? "true" : "false";
+
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""utf-8"" />
+<meta name=""viewport"" content=""width=device-width, initial-scale=1"" />
+<title>Sign in TV · {encBrand}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  html, body {{
+    margin: 0; padding: 0; min-height: 100vh; background: radial-gradient(circle at 50% 0%, rgba(229,9,20,0.18), transparent 55%), #0c0c10;
+    color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }}
+  .sf-card {{
+    width: 100%; max-width: 420px; background: rgba(20,20,26,0.96); border: 1px solid rgba(255,255,255,0.11);
+    border-radius: 20px; padding: 30px 26px; text-align: center; box-shadow: 0 28px 80px rgba(0,0,0,0.72);
+  }}
+  .sf-brand {{ font-weight: 900; font-size: 13px; letter-spacing: 0.2em; color: {accent}; margin-bottom: 14px; }}
+  .sf-code {{
+    display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 22px; font-weight: 900; letter-spacing: 0.16em; padding: 8px 16px; border-radius: 10px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16); color: #fff; margin-bottom: 16px;
+  }}
+  h1 {{ margin: 0 0 10px; font-size: 23px; font-weight: 800; color: #fff; }}
+  p {{ margin: 0 0 22px; font-size: 14.5px; line-height: 1.5; color: rgba(255,255,255,0.74); }}
+  p strong {{ color: #fff; }}
+  .sf-btn {{
+    width: 100%; height: 48px; border-radius: 12px; border: 0; cursor: pointer;
+    font: inherit; font-size: 15.5px; font-weight: 800; color: #fff; background: {accent};
+    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+  }}
+  .sf-btn:disabled {{ opacity: 0.55; cursor: default; }}
+  .sf-ok {{
+    width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.45); color: #4ade80;
+  }}
+  .sf-err {{ margin-top: 12px; font-size: 13px; color: #fca5a5; min-height: 18px; }}
+  .hide {{ display: none !important; }}
+</style>
+</head>
+<body>
+  <div class=""sf-card"">
+    <div class=""sf-brand"">{encBrandUpper}</div>
+    <div class=""sf-ok hide"" id=""sf-ok-ico"">
+      <svg width=""28"" height=""28"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2.6"" stroke-linecap=""round"" stroke-linejoin=""round""><path d=""M5 12.5l4.5 4.5L19 7.5""/></svg>
+    </div>
+    <div class=""sf-code"" id=""sf-code-pill"">{encCode}</div>
+    <h1 id=""sf-title"">Sign in your TV?</h1>
+    <p id=""sf-desc"">Checking your {encBrand} session on this device…</p>
+    <button type=""button"" class=""sf-btn"" id=""sf-act-btn"">Unlock TV Now</button>
+    <div class=""sf-err"" id=""sf-err""></div>
+  </div>
+<script>
+(function() {{
+  var code = {jsCode};
+  var approveUrl = {jsApproveUrl};
+  var webUrl = {jsWebUrl};
+  var isPending = {jsIsPending};
+  var titleEl = document.getElementById('sf-title');
+  var descEl = document.getElementById('sf-desc');
+  var btnEl = document.getElementById('sf-act-btn');
+  var errEl = document.getElementById('sf-err');
+  var okIco = document.getElementById('sf-ok-ico');
+  var codePill = document.getElementById('sf-code-pill');
+
+  if (!isPending) {{
+    titleEl.textContent = 'QR code expired';
+    descEl.textContent = 'This TV code has expired or was already used. Scan the fresh QR code shown on your TV.';
+    btnEl.classList.add('hide');
+    return;
+  }}
+
+  var sess = null;
+  try {{
+    var raw = localStorage.getItem('streamflix_session_v7');
+    if (raw) sess = JSON.parse(raw);
+  }} catch (e) {{}}
+
+  var hasToken = Boolean(sess && sess.token && (!sess.expiresAt || Date.parse(sess.expiresAt) > Date.now()));
+  if (!hasToken) {{
+    descEl.textContent = 'Sign in on your phone first — your TV (' + code + ') will unlock automatically right after.';
+    btnEl.textContent = 'Continue to Sign In';
+    btnEl.addEventListener('click', function() {{
+      try {{ sessionStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (e1) {{}}
+      try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (e2) {{}}
+      window.location.assign(webUrl + '?tvpair=' + encodeURIComponent(code) + '#/home');
+    }});
+    return;
+  }}
+
+  var who = sess.email || sess.username || sess.name || 'your account';
+  descEl.innerHTML = 'Approve signing in your TV as <strong>' + String(who).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</strong>.';
+  btnEl.textContent = 'Unlock TV Now';
+  btnEl.addEventListener('click', function() {{
+    btnEl.disabled = true;
+    btnEl.textContent = 'Unlocking TV…';
+    errEl.textContent = '';
+    fetch(approveUrl, {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json', 'X-StreamFlix-Session': sess.token }},
+      body: JSON.stringify({{ code: code }})
+    }})
+    .then(function(r) {{ return r.json().then(function(d) {{ return {{ ok: r.ok, data: d }}; }}); }})
+    .then(function(res) {{
+      if (res.ok && res.data && res.data.ok) {{
+        okIco.classList.remove('hide');
+        codePill.classList.add('hide');
+        titleEl.textContent = 'TV Unlocked!';
+        descEl.textContent = 'Your TV is now signed in — pick who is watching on your TV screen.';
+        btnEl.classList.add('hide');
+        return;
+      }}
+      if (res.data && res.data.code === 'auth_required') {{
+        try {{ localStorage.removeItem('streamflix_session_v7'); }} catch (eR) {{}}
+        try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (eS) {{}}
+        window.location.assign(webUrl + '?tvpair=' + encodeURIComponent(code) + '#/home');
+        return;
+      }}
+      btnEl.disabled = false;
+      btnEl.textContent = 'Unlock TV Now';
+      errEl.textContent = (res.data && res.data.message) || 'Could not approve TV sign-in.';
+    }})
+    .catch(function() {{
+      btnEl.disabled = false;
+      btnEl.textContent = 'Unlock TV Now';
+      errEl.textContent = 'Network error — check your connection and try again.';
+    }});
+  }});
 }})();
 </script>
 </body>

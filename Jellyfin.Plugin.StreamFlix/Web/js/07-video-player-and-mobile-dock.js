@@ -421,6 +421,7 @@
                 osdState.infoFor = '';
                 osdState.infoTries = 0;
                 osdState.nextEpisode = null;
+                osdState.nextMovieRec = null;
                 osdState.nextEpisodeForId = '';
                 osdState.upNextDismissedForId = '';
                 osdState.segments = [];
@@ -708,8 +709,9 @@
     }
 
     function preloadOsdNextEpisode(item) {
-        if (!item || item.Type !== 'Episode' || !item.SeriesId || !item.Id) {
+        if (!item || !item.Id) {
             osdState.nextEpisode = null;
+            osdState.nextMovieRec = null;
             osdState.nextEpisodeForId = '';
             return;
         }
@@ -718,28 +720,62 @@
             return;
         }
         osdState.nextEpisodeForId = normCur;
-        fetchOsdSeriesEpisodes(item.SeriesId).then(function (eps) {
-            if (!osdState.info || normalizeGuid(osdState.info.Id) !== normCur) {
-                return;
-            }
-            var idx = -1;
-            for (var i = 0; i < eps.length; i++) {
-                if (eps[i] && normalizeGuid(eps[i].Id) === normCur) {
-                    idx = i;
-                    break;
+        osdState.nextEpisode = null;
+        osdState.nextMovieRec = null;
+
+        if (item.Type === 'Episode' && item.SeriesId) {
+            fetchOsdSeriesEpisodes(item.SeriesId).then(function (eps) {
+                if (!osdState.info || normalizeGuid(osdState.info.Id) !== normCur) {
+                    return;
                 }
-            }
-            if (idx === -1 && item.IndexNumber != null) {
-                for (var j = 0; j < eps.length; j++) {
-                    if (eps[j] && (eps[j].ParentIndexNumber || 1) === (item.ParentIndexNumber || 1) && eps[j].IndexNumber === item.IndexNumber) {
-                        idx = j;
+                var idx = -1;
+                for (var i = 0; i < eps.length; i++) {
+                    if (eps[i] && normalizeGuid(eps[i].Id) === normCur) {
+                        idx = i;
                         break;
                     }
                 }
+                if (idx === -1 && item.IndexNumber != null) {
+                    for (var j = 0; j < eps.length; j++) {
+                        if (eps[j] && (eps[j].ParentIndexNumber || 1) === (item.ParentIndexNumber || 1) && eps[j].IndexNumber === item.IndexNumber) {
+                            idx = j;
+                            break;
+                        }
+                    }
+                }
+                osdState.nextEpisode = (idx !== -1 && idx + 1 < eps.length) ? eps[idx + 1] : null;
+                checkOsdUpNext();
+            });
+            return;
+        }
+
+        if (item.Type === 'Movie') {
+            var auth = getJellyfinAuthContext();
+            var uid = auth && auth.userId ? encodeURIComponent(auth.userId) : '';
+            if (!uid) {
+                return;
             }
-            osdState.nextEpisode = (idx !== -1 && idx + 1 < eps.length) ? eps[idx + 1] : null;
-            checkOsdUpNext();
-        });
+            apiFetch('/Items/' + encodeURIComponent(item.Id) + '/Similar?userId=' + uid + '&Limit=6&Fields=Overview,PrimaryImageAspectRatio,ProductionYear,OfficialRating')
+                .then(function (res) {
+                    if (!osdState.info || normalizeGuid(osdState.info.Id) !== normCur) {
+                        return;
+                    }
+                    var sim = (res && Array.isArray(res.Items)) ? res.Items : [];
+                    var pick = null;
+                    for (var k = 0; k < sim.length; k++) {
+                        if (sim[k] && sim[k].Id && normalizeGuid(sim[k].Id) !== normCur && !(sim[k].UserData && sim[k].UserData.Played)) {
+                            pick = sim[k];
+                            break;
+                        }
+                    }
+                    if (!pick && sim.length > 0 && sim[0] && normalizeGuid(sim[0].Id) !== normCur) {
+                        pick = sim[0];
+                    }
+                    osdState.nextMovieRec = pick || null;
+                    checkOsdUpNext();
+                })
+                .catch(function () {});
+        }
     }
 
     function playEpisodeFromOsd(ep) {
@@ -1458,42 +1494,41 @@
         }
     }
 
-    function isInsideCreditsChapter(v) {
-        if (!v || typeof v.currentTime !== 'number') {
-            return false;
-        }
-        var rawDur = Number(v.duration);
-        var itemDur = (osdState.info && Number(osdState.info.RunTimeTicks) > 0) ? (Number(osdState.info.RunTimeTicks) / 10000000) : 0;
-        var cur = v.currentTime;
-        if (itemDur > 60 && (!isFinite(rawDur) || rawDur < itemDur * 0.85) && typeof getEffectiveVideoPositionSec === 'function') {
-            cur = getEffectiveVideoPositionSec(v);
-        }
+    function getExactOutroCreditsStartSec(dur) {
+        var earliest = dur > 180 ? (dur * 0.52) : 0;
         if (Array.isArray(osdState.segments) && osdState.segments.length) {
             for (var s = 0; s < osdState.segments.length; s++) {
                 var seg = osdState.segments[s];
-                if (seg && seg.kind === 'outro' && cur >= seg.startSec) {
-                    return true;
+                if (!seg || seg.kind !== 'outro' || seg.startSec < earliest) {
+                    continue;
+                }
+                // Only treat as end-of-title credits when no post-credits scene follows (>8s after seg.endSec)
+                var hasPostCreditsScene = dur > 0 && seg.endSec < (dur - 8);
+                if (!hasPostCreditsScene) {
+                    return seg.startSec;
                 }
             }
         }
         var chapters = osdState.info && Array.isArray(osdState.info.Chapters) ? osdState.info.Chapters : [];
         for (var i = 0; i < chapters.length; i++) {
             var ch = chapters[i];
-            if (ch && /^(end\s*credits|credits|outro)$/i.test(String(ch.Name || '').trim())) {
+            if (ch && /^(end\s*credits|credits|outro|ending|ed)$/i.test(String(ch.Name || '').trim())) {
                 var startSec = (Number(ch.StartPositionTicks) || 0) / 10000000;
-                if (cur >= startSec) {
-                    return true;
+                var hasLaterScene = (i + 1 < chapters.length) && (((Number(chapters[i + 1].StartPositionTicks) || 0) / 10000000) < (dur - 8));
+                if (startSec >= earliest && !hasLaterScene) {
+                    return startSec;
                 }
             }
         }
-        return false;
+        return -1;
     }
 
     function checkOsdUpNext() {
         var v = osdState.video;
-        var nextEp = osdState.nextEpisode;
+        var nextTarget = osdState.nextEpisode || osdState.nextMovieRec;
+        var isMovieRec = !osdState.nextEpisode && Boolean(osdState.nextMovieRec);
         var curIt = osdState.info;
-        if (!v || !nextEp || !curIt || !isVideoPlayerActive() || osdState.episodesOpen || osdState.tracksOpen) {
+        if (!v || !nextTarget || !curIt || !isVideoPlayerActive() || osdState.episodesOpen || osdState.tracksOpen) {
             if (osdState.upNextVisible && (osdState.episodesOpen || osdState.tracksOpen || !isVideoPlayerActive())) {
                 hideOsdUpNextCard();
             }
@@ -1522,9 +1557,11 @@
         if (osdState.upNextDismissedForId === normCur) {
             return;
         }
-        var inEndWindow = (rem > 0.3 && rem <= 35) || (isInsideCreditsChapter(v) && rem > 0.3 && rem <= 90);
-        if (!inEndWindow) {
-            if (osdState.upNextVisible && rem > 40) {
+        var exactCreditsStart = getExactOutroCreditsStartSec(dur);
+        var inExactCredits = exactCreditsStart > 0 && cur >= exactCreditsStart && rem > 0.3 && rem <= 300;
+        var inFallbackTail = exactCreditsStart <= 0 && rem > 0.3 && rem <= 35;
+        if (!inExactCredits && !inFallbackTail) {
+            if (osdState.upNextVisible && (exactCreditsStart > 0 ? (cur < exactCreditsStart - 2) : (rem > 40))) {
                 hideOsdUpNextCard();
             }
             return;
@@ -1532,35 +1569,43 @@
         if (osdState.upNextVisible && document.getElementById('streamflix-osd-upnext')) {
             return;
         }
-        showOsdUpNextCard(nextEp, normCur, Math.min(10, Math.max(3, Math.ceil(rem))));
+        var defaultCountdown = isTvOrDpadActive() ? 12 : 10;
+        showOsdUpNextCard(nextTarget, normCur, Math.min(defaultCountdown, Math.max(4, Math.ceil(rem))), isMovieRec);
     }
 
-    function showOsdUpNextCard(nextEp, normCurId, seconds) {
+    function showOsdUpNextCard(nextItem, normCurId, seconds, isMovieRec) {
         hideOsdUpNextCard();
         hideOsdPaused();
         osdState.upNextVisible = true;
         osdState.upNextCountdown = seconds || 10;
         osdState.upNextTotal = osdState.upNextCountdown;
 
-        var autoplay = !(state.activeProfile && state.activeProfile.autoplayNextEpisode === false);
-        var epTag = 'S' + (nextEp.ParentIndexNumber || 1) + ':E' + (nextEp.IndexNumber || 1);
-        var titleText = epTag + (nextEp.Name ? ' · ' + nextEp.Name : '');
+        var autoplay = !isMovieRec && !(state.activeProfile && state.activeProfile.autoplayNextEpisode === false);
+        var titleText = '';
+        if (isMovieRec) {
+            titleText = (nextItem.Name || 'Recommended') + (nextItem.ProductionYear ? ' (' + nextItem.ProductionYear + ')' : '');
+        } else {
+            var epTag = 'S' + (nextItem.ParentIndexNumber || 1) + ':E' + (nextItem.IndexNumber || 1);
+            titleText = epTag + (nextItem.Name ? ' · ' + nextItem.Name : '');
+        }
+        var kickerLabel = isMovieRec ? 'Up Next' : 'Next Episode';
+        var playBtnLabel = isMovieRec ? 'Play Movie' : 'Play Next';
         var card = document.createElement('div');
         card.id = 'streamflix-osd-upnext';
         card.setAttribute('role', 'region');
-        card.setAttribute('aria-label', 'Next episode');
+        card.setAttribute('aria-label', kickerLabel);
         card.innerHTML = ''
             + '<div class="bfx-upnext-thumb" data-upnext-play="1">'
-            + '  <img src="' + escapeHtml(getItemBackdropUrl(nextEp, 480)) + '" alt="" data-bfx-img="fade" />'
+            + '  <img src="' + escapeHtml(getItemBackdropUrl(nextItem, 480)) + '" alt="" data-bfx-img="fade" />'
             + '  <span class="bfx-upnext-thumb-play">' + icon('play') + '</span>'
             + '</div>'
             + '<div class="bfx-upnext-body">'
-            + '  <div class="bfx-upnext-kicker"><span>Next Episode</span>' + (autoplay ? ('<b id="streamflix-upnext-secs">in ' + osdState.upNextCountdown + 's</b>') : '') + '</div>'
+            + '  <div class="bfx-upnext-kicker"><span>' + escapeHtml(kickerLabel) + '</span>' + (autoplay ? ('<b id="streamflix-upnext-secs">in ' + osdState.upNextCountdown + 's</b>') : '') + '</div>'
             + '  <div class="bfx-upnext-title">' + escapeHtml(titleText) + '</div>'
             + '  <div class="bfx-upnext-actions">'
             + '    <button type="button" class="bfx-upnext-play-btn" id="streamflix-upnext-play">'
             + '      <span class="bfx-upnext-fill" id="streamflix-upnext-fill" style="transform:scaleX(0)"></span>'
-            + '      <span class="bfx-upnext-play-content">' + icon('play') + '<span>Play Next</span></span>'
+            + '      <span class="bfx-upnext-play-content">' + icon('play') + '<span>' + escapeHtml(playBtnLabel) + '</span></span>'
             + '    </button>'
             + '    <button type="button" class="bfx-upnext-dismiss-btn" id="streamflix-upnext-dismiss">Watch Credits</button>'
             + '  </div>'
@@ -1569,14 +1614,24 @@
         hydrateCompleteImages(card);
 
         var startNow = function () {
-            playEpisodeFromOsd(nextEp);
+            if (isMovieRec) {
+                closeOsdOverlays();
+                hideOsdUpNextCard();
+                playItemImmediately(nextItem, null, null, 0);
+            } else {
+                playEpisodeFromOsd(nextItem);
+            }
         };
-        card.querySelector('#streamflix-upnext-play').addEventListener('click', startNow);
+        var playBtnEl = card.querySelector('#streamflix-upnext-play');
+        playBtnEl.addEventListener('click', startNow);
         card.querySelector('[data-upnext-play]').addEventListener('click', startNow);
         card.querySelector('#streamflix-upnext-dismiss').addEventListener('click', function () {
             osdState.upNextDismissedForId = normCurId;
             hideOsdUpNextCard();
         });
+        if (isTvOrDpadActive()) {
+            try { playBtnEl.focus({ preventScroll: true }); } catch (eUpFoc) {}
+        }
 
         if (!autoplay) {
             return;
@@ -1602,7 +1657,7 @@
             }
             if (osdState.upNextCountdown <= 0) {
                 hideOsdUpNextCard();
-                playEpisodeFromOsd(nextEp);
+                playEpisodeFromOsd(nextItem);
             }
         }, 1000);
     }

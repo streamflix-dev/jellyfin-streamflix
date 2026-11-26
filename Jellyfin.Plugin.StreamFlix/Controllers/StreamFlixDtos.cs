@@ -98,6 +98,23 @@ public class CompleteOidcRequest
     public string? PollSecret { get; set; }
 }
 
+public class BeginTvPairRequest
+{
+    public string? ClientOrigin { get; set; }
+}
+
+public class PollTvPairRequest
+{
+    public string? PairId { get; set; }
+
+    public string? PollSecret { get; set; }
+}
+
+public class ApproveTvPairRequest
+{
+    public string? Code { get; set; }
+}
+
 public class ActivateProfileRequest
 {
     public string ProfileId { get; set; } = string.Empty;

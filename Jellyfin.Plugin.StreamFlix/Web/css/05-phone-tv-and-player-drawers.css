@@ -1554,6 +1554,32 @@ html.layout-tv .bfx-skip-pill-btn {
     font-size: 17px;
     padding: 0 24px;
 }
+body.bfx-tv-mode #streamflix-osd-upnext,
+html.layout-tv #streamflix-osd-upnext {
+    right: 52px;
+    bottom: 128px;
+    width: 488px;
+    padding: 15px;
+}
+body.bfx-tv-mode .bfx-upnext-play-btn,
+html.layout-tv .bfx-upnext-play-btn,
+body.bfx-tv-mode .bfx-upnext-dismiss-btn,
+html.layout-tv .bfx-upnext-dismiss-btn {
+    height: 44px;
+    font-size: 15px;
+    padding: 0 18px;
+}
+/* Hybrid Google TV / Android TV Native ExoPlayer SurfaceView transparency hook */
+html.bfx-native-exo-playing,
+html.bfx-native-exo-playing body,
+html.bfx-native-exo-playing .backgroundContainer,
+html.bfx-native-exo-playing #videoOsdPage,
+body.bfx-native-exo-playing,
+body.bfx-native-exo-playing .backgroundContainer,
+body.bfx-native-exo-playing #videoOsdPage {
+    background: transparent !important;
+    background-color: transparent !important;
+}
 
 /* ---------- Persistent Music & Audiobook Glass Mini-Player (#bfx-audio-miniplayer) ---------- */
 .bfx-miniplayer {

@@ -74,6 +74,178 @@
         return pid;
     }
 
+    function capturePendingTvPairFromUrl() {
+        try {
+            var raw = (window.location.search || '') + '&' + (window.location.hash || '');
+            var m = raw.match(/(?:[?&#]|^)tvpair=([A-Za-z0-9-]{6,9})/);
+            if (m && m[1]) {
+                sessionStorage.setItem(TV_PAIR_PENDING_KEY, m[1].toUpperCase());
+                localStorage.setItem(TV_PAIR_PENDING_KEY, m[1].toUpperCase());
+            }
+        } catch (e) {}
+    }
+
+    function completePendingTvPairApprovalIfAny() {
+        var code = '';
+        try {
+            code = sessionStorage.getItem(TV_PAIR_PENDING_KEY) || localStorage.getItem(TV_PAIR_PENDING_KEY) || '';
+            sessionStorage.removeItem(TV_PAIR_PENDING_KEY);
+            localStorage.removeItem(TV_PAIR_PENDING_KEY);
+        } catch (e) {}
+        if (!code || !state.googleUser || !state.googleUser.token) {
+            return;
+        }
+        apiFetch('/StreamFlix/Auth/TvPair/Approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        }).then(function (res) {
+            if (res && res.ok) {
+                showToast('TV (' + (res.code || code) + ') unlocked! Pick who\'s watching on your TV.', 'success', 4500);
+            }
+        }).catch(function () {});
+    }
+
+    var tvPairPollTimer = null;
+
+    function stopTvPairSignInPolling() {
+        if (tvPairPollTimer) {
+            clearInterval(tvPairPollTimer);
+            tvPairPollTimer = null;
+        }
+        state.tvPairInFlight = false;
+    }
+
+    function startOrRefreshTvPairQr(forceNew) {
+        if (state.tvPairStarting) {
+            return;
+        }
+        var now = Date.now();
+        if (!forceNew && state.tvPairData && state.tvPairData.expiresAtMs > now + 15000 && state.tvPairData.qrSvg) {
+            mountTvPairQrIntoGate();
+            ensureTvPairPollLoop();
+            return;
+        }
+        state.tvPairStarting = true;
+        apiFetch('/StreamFlix/Auth/TvPair/Begin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                clientOrigin: (window.location && window.location.origin) ? window.location.origin : ''
+            })
+        }).then(function (res) {
+            state.tvPairStarting = false;
+            if (!res || !res.pairId || !res.pollSecret || !res.code) {
+                return;
+            }
+            var expMs = res.expiresAt ? Date.parse(res.expiresAt) : (Date.now() + 300000);
+            state.tvPairData = {
+                pairId: res.pairId,
+                code: res.code,
+                pollSecret: res.pollSecret,
+                pairUrl: res.pairUrl || '',
+                qrSvg: res.qrSvg || '',
+                expiresAtMs: isNaN(expMs) ? (Date.now() + 300000) : expMs
+            };
+            mountTvPairQrIntoGate();
+            ensureTvPairPollLoop();
+        }).catch(function () {
+            state.tvPairStarting = false;
+            var statusEl = document.getElementById('streamflix-tv-qr-status');
+            if (statusEl) {
+                statusEl.textContent = 'Could not generate QR code.';
+            }
+        });
+    }
+
+    function mountTvPairQrIntoGate() {
+        var box = document.getElementById('streamflix-tv-qr-svg');
+        var codeEl = document.getElementById('streamflix-tv-qr-code');
+        var statusEl = document.getElementById('streamflix-tv-qr-status');
+        if (!box || !state.tvPairData) {
+            return;
+        }
+        mountSanitizedQrSvg(box, state.tvPairData.qrSvg);
+        if (codeEl) {
+            codeEl.textContent = state.tvPairData.code || '------';
+        }
+        if (statusEl) {
+            statusEl.textContent = 'Scan with your phone camera to sign in instantly';
+        }
+    }
+
+    function ensureTvPairPollLoop() {
+        if (tvPairPollTimer) {
+            return;
+        }
+        tvPairPollTimer = setInterval(function () {
+            if (!isGateOpen() || hasHouseholdAccess() && !state.explicitAuthPrompt) {
+                stopTvPairSignInPolling();
+                return;
+            }
+            var d = state.tvPairData;
+            if (!d || !d.pairId || !d.pollSecret) {
+                return;
+            }
+            if (Date.now() >= d.expiresAtMs) {
+                state.tvPairData = null;
+                startOrRefreshTvPairQr(true);
+                return;
+            }
+            if (state.tvPairInFlight) {
+                return;
+            }
+            state.tvPairInFlight = true;
+            apiFetch('/StreamFlix/Auth/TvPair/Poll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pairId: d.pairId, pollSecret: d.pollSecret })
+            }).then(function (res) {
+                state.tvPairInFlight = false;
+                if (!res || !res.status || res.status === 'pending') {
+                    return;
+                }
+                if (res.status === 'expired') {
+                    state.tvPairData = null;
+                    startOrRefreshTvPairQr(true);
+                    return;
+                }
+                if (res.status === 'complete' && res.verified && res.sessionToken) {
+                    stopTvPairSignInPolling();
+                    state.tvPairData = null;
+                    state.tvQrExpanded = false;
+                    state.explicitAuthPrompt = false;
+                    setHouseholdSession({
+                        token: res.sessionToken,
+                        authKind: res.authKind || 'google',
+                        providerName: res.providerName || '',
+                        email: res.email || '',
+                        username: res.username || '',
+                        userId: res.userId || '',
+                        name: res.name || res.email || res.username || '',
+                        picture: res.picture || '',
+                        isAdmin: Boolean(res.isAdmin),
+                        expiresAt: res.expiresAt || ''
+                    });
+                    clearActiveProfileState(true);
+                    clearLocalJellyfinAuth();
+                    var pendingId = takePendingProfileId();
+                    fetchPublicConfig().then(function () {
+                        renderProfilePickerGate();
+                        var pending = pendingId ? findProfileById(pendingId) : null;
+                        if (pending) {
+                            handleSelectProfile(pending);
+                        } else {
+                            showToast('Signed in via phone QR' + (res.name ? (' as ' + res.name) : ''), 'success');
+                        }
+                    });
+                }
+            }).catch(function () {
+                state.tvPairInFlight = false;
+            });
+        }, 2000);
+    }
+
     function canOpenExternalSystemBrowser() {
         try {
             return Boolean(isJellyfinMediaPlayerApp() && window.NativeShell && typeof window.NativeShell.openUrl === 'function');
@@ -448,6 +620,7 @@
                 picture: res.picture || '',
                 expiresAt: res.expiresAt || ''
             });
+            completePendingTvPairApprovalIfAny();
             // Netflix-style: always choose who's watching after signing in
             clearActiveProfileState(true);
             clearLocalJellyfinAuth();
@@ -693,6 +866,7 @@
             picture: res.picture || '',
             expiresAt: res.expiresAt || ''
         });
+        completePendingTvPairApprovalIfAny();
 
         clearActiveProfileState(true);
         clearLocalJellyfinAuth();
