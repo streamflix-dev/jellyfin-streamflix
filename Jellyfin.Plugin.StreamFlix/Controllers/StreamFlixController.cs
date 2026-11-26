@@ -284,6 +284,10 @@ public partial class StreamFlixController : ControllerBase
             }
 
             config.EnableHeroTrailerPreview = request.EnableHeroTrailerPreview;
+            config.EnableRichDetailBadges = request.EnableRichDetailBadges;
+            config.EnableSkipIntro = request.EnableSkipIntro;
+            config.VisualPreset = NormalizeVisualPreset(request.VisualPreset);
+            config.CardDensity = NormalizeCardDensity(request.CardDensity);
             config.MigratedHeroYouTubeTrailers = true;
             if (request.HomeRowOrder != null)
             {
@@ -802,6 +806,10 @@ public partial class StreamFlixController : ControllerBase
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = heroLibrariesSnapshot,
             enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            enableRichDetailBadges = config.EnableRichDetailBadges,
+            enableSkipIntro = config.EnableSkipIntro,
+            visualPreset = NormalizeVisualPreset(config.VisualPreset),
+            cardDensity = NormalizeCardDensity(config.CardDensity),
             homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
             homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,
@@ -813,6 +821,29 @@ public partial class StreamFlixController : ControllerBase
             serverLibraries = hasAccess ? JellyfinCompat.GetServerMediaLibraries(_libraryManager) : new List<object>(),
             profiles = hasAccess ? profilesSnapshot.Select(p => MapProfilePublic(config, p, caller)).ToList() : new List<object>(),
             showcaseItems = hasAccess && !isGuestPass ? GetShowcaseItemsCached(_libraryManager) : new List<object>(),
+        };
+    }
+
+    internal static string NormalizeVisualPreset(string? raw)
+    {
+        var clean = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return clean switch
+        {
+            "oled" => "oled",
+            "glass" => "glass",
+            "midnight" => "midnight",
+            _ => "netflix",
+        };
+    }
+
+    internal static string NormalizeCardDensity(string? raw)
+    {
+        var clean = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return clean switch
+        {
+            "compact" => "compact",
+            "large" => "large",
+            _ => "standard",
         };
     }
 
@@ -903,6 +934,10 @@ public partial class StreamFlixController : ControllerBase
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = (config.HeroLibraryIds ?? new List<string>()).ToList(),
             enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            enableRichDetailBadges = config.EnableRichDetailBadges,
+            enableSkipIntro = config.EnableSkipIntro,
+            visualPreset = NormalizeVisualPreset(config.VisualPreset),
+            cardDensity = NormalizeCardDensity(config.CardDensity),
             homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
             homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,

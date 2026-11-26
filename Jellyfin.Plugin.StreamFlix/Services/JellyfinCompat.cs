@@ -1020,6 +1020,7 @@ public static class JellyfinCompat
             DateCreated = item.DateCreated.ToString("O"),
             OfficialRating = item.OfficialRating,
             CommunityRating = item.CommunityRating,
+            CriticRating = item.CriticRating,
             RunTimeTicks = item.RunTimeTicks,
             Genres = item.Genres ?? Array.Empty<string>(),
             Taglines = item.Tagline is { Length: > 0 } tl ? new[] { tl } : Array.Empty<string>(),

@@ -1177,6 +1177,13 @@
         if (typeof stopHeroVideoPreview === 'function') {
             stopHeroVideoPreview(false);
         }
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            stopStreamFlixAudioMiniPlayer({ skipReport: true });
+        }
+        if (typeof osdState !== 'undefined' && osdState) {
+            osdState.episodesCache = {};
+            osdState.segmentsCache = {};
+        }
         state.itemCache = {};
         state.heroTrailerCache = {};
         state.heroTrailerInFlight = {};
@@ -1212,6 +1219,13 @@
     function handleHouseholdSessionLost() {
         var hadSession = Boolean(state.googleUser && state.googleUser.token);
         var wasGuest = isGuestPassSession();
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            stopStreamFlixAudioMiniPlayer({ skipReport: true });
+        }
+        if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDm) {}
+            state.activeDetailModal = null;
+        }
         clearHouseholdSession();
         var openAccess = isOpenWithoutLogin(state.config);
         if (!openAccess && typeof detachEndedWatchPartyCleanly === 'function') {
@@ -1297,6 +1311,12 @@
 
         var prevEnableHeroTrailer = prevCfg.enableHeroTrailerPreview !== false;
         var nextEnableHeroTrailer = cfg.enableHeroTrailerPreview !== false;
+        var nextEnableRichBadges = cfg.enableRichDetailBadges !== false;
+        var nextEnableSkipIntro = cfg.enableSkipIntro !== false;
+        var rawPreset = String(cfg.visualPreset || 'netflix').trim().toLowerCase();
+        var nextVisualPreset = (rawPreset === 'oled' || rawPreset === 'glass' || rawPreset === 'midnight') ? rawPreset : 'netflix';
+        var rawDensity = String(cfg.cardDensity || 'standard').trim().toLowerCase();
+        var nextCardDensity = (rawDensity === 'compact' || rawDensity === 'large') ? rawDensity : 'standard';
         var nextHomeRowOrder = Array.isArray(cfg.homeRowOrder)
             ? cfg.homeRowOrder.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
             : [];
@@ -1368,6 +1388,10 @@
             heroContentType: nextHeroType,
             heroLibraryIds: nextHeroLibs,
             enableHeroTrailerPreview: nextEnableHeroTrailer,
+            enableRichDetailBadges: nextEnableRichBadges,
+            enableSkipIntro: nextEnableSkipIntro,
+            visualPreset: nextVisualPreset,
+            cardDensity: nextCardDensity,
             homeRowOrder: nextHomeRowOrder,
             homeHiddenRows: nextHomeHiddenRows,
             showLibrariesInNav: nextShowLibsInNav,
@@ -1444,6 +1468,15 @@
 
         if (typeof applyBrandAccentTheme === 'function') {
             applyBrandAccentTheme();
+        }
+        if (typeof applyVisualPresetAndDensity === 'function') {
+            applyVisualPresetAndDensity();
+        }
+        if (document.body && document.body.classList.contains('streamflix-nf-player')) {
+            document.body.classList.toggle('bfx-skip-pill-enabled', nextEnableSkipIntro);
+            if (!nextEnableSkipIntro && typeof hideOsdSkipPill === 'function') {
+                hideOsdSkipPill();
+            }
         }
 
         if (state.config.assetVersion) {

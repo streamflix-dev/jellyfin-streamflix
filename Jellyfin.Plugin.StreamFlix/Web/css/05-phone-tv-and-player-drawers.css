@@ -37,16 +37,37 @@
         border-radius: 8px;
     }
 
-    /* Account Dropdown: full-width floating card with zero overflow */
+    /* Account Dropdown: full-width floating card with touch-sized controls and zero overflow */
     #streamflix-account-dropdown {
         top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
         left: 10px !important;
         right: 10px !important;
         width: auto !important;
         max-width: none !important;
+        padding: 12px !important;
+        border-radius: 24px !important;
         max-height: calc(100vh - 20px) !important;
         max-height: calc(100dvh - 20px) !important;
     }
+    #streamflix-account-dropdown .streamflix-dd-active-avatar,
+    #streamflix-account-dropdown .bfx-dd-prof-av {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        font-size: 24px;
+    }
+    #streamflix-account-dropdown .streamflix-dd-active-name { font-size: 17px; }
+    #streamflix-account-dropdown .streamflix-dd-active-sub { font-size: 13px; }
+    #streamflix-account-dropdown .bfx-dd-close { width: 38px; height: 38px; }
+    #streamflix-account-dropdown .bfx-dd-prof { flex: 0 0 74px; gap: 7px; padding: 7px 3px; }
+    #streamflix-account-dropdown .bfx-dd-prof-name { max-width: 72px; font-size: 12.5px; }
+    #streamflix-account-dropdown .bfx-dd-tile { min-height: 50px; padding: 9px 12px 9px 10px; border-radius: 14px; }
+    #streamflix-account-dropdown .bfx-dd-tile-ico { width: 34px; height: 34px; border-radius: 11px; }
+    #streamflix-account-dropdown .bfx-dd-tile-label { font-size: 14px; }
+    #streamflix-account-dropdown .streamflix-dd-item { min-height: 48px; padding: 10px 12px; gap: 14px; border-radius: 13px; font-size: 15.5px; }
+    #streamflix-account-dropdown .bfx-dd-ico { width: 24px; height: 24px; }
+    #streamflix-account-dropdown .bfx-dd-ico .bfx-icon { width: 20px; height: 20px; }
+    #streamflix-account-dropdown .bfx-dd-duo-btn { height: 46px; border-radius: 13px; font-size: 14px; gap: 8px; }
 
     /* Single-row Subnav: scrollable category pills + compact search circle that expands on tap */
     .streamflix-subnav {
@@ -1369,9 +1390,303 @@ html.layout-tv .bfx-track-opt {
 @media (prefers-reduced-motion: reduce) {
     .bfx-osd-drawer-panel,
     .bfx-tracks-card,
-    #streamflix-osd-upnext {
+    #streamflix-osd-upnext,
+    #streamflix-osd-skip-pill,
+    .bfx-miniplayer {
         animation: none !important;
     }
+}
+
+/* ---------- Upgraded Skip Intro / Recap / Credits Feature Pill ---------- */
+body.streamflix-nf-player.bfx-skip-pill-enabled .skipIntro,
+body.streamflix-nf-player.bfx-skip-pill-enabled .btnSkipIntro,
+body.streamflix-nf-player.bfx-skip-pill-enabled .skipbutton {
+    display: none !important;
+}
+
+#streamflix-osd-skip-pill {
+    position: fixed;
+    right: 36px;
+    bottom: 108px;
+    z-index: 10040;
+    display: inline-flex;
+    align-items: stretch;
+    border-radius: 12px;
+    background: rgba(14, 14, 18, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    overflow: hidden;
+    animation: bfxSkipPillIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes bfxSkipPillIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.bfx-skip-pill-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 46px;
+    padding: 0 18px 0 16px;
+    border: 0;
+    background: transparent;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    overflow: hidden;
+    transition: background 0.16s ease, color 0.16s ease;
+}
+.bfx-skip-pill-btn:hover,
+.bfx-skip-pill-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.95);
+    color: #09090b;
+    outline: none;
+}
+.bfx-skip-pill-fill {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(90deg, rgba(229, 9, 20, 0.32) 0%, rgba(255, 255, 255, 0.18) 100%);
+    transform-origin: left center;
+    transition: transform 0.3s linear;
+    pointer-events: none;
+}
+.bfx-skip-pill-btn:hover .bfx-skip-pill-fill,
+.bfx-skip-pill-btn:focus-visible .bfx-skip-pill-fill {
+    opacity: 0.2;
+}
+.bfx-skip-pill-content {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+}
+html.bfx-no-flex-gap .bfx-skip-pill-content > * + * {
+    margin-left: 9px;
+}
+.bfx-skip-pill-ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bfx-skip-pill-ico .bfx-icon {
+    width: 18px;
+    height: 18px;
+}
+.bfx-skip-pill-rem {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.88);
+    font-variant-numeric: tabular-nums;
+}
+.bfx-skip-pill-btn:hover .bfx-skip-pill-rem,
+.bfx-skip-pill-btn:focus-visible .bfx-skip-pill-rem {
+    background: rgba(0, 0, 0, 0.12);
+    color: #111827;
+}
+.bfx-skip-pill-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    color: rgba(255, 255, 255, 0.85);
+}
+.bfx-skip-pill-btn:hover .bfx-skip-pill-kbd,
+.bfx-skip-pill-btn:focus-visible .bfx-skip-pill-kbd {
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.22);
+    color: #111827;
+}
+.bfx-skip-pill-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.68);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.bfx-skip-pill-dismiss:hover,
+.bfx-skip-pill-dismiss:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    outline: none;
+}
+.bfx-skip-pill-dismiss .bfx-icon {
+    width: 15px;
+    height: 15px;
+}
+@media (hover: none), (max-width: 680px) {
+    .bfx-skip-pill-kbd { display: none; }
+    #streamflix-osd-skip-pill { right: 16px; bottom: 86px; }
+}
+body.bfx-tv-mode #streamflix-osd-skip-pill,
+html.layout-tv #streamflix-osd-skip-pill {
+    right: 52px;
+    bottom: 128px;
+}
+body.bfx-tv-mode .bfx-skip-pill-btn,
+html.layout-tv .bfx-skip-pill-btn {
+    height: 54px;
+    font-size: 17px;
+    padding: 0 24px;
+}
+
+/* ---------- Persistent Music & Audiobook Glass Mini-Player (#bfx-audio-miniplayer) ---------- */
+.bfx-miniplayer {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: 18px;
+    max-width: 760px;
+    margin: 0 auto;
+    z-index: 9985;
+    border-radius: 16px;
+    background: rgba(16, 16, 22, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    overflow: hidden;
+    animation: bfxSkipPillIn 0.22s ease;
+}
+body.bfx-phone-mode .bfx-miniplayer {
+    left: 10px;
+    right: 10px;
+    bottom: 86px;
+}
+.bfx-mp-progress-wrap {
+    width: 100%;
+    height: 6px;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+}
+.bfx-mp-scrub {
+    width: 100%;
+    height: 6px;
+    margin: 0;
+    accent-color: var(--streamflix-accent, #E50914);
+    cursor: pointer;
+}
+.bfx-mp-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+}
+.bfx-mp-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 0%;
+}
+.bfx-mp-art {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.bfx-mp-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.bfx-mp-copy {
+    min-width: 0;
+    flex: 1 1 0%;
+}
+.bfx-mp-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bfx-mp-sub {
+    font-size: 12px;
+    color: #9ca3af;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.bfx-mp-controls,
+.bfx-mp-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.bfx-mp-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f3f4f6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+.bfx-mp-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+.bfx-mp-btn.is-play {
+    width: 40px;
+    height: 40px;
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #09090b;
+}
+.bfx-mp-btn .bfx-icon {
+    width: 17px;
+    height: 17px;
+}
+.bfx-mp-time {
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+    font-variant-numeric: tabular-nums;
+    margin-right: 4px;
+}
+@media (max-width: 560px) {
+    .bfx-mp-time { display: none; }
 }
 
 /* ==========================================================================

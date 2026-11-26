@@ -32,7 +32,12 @@
         upNextDismissedForId: '',
         upNextCountdown: 0,
         upNextTotal: 10,
-        upNextTimer: null
+        upNextTimer: null,
+        segments: [],
+        segmentsForId: '',
+        segmentsCache: {},
+        activeSkipKey: '',
+        dismissedSegmentKeys: {}
     };
 
     function osdSkipSeconds(kind) {
@@ -174,6 +179,7 @@
                 osdState.infoTries = 0;
                 syncOsdActiveTracksFromInfo(item);
                 preloadOsdNextEpisode(item);
+                fetchOsdSkipSegments(item);
                 if (typeof onWatchPartyOsdInfoLoaded === 'function') {
                     onWatchPartyOsdInfoLoaded(item);
                 }
@@ -184,6 +190,7 @@
             }
             paintOsdTitle();
             syncOsdExtraButtons();
+            checkOsdSkipSegment();
             checkOsdUpNext();
         }).catch(function () {
             osdState.fetching = false;
@@ -290,6 +297,26 @@
     }
 
     function onOsdActivity(ev) {
+        if (ev && ev.type === 'keydown' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+            var k = String(ev.key || '').toLowerCase();
+            if (k === 's' && osdState.activeSkipKey && document.getElementById('streamflix-osd-skip-pill')) {
+                var tg = ev.target && ev.target.tagName ? String(ev.target.tagName).toUpperCase() : '';
+                if (tg !== 'INPUT' && tg !== 'TEXTAREA' && tg !== 'SELECT') {
+                    var skipBtn = document.getElementById('streamflix-skip-pill-btn');
+                    if (skipBtn) {
+                        if (typeof onWatchPartyUserPlayerGesture === 'function') {
+                            onWatchPartyUserPlayerGesture('keydown');
+                        }
+                        if (ev.cancelable) {
+                            ev.preventDefault();
+                        }
+                        ev.stopPropagation();
+                        skipBtn.click();
+                        return;
+                    }
+                }
+            }
+        }
         if (ev && (ev.type === 'pointerdown' || ev.type === 'touchstart' || ev.type === 'keydown') && typeof onWatchPartyUserPlayerGesture === 'function') {
             onWatchPartyUserPlayerGesture(ev.type);
         }
@@ -377,9 +404,11 @@
                 }
             },
             timeupdate: function () {
+                checkOsdSkipSegment();
                 checkOsdUpNext();
             },
             seeked: function () {
+                checkOsdSkipSegment();
                 checkOsdUpNext();
                 if (typeof onWatchPartyVideoEvent === 'function') {
                     onWatchPartyVideoEvent('seeked', v);
@@ -394,7 +423,12 @@
                 osdState.nextEpisode = null;
                 osdState.nextEpisodeForId = '';
                 osdState.upNextDismissedForId = '';
+                osdState.segments = [];
+                osdState.segmentsForId = '';
+                osdState.activeSkipKey = '';
+                osdState.dismissedSegmentKeys = {};
                 hideOsdPaused();
+                hideOsdSkipPill();
                 hideOsdUpNextCard();
                 closeOsdOverlays();
                 if (typeof onWatchPartyVideoEvent === 'function') {
@@ -421,10 +455,14 @@
             return;
         }
         document.body.classList.add('streamflix-nf-player');
+        document.body.classList.toggle('bfx-skip-pill-enabled', !(state.config && state.config.enableSkipIntro === false));
+        if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+            stopStreamFlixAudioMiniPlayer();
+        }
         if (!osdState.docBound) {
             osdState.docBound = true;
             ['mousemove', 'pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(function (evName) {
-                document.addEventListener(evName, onOsdActivity, { passive: true, capture: true });
+                document.addEventListener(evName, onOsdActivity, { passive: evName !== 'keydown', capture: true });
             });
         }
         var v = document.querySelector('video.htmlvideoplayer');
@@ -1085,16 +1123,365 @@
         }
     }
 
+    function formatShortClockSec(sec) {
+        var total = Math.max(0, Math.round(Number(sec) || 0));
+        var mins = Math.floor(total / 60);
+        var rem = total % 60;
+        return mins + ':' + (rem < 10 ? '0' : '') + rem;
+    }
+
+    function normalizeSkipSegmentKind(rawType) {
+        var low = String(rawType || '').trim().toLowerCase();
+        if (!low) {
+            return '';
+        }
+        if (low === 'intro' || low === 'introduction' || low === 'opening') {
+            return 'intro';
+        }
+        if (low === 'recap' || low === 'previously') {
+            return 'recap';
+        }
+        if (low === 'commercial' || low === 'ad' || low === 'advertisement') {
+            return 'commercial';
+        }
+        if (low === 'preview' || low === 'nextepisodepreview') {
+            return 'preview';
+        }
+        if (low === 'outro' || low === 'credits' || low === 'endcredits' || low === 'ending') {
+            return 'outro';
+        }
+        return '';
+    }
+
+    function getSkipSegmentLabel(kind) {
+        if (kind === 'recap') { return 'Skip Recap'; }
+        if (kind === 'commercial') { return 'Skip Ad'; }
+        if (kind === 'preview') { return 'Skip Preview'; }
+        if (kind === 'outro') { return 'Skip Credits'; }
+        return 'Skip Intro';
+    }
+
+    function parseAllSkipSegments(item, mediaSegmentsRes, introSkipperV2Res, introTimestampsV1Res) {
+        var rawList = [];
+        var pushSeg = function (kind, startSec, endSec) {
+            var s = Number(startSec);
+            var e = Number(endSec);
+            if (!kind || !isFinite(s) || !isFinite(e) || s < 0 || e <= s + 2.5) {
+                return;
+            }
+            rawList.push({
+                kind: kind,
+                label: getSkipSegmentLabel(kind),
+                startSec: Math.round(s * 10) / 10,
+                endSec: Math.round(e * 10) / 10,
+                key: kind + ':' + Math.round(s) + ':' + Math.round(e)
+            });
+        };
+
+        // 1. Jellyfin 10.10+ / 12.x native /MediaSegments/{itemId}
+        var msItems = (mediaSegmentsRes && Array.isArray(mediaSegmentsRes.Items))
+            ? mediaSegmentsRes.Items
+            : (Array.isArray(mediaSegmentsRes) ? mediaSegmentsRes : []);
+        msItems.forEach(function (ms) {
+            if (!ms) { return; }
+            var k = normalizeSkipSegmentKind(ms.Type || ms.type);
+            var sTicks = ms.StartTicks != null ? Number(ms.StartTicks) : Number(ms.startTicks);
+            var eTicks = ms.EndTicks != null ? Number(ms.EndTicks) : Number(ms.endTicks);
+            if (k && isFinite(sTicks) && isFinite(eTicks)) {
+                pushSeg(k, sTicks / 10000000, eTicks / 10000000);
+            }
+        });
+
+        // 2. Intro Skipper plugin v2 (/Episode/{id}/IntroSkipperSegments)
+        if (introSkipperV2Res && typeof introSkipperV2Res === 'object' && !Array.isArray(introSkipperV2Res)) {
+            Object.keys(introSkipperV2Res).forEach(function (segKey) {
+                var segObj = introSkipperV2Res[segKey];
+                if (!segObj || typeof segObj !== 'object') { return; }
+                var k = normalizeSkipSegmentKind(segObj.SegmentType || segKey);
+                var st = segObj.Start != null ? segObj.Start : (segObj.IntroStart != null ? segObj.IntroStart : segObj.start);
+                var en = segObj.End != null ? segObj.End : (segObj.IntroEnd != null ? segObj.IntroEnd : segObj.end);
+                if (k && st != null && en != null) {
+                    pushSeg(k, st, en);
+                }
+            });
+        }
+
+        // 3. Intro Skipper plugin v1 classic (/Episode/{id}/IntroTimestamps)
+        if (introTimestampsV1Res && typeof introTimestampsV1Res === 'object') {
+            var v1Valid = introTimestampsV1Res.Valid !== false && introTimestampsV1Res.valid !== false;
+            var v1Start = introTimestampsV1Res.IntroStart != null ? introTimestampsV1Res.IntroStart : introTimestampsV1Res.introStart;
+            var v1End = introTimestampsV1Res.IntroEnd != null ? introTimestampsV1Res.IntroEnd : introTimestampsV1Res.introEnd;
+            if (v1Valid && v1Start != null && v1End != null) {
+                pushSeg('intro', v1Start, v1End);
+            }
+        }
+
+        // 4. Embedded Chapter markers fallback (when no MediaSegments / Intro Skipper segment covered that kind)
+        var chapters = item && Array.isArray(item.Chapters) ? item.Chapters : [];
+        if (chapters.length > 0) {
+            var itemDurSec = (Number(item && item.RunTimeTicks) || 0) / 10000000;
+            for (var cIdx = 0; cIdx < chapters.length; cIdx++) {
+                var ch = chapters[cIdx];
+                if (!ch || !ch.Name) { continue; }
+                var chName = String(ch.Name).trim();
+                var chStart = (Number(ch.StartPositionTicks) || 0) / 10000000;
+                var nextCh = chapters[cIdx + 1];
+                var chEnd = nextCh
+                    ? ((Number(nextCh.StartPositionTicks) || 0) / 10000000)
+                    : (itemDurSec > chStart ? itemDurSec : 0);
+                if (chEnd <= chStart + 3) { continue; }
+                var chKind = '';
+                if (/^(intro|introduction|opening|op|opening\s*credits|theme|main\s*titles)$/i.test(chName) && (chEnd - chStart) <= 240) {
+                    chKind = 'intro';
+                } else if (/^(recap|previously(\s*on)?)$/i.test(chName) && (chEnd - chStart) <= 240) {
+                    chKind = 'recap';
+                } else if (/^(end\s*credits|credits|outro|ending|ed)$/i.test(chName)) {
+                    chKind = 'outro';
+                }
+                if (chKind && !rawList.some(function (existing) { return existing.kind === chKind && Math.abs(existing.startSec - chStart) < 8; })) {
+                    pushSeg(chKind, chStart, chEnd);
+                }
+            }
+        }
+
+        rawList.sort(function (a, b) { return a.startSec - b.startSec; });
+        var deduped = [];
+        rawList.forEach(function (seg) {
+            var dup = deduped.some(function (d) {
+                return d.kind === seg.kind && Math.abs(d.startSec - seg.startSec) < 3 && Math.abs(d.endSec - seg.endSec) < 4;
+            });
+            if (!dup) {
+                deduped.push(seg);
+            }
+        });
+        return deduped;
+    }
+
+    function fetchOsdSkipSegments(item) {
+        if (!item || !item.Id) {
+            osdState.segments = [];
+            osdState.segmentsForId = '';
+            return;
+        }
+        var normId = normalizeGuid(item.Id);
+        if (osdState.segmentsForId === normId) {
+            return;
+        }
+        osdState.segmentsForId = normId;
+        if (Array.isArray(osdState.segmentsCache[normId])) {
+            osdState.segments = osdState.segmentsCache[normId];
+            checkOsdSkipSegment();
+            return;
+        }
+        var iid = encodeURIComponent(item.Id);
+        var pMediaSegs = apiFetch('/MediaSegments/' + iid).catch(function () { return null; });
+        var pIntroV2 = apiFetch('/Episode/' + iid + '/IntroSkipperSegments').catch(function () { return null; });
+        var pIntroV1 = apiFetch('/Episode/' + iid + '/IntroTimestamps').catch(function () { return null; });
+
+        Promise.all([pMediaSegs, pIntroV2, pIntroV1]).then(function (arr) {
+            var parsed = parseAllSkipSegments(item, arr[0], arr[1], arr[2]);
+            osdState.segmentsCache[normId] = parsed;
+            if (osdState.info && normalizeGuid(osdState.info.Id) === normId) {
+                osdState.segments = parsed;
+                checkOsdSkipSegment();
+                checkOsdUpNext();
+            }
+        }).catch(function () {});
+    }
+
+    function hideOsdSkipPill() {
+        osdState.activeSkipKey = '';
+        var el = document.getElementById('streamflix-osd-skip-pill');
+        if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
+        }
+    }
+
+    function executeSkipSegment(seg) {
+        var v = osdState.video;
+        if (!v || !seg) {
+            return;
+        }
+        var activeWpRoom = (typeof watchPartyState !== 'undefined' && watchPartyState && watchPartyState.activeGroup && typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
+            ? watchPartyState.activeGroup
+            : null;
+        if (activeWpRoom && typeof canControlWatchPartyRoom === 'function' && !canControlWatchPartyRoom(activeWpRoom)) {
+            if (typeof showWatchPartyOsdBanner === 'function') {
+                showWatchPartyOsdBanner('Controls are locked to ' + (activeWpRoom.hostName || 'the host') + '.');
+            }
+            return;
+        }
+        if (typeof onWatchPartyUserPlayerGesture === 'function') {
+            onWatchPartyUserPlayerGesture('skip_segment');
+        }
+        var targetSec = Math.max(0, Number(seg.endSec) || 0);
+        var seekHandled = false;
+        if (typeof seekEffectiveVideoToSec === 'function') {
+            try {
+                seekHandled = Boolean(seekEffectiveVideoToSec(v, targetSec, true));
+            } catch (eWpSeek) {
+                seekHandled = false;
+            }
+        }
+        if (!seekHandled) {
+            try {
+                var pm = window.StreamFlixPlaybackManager || window.playbackManager;
+                var rawDur = Number(v.duration);
+                var itemDur = (osdState.info && Number(osdState.info.RunTimeTicks) > 0) ? (Number(osdState.info.RunTimeTicks) / 10000000) : 0;
+                if (pm && typeof pm.seek === 'function' && itemDur > 60 && (!isFinite(rawDur) || rawDur < itemDur * 0.85)) {
+                    pm.seek(Math.round(targetSec * 10000000));
+                } else {
+                    v.currentTime = targetSec;
+                }
+            } catch (eSeek) {
+                try { v.currentTime = targetSec; } catch (e2) {}
+            }
+        }
+        if (activeWpRoom && typeof sendWatchPartyCommand === 'function') {
+            if (typeof suppressLocalWatchPartyEvents === 'function') {
+                suppressLocalWatchPartyEvents(4500);
+            }
+            sendWatchPartyCommand('seek', {
+                positionSeconds: targetSec,
+                isPlaying: !v.paused
+            });
+        }
+        osdState.dismissedSegmentKeys[seg.key] = true;
+        hideOsdSkipPill();
+        osdFlash('chevronRight');
+    }
+
+    function checkOsdSkipSegment() {
+        if (state.config && state.config.enableSkipIntro === false) {
+            hideOsdSkipPill();
+            return;
+        }
+        var v = osdState.video;
+        var segs = osdState.segments;
+        if (!v || !Array.isArray(segs) || !segs.length || !isVideoPlayerActive() || osdState.episodesOpen || osdState.tracksOpen) {
+            hideOsdSkipPill();
+            return;
+        }
+        var rawDur = Number(v.duration);
+        var itemDur = (osdState.info && Number(osdState.info.RunTimeTicks) > 0) ? (Number(osdState.info.RunTimeTicks) / 10000000) : 0;
+        var dur = (isFinite(rawDur) && rawDur > 0) ? rawDur : itemDur;
+        var cur = Number(v.currentTime) || 0;
+        if (itemDur > 60 && (!isFinite(rawDur) || rawDur < itemDur * 0.85) && typeof getEffectiveVideoPositionSec === 'function') {
+            cur = getEffectiveVideoPositionSec(v);
+            dur = itemDur;
+        }
+        if (!isFinite(cur) || cur < 0) {
+            return;
+        }
+
+        var matched = null;
+        for (var i = 0; i < segs.length; i++) {
+            var s = segs[i];
+            if (!s || osdState.dismissedSegmentKeys[s.key]) {
+                continue;
+            }
+            if (cur >= s.startSec && cur < (s.endSec - 0.8)) {
+                if (s.kind === 'outro') {
+                    // Let Up Next handle end-of-episode credits when a next episode exists, EXCEPT when credits precede a post-credits scene!
+                    var hasPostCreditsScene = dur > 0 && s.endSec < (dur - 8);
+                    if (osdState.upNextVisible || (osdState.nextEpisode && !hasPostCreditsScene)) {
+                        continue;
+                    }
+                    // On standalone movies without post-credits scene where endSec is the end of the file, don't seek to EOF
+                    if (!hasPostCreditsScene && !osdState.nextEpisode) {
+                        continue;
+                    }
+                }
+                matched = s;
+                break;
+            }
+        }
+
+        if (!matched) {
+            if (osdState.activeSkipKey) {
+                hideOsdSkipPill();
+            }
+            return;
+        }
+
+        var totalSpan = Math.max(1, matched.endSec - matched.startSec);
+        var frac = Math.min(1, Math.max(0, (cur - matched.startSec) / totalSpan));
+        var remSec = Math.max(1, Math.ceil(matched.endSec - cur));
+        var pill = document.getElementById('streamflix-osd-skip-pill');
+
+        if (!pill || osdState.activeSkipKey !== matched.key) {
+            hideOsdSkipPill();
+            osdState.activeSkipKey = matched.key;
+            pill = document.createElement('div');
+            pill.id = 'streamflix-osd-skip-pill';
+            pill.className = 'bfx-skip-pill-wrap';
+            pill.setAttribute('role', 'region');
+            pill.setAttribute('aria-label', matched.label);
+            pill.innerHTML = ''
+                + '<button type="button" class="bfx-skip-pill-btn" id="streamflix-skip-pill-btn">'
+                + '  <span class="bfx-skip-pill-fill" id="streamflix-skip-pill-fill" style="transform:scaleX(' + frac.toFixed(3) + ')"></span>'
+                + '  <span class="bfx-skip-pill-content">'
+                + '    <span class="bfx-skip-pill-ico">' + icon('chevronRight') + '</span>'
+                + '    <span class="bfx-skip-pill-lbl">' + escapeHtml(matched.label) + '</span>'
+                + '    <span class="bfx-skip-pill-rem" id="streamflix-skip-pill-rem">' + escapeHtml(formatShortClockSec(remSec)) + '</span>'
+                + '    <kbd class="bfx-skip-pill-kbd" aria-hidden="true">S</kbd>'
+                + '  </span>'
+                + '</button>'
+                + '<button type="button" class="bfx-skip-pill-dismiss" id="streamflix-skip-pill-dismiss" title="Dismiss" aria-label="Dismiss skip button">' + icon('close') + '</button>';
+            document.body.appendChild(pill);
+
+            var mainBtn = pill.querySelector('#streamflix-skip-pill-btn');
+            var dismissBtn = pill.querySelector('#streamflix-skip-pill-dismiss');
+            mainBtn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                executeSkipSegment(matched);
+            });
+            dismissBtn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                osdState.dismissedSegmentKeys[matched.key] = true;
+                hideOsdSkipPill();
+            });
+            if (isTvOrDpadActive()) {
+                try { mainBtn.focus({ preventScroll: true }); } catch (eFoc) {}
+            }
+        } else {
+            var fillEl = pill.querySelector('#streamflix-skip-pill-fill');
+            if (fillEl) {
+                fillEl.style.transform = 'scaleX(' + frac.toFixed(3) + ')';
+            }
+            var remEl = pill.querySelector('#streamflix-skip-pill-rem');
+            if (remEl) {
+                remEl.textContent = formatShortClockSec(remSec);
+            }
+        }
+    }
+
     function isInsideCreditsChapter(v) {
-        var chapters = osdState.info && Array.isArray(osdState.info.Chapters) ? osdState.info.Chapters : [];
-        if (!v || !chapters.length || typeof v.currentTime !== 'number') {
+        if (!v || typeof v.currentTime !== 'number') {
             return false;
         }
+        var rawDur = Number(v.duration);
+        var itemDur = (osdState.info && Number(osdState.info.RunTimeTicks) > 0) ? (Number(osdState.info.RunTimeTicks) / 10000000) : 0;
+        var cur = v.currentTime;
+        if (itemDur > 60 && (!isFinite(rawDur) || rawDur < itemDur * 0.85) && typeof getEffectiveVideoPositionSec === 'function') {
+            cur = getEffectiveVideoPositionSec(v);
+        }
+        if (Array.isArray(osdState.segments) && osdState.segments.length) {
+            for (var s = 0; s < osdState.segments.length; s++) {
+                var seg = osdState.segments[s];
+                if (seg && seg.kind === 'outro' && cur >= seg.startSec) {
+                    return true;
+                }
+            }
+        }
+        var chapters = osdState.info && Array.isArray(osdState.info.Chapters) ? osdState.info.Chapters : [];
         for (var i = 0; i < chapters.length; i++) {
             var ch = chapters[i];
             if (ch && /^(end\s*credits|credits|outro)$/i.test(String(ch.Name || '').trim())) {
                 var startSec = (Number(ch.StartPositionTicks) || 0) / 10000000;
-                if (v.currentTime >= startSec) {
+                if (cur >= startSec) {
                     return true;
                 }
             }
@@ -1224,7 +1611,7 @@
         if (!document.body.classList.contains('streamflix-nf-player') && !osdState.video && !osdState.docBound) {
             return;
         }
-        document.body.classList.remove('streamflix-nf-player', 'streamflix-osd-paused-on', 'bfx-unified-tracks');
+        document.body.classList.remove('streamflix-nf-player', 'streamflix-osd-paused-on', 'bfx-unified-tracks', 'bfx-skip-pill-enabled');
         unbindOsdVideo();
         if (osdState.docBound) {
             ['mousemove', 'pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(function (evName) {
@@ -1241,11 +1628,12 @@
             osdState.flashTimer = null;
         }
         closeOsdOverlays();
+        hideOsdSkipPill();
         hideOsdUpNextCard();
         if (typeof onWatchPartyOsdTeardown === 'function') {
             onWatchPartyOsdTeardown();
         }
-        ['streamflix-osd-flash', 'streamflix-osd-paused', 'streamflix-osd-episodes', 'streamflix-osd-tracks', 'streamflix-osd-upnext'].forEach(function (id) {
+        ['streamflix-osd-flash', 'streamflix-osd-paused', 'streamflix-osd-episodes', 'streamflix-osd-tracks', 'streamflix-osd-upnext', 'streamflix-osd-skip-pill'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el && el.parentNode) {
                 el.parentNode.removeChild(el);
@@ -1265,6 +1653,10 @@
         osdState.nextEpisode = null;
         osdState.nextEpisodeForId = '';
         osdState.upNextDismissedForId = '';
+        osdState.segments = [];
+        osdState.segmentsForId = '';
+        osdState.activeSkipKey = '';
+        osdState.dismissedSegmentKeys = {};
     }
 
     function ensureHeaderWidgets() {
@@ -1286,8 +1678,10 @@
         if (inVideo && state.accountDropdownOpen) {
             closeAccountDropdown();
         }
-        if (inVideo && state.notificationsOpen && typeof closeNotificationsDropdown === 'function') {
-            closeNotificationsDropdown();
+
+        var staleBell = document.getElementById('streamflix-header-bell-btn');
+        if (staleBell && staleBell.parentNode) {
+            staleBell.parentNode.removeChild(staleBell);
         }
 
         // Merged Top-Right Profile & Account Pill
@@ -1300,10 +1694,6 @@
             var staleBtn = document.getElementById('streamflix-header-profile-btn');
             if (staleBtn) {
                 staleBtn.style.setProperty('display', 'none', 'important');
-            }
-            var staleBell = document.getElementById('streamflix-header-bell-btn');
-            if (staleBell) {
-                staleBell.style.setProperty('display', 'none', 'important');
             }
             ensureMobileDock(true, inVideo);
             if (typeof syncKidsModeChrome === 'function') {
@@ -1348,38 +1738,6 @@
                 + '<span class="streamflix-header-caret">' + icon('chevronDown') + '</span>';
         }
         syncHeaderCastIndicator(btn);
-
-        var bellBtn = document.getElementById('streamflix-header-bell-btn');
-        if (!bellBtn) {
-            bellBtn = document.createElement('button');
-            bellBtn.type = 'button';
-            bellBtn.id = 'streamflix-header-bell-btn';
-            bellBtn.setAttribute('aria-label', 'Notifications');
-            bellBtn.setAttribute('aria-haspopup', 'menu');
-            bellBtn.innerHTML = icon('bell');
-            bellBtn.addEventListener('click', function (ev) {
-                ev.stopPropagation();
-                if (typeof toggleNotificationsDropdown === 'function') {
-                    toggleNotificationsDropdown();
-                }
-            });
-            document.body.appendChild(bellBtn);
-        }
-        var hideBell = overlayOpen || inVideo || isMobileDockViewportActive() || isAdminConfigRoute() || isKidsProfileActive();
-        if (hideBell) {
-            bellBtn.style.setProperty('display', 'none', 'important');
-        } else {
-            bellBtn.style.removeProperty('display');
-            try {
-                var profRect = btn.getBoundingClientRect();
-                if (profRect && profRect.width > 10) {
-                    bellBtn.style.right = Math.max(64, Math.round(window.innerWidth - profRect.left + 8)) + 'px';
-                }
-            } catch (eBellPos) {}
-            if (typeof syncHeaderBellBadge === 'function') {
-                syncHeaderBellBadge();
-            }
-        }
 
         if (typeof syncKidsModeChrome === 'function') {
             syncKidsModeChrome();
@@ -1624,4 +1982,341 @@
         }
 
         syncMobileDockState();
+    }
+
+    /* ----------------------------------------------------------------------
+       Music & Audiobook Persistent Glass Mini-Player (#bfx-audio-miniplayer)
+       ---------------------------------------------------------------------- */
+    var audioMiniState = {
+        audioEl: null,
+        queue: [],
+        index: 0,
+        lastReportMs: 0,
+        ownerUserId: '',
+        ownerProfileId: '',
+        requestSeq: 0
+    };
+
+    function reportMiniPlayerProgress(eventName, item, posSec, isPaused) {
+        if (!item || !item.Id) {
+            return;
+        }
+        var auth = getJellyfinAuthContext();
+        if (!auth || !auth.token || !auth.userId) {
+            return;
+        }
+        if (audioMiniState.ownerUserId && normalizeGuid(auth.userId) !== audioMiniState.ownerUserId) {
+            return;
+        }
+        if (audioMiniState.ownerProfileId && state.activeProfile && state.activeProfile.id && state.activeProfile.id !== audioMiniState.ownerProfileId) {
+            return;
+        }
+        var ticks = Math.max(0, Math.round((Number(posSec) || 0) * 10000000));
+        var endpoint = eventName === 'start'
+            ? '/Sessions/Playing'
+            : (eventName === 'stop' ? '/Sessions/Playing/Stopped' : '/Sessions/Playing/Progress');
+        apiFetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ItemId: item.Id,
+                PositionTicks: ticks,
+                IsPaused: Boolean(isPaused),
+                CanSeek: true
+            })
+        }).catch(function () {});
+    }
+
+    function stopStreamFlixAudioMiniPlayer(opts) {
+        var skipReport = Boolean(opts && opts.skipReport);
+        audioMiniState.requestSeq = (audioMiniState.requestSeq + 1) % 1000000;
+        var a = audioMiniState.audioEl;
+        var curItem = audioMiniState.queue[audioMiniState.index];
+        if (a) {
+            if (curItem && !skipReport) {
+                reportMiniPlayerProgress('stop', curItem, a.currentTime || 0, true);
+            }
+            if (a.__bfxOnMeta) {
+                try { a.removeEventListener('loadedmetadata', a.__bfxOnMeta); } catch (eRmMeta) {}
+                a.__bfxOnMeta = null;
+            }
+            try {
+                a.pause();
+                a.removeAttribute('src');
+                a.load();
+            } catch (eStop) {}
+            if (a.parentNode) {
+                a.parentNode.removeChild(a);
+            }
+            audioMiniState.audioEl = null;
+        }
+        var strayAudio = document.getElementById('bfx-audio-engine');
+        if (strayAudio && strayAudio.parentNode) {
+            try { strayAudio.pause(); strayAudio.removeAttribute('src'); } catch (eStray) {}
+            strayAudio.parentNode.removeChild(strayAudio);
+        }
+        audioMiniState.queue = [];
+        audioMiniState.index = 0;
+        audioMiniState.ownerUserId = '';
+        audioMiniState.ownerProfileId = '';
+        var bar = document.getElementById('bfx-audio-miniplayer');
+        if (bar && bar.parentNode) {
+            bar.parentNode.removeChild(bar);
+        }
+        if (document.body) {
+            document.body.classList.remove('bfx-has-miniplayer');
+        }
+    }
+
+    function buildAudioStreamUrl(item) {
+        var auth = getJellyfinAuthContext();
+        var tok = (auth && auth.token) || '';
+        var devId = 'streamflix-web';
+        try {
+            if (window.ApiClient && typeof window.ApiClient.deviceId === 'function') {
+                devId = window.ApiClient.deviceId() || devId;
+            }
+        } catch (eDev) {}
+        return apiBase()
+            + '/Audio/' + encodeURIComponent(item.Id) + '/universal'
+            + '?UserId=' + encodeURIComponent((auth && auth.userId) || '')
+            + '&DeviceId=' + encodeURIComponent(devId)
+            + '&MaxStreamingBitrate=320000'
+            + '&Container=opus,webm|opus,mp3,aac,m4a|aac,m4b|aac,flac,wav'
+            + '&TranscodingContainer=ts&TranscodingProtocol=hls&AudioCodec=aac'
+            + (tok ? ('&ApiKey=' + encodeURIComponent(tok)) : '');
+    }
+
+    function renderAudioMiniPlayerBar() {
+        var cur = audioMiniState.queue[audioMiniState.index];
+        var a = audioMiniState.audioEl;
+        if (!cur || !a) {
+            return;
+        }
+        if (document.body) {
+            document.body.classList.add('bfx-has-miniplayer');
+        }
+        var bar = document.getElementById('bfx-audio-miniplayer');
+        var artUrl = getItemPosterUrl(cur, 240)
+            || (cur.AlbumId ? (apiBase() + '/Items/' + encodeURIComponent(cur.AlbumId) + '/Images/Primary?maxWidth=240&quality=85') : '');
+        var artistOrAlbum = [
+            Array.isArray(cur.Artists) && cur.Artists.length ? cur.Artists.join(', ') : (cur.AlbumArtist || ''),
+            cur.Album || (cur.Type === 'AudioBook' ? 'Audiobook' : '')
+        ].filter(Boolean).join(' · ') || (cur.Type === 'AudioBook' ? 'Audiobook' : 'Audio');
+
+        if (!bar) {
+            bar = document.createElement('aside');
+            bar.id = 'bfx-audio-miniplayer';
+            bar.className = 'bfx-miniplayer';
+            bar.setAttribute('aria-label', 'Audio Mini Player');
+            bar.innerHTML = ''
+                + '<div class="bfx-mp-progress-wrap">'
+                + '  <input type="range" class="bfx-mp-scrub" id="bfx-mp-scrub" min="0" max="1000" value="0" aria-label="Seek audio" />'
+                + '</div>'
+                + '<div class="bfx-mp-inner">'
+                + '  <div class="bfx-mp-meta">'
+                + '    <div class="bfx-mp-art" id="bfx-mp-art"></div>'
+                + '    <div class="bfx-mp-copy">'
+                + '      <div class="bfx-mp-title" id="bfx-mp-title"></div>'
+                + '      <div class="bfx-mp-sub" id="bfx-mp-sub"></div>'
+                + '    </div>'
+                + '  </div>'
+                + '  <div class="bfx-mp-controls">'
+                + '    <button type="button" class="bfx-mp-btn" id="bfx-mp-prev" title="Back 15s / Previous" aria-label="Previous or back 15 seconds">' + icon('chevronLeft') + '</button>'
+                + '    <button type="button" class="bfx-mp-btn is-play" id="bfx-mp-toggle" title="Play / Pause" aria-label="Play or pause"></button>'
+                + '    <button type="button" class="bfx-mp-btn" id="bfx-mp-next" title="Forward 30s / Next" aria-label="Next or forward 30 seconds">' + icon('chevronRight') + '</button>'
+                + '  </div>'
+                + '  <div class="bfx-mp-right">'
+                + '    <span class="bfx-mp-time" id="bfx-mp-time">0:00</span>'
+                + '    <button type="button" class="bfx-mp-btn is-close" id="bfx-mp-close" title="Close player" aria-label="Close mini player">' + icon('close') + '</button>'
+                + '  </div>'
+                + '</div>';
+            document.body.appendChild(bar);
+
+            bar.querySelector('#bfx-mp-toggle').addEventListener('click', function () {
+                var eng = audioMiniState.audioEl;
+                if (!eng) { return; }
+                if (eng.paused) {
+                    try { eng.play(); } catch (eP) {}
+                } else {
+                    eng.pause();
+                }
+            });
+            bar.querySelector('#bfx-mp-prev').addEventListener('click', function () {
+                var eng = audioMiniState.audioEl;
+                if (!eng) { return; }
+                if ((eng.currentTime || 0) > 12 || audioMiniState.index === 0) {
+                    eng.currentTime = Math.max(0, (eng.currentTime || 0) - 15);
+                } else {
+                    startAudioQueueTrack(audioMiniState.index - 1);
+                }
+            });
+            bar.querySelector('#bfx-mp-next').addEventListener('click', function () {
+                var eng = audioMiniState.audioEl;
+                if (!eng) { return; }
+                if (audioMiniState.index + 1 < audioMiniState.queue.length) {
+                    startAudioQueueTrack(audioMiniState.index + 1);
+                } else {
+                    var activeTrack = audioMiniState.queue[audioMiniState.index];
+                    var dur = (isFinite(eng.duration) && eng.duration > 0)
+                        ? eng.duration
+                        : ((Number(activeTrack && activeTrack.RunTimeTicks) || 0) / 10000000);
+                    eng.currentTime = dur > 0 ? Math.min(dur, (eng.currentTime || 0) + 30) : ((eng.currentTime || 0) + 30);
+                }
+            });
+            bar.querySelector('#bfx-mp-close').addEventListener('click', function () {
+                stopStreamFlixAudioMiniPlayer();
+            });
+            bar.querySelector('#bfx-mp-scrub').addEventListener('input', function (ev) {
+                var eng = audioMiniState.audioEl;
+                var activeTrack = audioMiniState.queue[audioMiniState.index];
+                if (!eng || !activeTrack) { return; }
+                var dur = (isFinite(eng.duration) && eng.duration > 0)
+                    ? eng.duration
+                    : ((Number(activeTrack.RunTimeTicks) || 0) / 10000000);
+                if (dur > 0) {
+                    eng.currentTime = (Number(ev.target.value) / 1000) * dur;
+                }
+            });
+        }
+
+        var artEl = bar.querySelector('#bfx-mp-art');
+        if (artEl) {
+            artEl.innerHTML = artUrl
+                ? '<img src="' + escapeHtml(artUrl) + '" alt="" />'
+                : icon('play');
+        }
+        var titleEl = bar.querySelector('#bfx-mp-title');
+        if (titleEl) { titleEl.textContent = cur.Name || 'Untitled Track'; }
+        var subEl = bar.querySelector('#bfx-mp-sub');
+        if (subEl) { subEl.textContent = artistOrAlbum; }
+        var toggleEl = bar.querySelector('#bfx-mp-toggle');
+        if (toggleEl) { toggleEl.innerHTML = icon(a.paused ? 'play' : 'pause'); }
+    }
+
+    function startAudioQueueTrack(idx) {
+        if (idx < 0 || idx >= audioMiniState.queue.length) {
+            stopStreamFlixAudioMiniPlayer();
+            return;
+        }
+        audioMiniState.index = idx;
+        var track = audioMiniState.queue[idx];
+        var a = audioMiniState.audioEl;
+        if (!a) {
+            a = document.createElement('audio');
+            a.id = 'bfx-audio-engine';
+            a.preload = 'auto';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            audioMiniState.audioEl = a;
+
+            a.addEventListener('play', function () {
+                renderAudioMiniPlayerBar();
+                var cur = audioMiniState.queue[audioMiniState.index];
+                reportMiniPlayerProgress('start', cur, a.currentTime || 0, false);
+            });
+            a.addEventListener('pause', function () {
+                renderAudioMiniPlayerBar();
+                var cur = audioMiniState.queue[audioMiniState.index];
+                reportMiniPlayerProgress('progress', cur, a.currentTime || 0, true);
+            });
+            a.addEventListener('timeupdate', function () {
+                var cur = audioMiniState.queue[audioMiniState.index];
+                if (!cur) { return; }
+                var dur = (isFinite(a.duration) && a.duration > 0)
+                    ? a.duration
+                    : ((Number(cur.RunTimeTicks) || 0) / 10000000);
+                var pos = Number(a.currentTime) || 0;
+                var scrubEl = document.getElementById('bfx-mp-scrub');
+                if (scrubEl && dur > 0) {
+                    scrubEl.value = String(Math.min(1000, Math.max(0, Math.round((pos / dur) * 1000))));
+                }
+                var timeEl = document.getElementById('bfx-mp-time');
+                if (timeEl) {
+                    timeEl.textContent = formatShortClockSec(pos) + (dur > 0 ? (' / ' + formatShortClockSec(dur)) : '');
+                }
+                var now = Date.now();
+                if (now - audioMiniState.lastReportMs > 10000) {
+                    audioMiniState.lastReportMs = now;
+                    reportMiniPlayerProgress('progress', cur, pos, a.paused);
+                }
+            });
+            a.addEventListener('ended', function () {
+                if (audioMiniState.index + 1 < audioMiniState.queue.length) {
+                    startAudioQueueTrack(audioMiniState.index + 1);
+                } else {
+                    stopStreamFlixAudioMiniPlayer();
+                }
+            });
+            a.addEventListener('error', function () {
+                var cur = audioMiniState.queue[audioMiniState.index];
+                if (cur && !a.__bfxFallbackTried) {
+                    a.__bfxFallbackTried = true;
+                    var auth = getJellyfinAuthContext();
+                    a.src = apiBase() + '/Items/' + encodeURIComponent(cur.Id) + '/Download' + ((auth && auth.token) ? ('?ApiKey=' + encodeURIComponent(auth.token)) : '');
+                    try {
+                        var fbPlay = a.play();
+                        if (fbPlay && typeof fbPlay.catch === 'function') { fbPlay.catch(function () {}); }
+                    } catch (eFb) {}
+                }
+            });
+        }
+
+        if (a.__bfxOnMeta) {
+            try { a.removeEventListener('loadedmetadata', a.__bfxOnMeta); } catch (eOldMeta) {}
+            a.__bfxOnMeta = null;
+        }
+        a.__bfxFallbackTried = false;
+        a.src = buildAudioStreamUrl(track);
+        var resumeSec = (track.UserData && Number(track.UserData.PlaybackPositionTicks) > 0)
+            ? (Number(track.UserData.PlaybackPositionTicks) / 10000000)
+            : 0;
+        if (resumeSec > 5) {
+            var onMeta = function () {
+                a.removeEventListener('loadedmetadata', onMeta);
+                if (a.__bfxOnMeta === onMeta) {
+                    a.__bfxOnMeta = null;
+                }
+                try { a.currentTime = resumeSec; } catch (eSeek) {}
+            };
+            a.__bfxOnMeta = onMeta;
+            a.addEventListener('loadedmetadata', onMeta);
+        }
+        renderAudioMiniPlayerBar();
+        var playPromise = a.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(function () {});
+        }
+    }
+
+    function playStreamFlixAudioItem(item) {
+        if (!item || !item.Id) {
+            return;
+        }
+        if (typeof stopHeroVideoPreview === 'function') {
+            stopHeroVideoPreview(false);
+        }
+        var auth = getJellyfinAuthContext();
+        audioMiniState.ownerUserId = (auth && auth.userId) ? normalizeGuid(auth.userId) : '';
+        audioMiniState.ownerProfileId = (state.activeProfile && state.activeProfile.id) ? String(state.activeProfile.id) : '';
+        audioMiniState.requestSeq = (audioMiniState.requestSeq + 1) % 1000000;
+        var reqSeq = audioMiniState.requestSeq;
+        if (item.Type === 'MusicAlbum') {
+            var uid = auth && auth.userId ? encodeURIComponent(auth.userId) : '';
+            fetchUserItems(uid, 'ParentId=' + encodeURIComponent(item.Id) + '&Recursive=true&IncludeItemTypes=Audio&SortBy=ParentIndexNumber,IndexNumber,SortName&SortOrder=Ascending&Limit=100')
+                .then(function (res) {
+                    if (audioMiniState.requestSeq !== reqSeq) {
+                        return;
+                    }
+                    var tracks = (res && Array.isArray(res.Items)) ? res.Items : [];
+                    if (tracks.length > 0) {
+                        audioMiniState.queue = tracks;
+                        startAudioQueueTrack(0);
+                    }
+                })
+                .catch(function () {});
+            return;
+        }
+        audioMiniState.queue = [item];
+        startAudioQueueTrack(0);
     }

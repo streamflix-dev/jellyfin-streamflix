@@ -2,7 +2,7 @@
 
 # StreamFlix for Jellyfin
 
-**A Netflix-style web UI, multi-auth household sign-in gate (Google OAuth, Custom OIDC, Jellyfin & QR Guest Passes), Dedicated Kids Mode, real-time synced Watch Together, liquid-glass mobile dock, native Seerr requests, and household profiles backed by real Jellyfin users.**
+**A Netflix-style web UI, multi-auth household sign-in gate (Google OAuth, Custom OIDC, Jellyfin & QR Guest Passes), Dedicated Kids Mode, real-time synced Watch Together, Skip Intro & Credits support, liquid-glass mobile dock, native Seerr requests, and household profiles backed by real Jellyfin users.**
 
 [![Release](https://img.shields.io/github/v/release/streamflix-dev/jellyfin-streamflix?style=flat-square&label=version&color=E50914)](https://github.com/streamflix-dev/jellyfin-streamflix/releases)
 [![Downloads](https://img.shields.io/github/downloads/streamflix-dev/jellyfin-streamflix/total?style=flat-square&label=downloads&color=46d369)](https://github.com/streamflix-dev/jellyfin-streamflix/releases)
@@ -66,56 +66,68 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/v09-mobile-showcase.jpg" alt="StreamFlix Mobile Liquid-Glass Dock and Account Sheet" />
       <br />
-      <sub><b>8. Mobile Dock &amp; Phone Account Sheet</b> — Liquid-glass bottom navigation, clean category pills, Quick Connect &amp; phone Client Settings</sub>
+      <sub><b>8. Mobile Dock &amp; Phone Account Sheet</b> — Liquid-glass bottom dock, edge-to-edge account sheet, enlarged touch rows, Quick Connect &amp; Client Settings</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/v09-account-menu.jpg" alt="StreamFlix Account Pill Menu and Profile Switcher" />
       <br />
-      <sub><b>9. Account Pill Menu</b> — Instant profile switching, Cast, 6-digit Quick Connect modal, live Watch Together status, Media Requests &amp; Settings</sub>
+      <sub><b>9. Streamlined Account Menu</b> — Fast profile switching, Cast, Quick Connect, Watch Together, Media Requests, Settings &amp; side-by-side Admin shortcuts</sub>
     </td>
     <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/title-details.jpg" alt="StreamFlix Title Details Modal" />
+      <img src="docs/screenshots/title-details.jpg" alt="StreamFlix 2-Column Editorial Title Details Modal" />
       <br />
-      <sub><b>10. Title Details (&ldquo;More Info&rdquo;)</b> — Synopsis, video/audio stream picker, clickable cast/director/genre chips &amp; Watch Together launch</sub>
+      <sub><b>10. Editorial Title Details (&ldquo;More Info&rdquo;)</b> — 2-column layout, configurable 4K/DV/Atmos badges, YouTube Trailer, Series Shuffle &amp; clickable cast/genre links</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/v099-user-settings.jpg" alt="StreamFlix Grouped User Settings Hub" />
+      <br />
+      <sub><b>11. Grouped User Settings Hub</b> — Organized sections for Appearance &amp; Home, Playback &amp; Subtitles, Display &amp; Libraries, Administration &amp; Account</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/screenshots/v099-visual-presets.jpg" alt="StreamFlix Visual Presets, Card Density and Layout Customizer" />
+      <br />
+      <sub><b>12. Visual Presets &amp; Card Density</b> — 1-click themes (<i>Netflix Classic</i>, <i>OLED Pure Black</i>, <i>Cinema Glass</i>, <i>Prime Midnight</i>), card sizes &amp; row order</sub>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
       <img src="docs/screenshots/top-10-row.jpg" alt="StreamFlix Top 10 Row" />
       <br />
-      <sub><b>11. Top 10 in StreamFlix Today</b> — Configurable server rankings with bold <code>#1</code>&ndash;<code>#10</code> badges &amp; rank numerals</sub>
+      <sub><b>13. Top 10 in StreamFlix Today</b> — Configurable server rankings with bold <code>#1</code>&ndash;<code>#10</code> badges &amp; rank numerals</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/player-controls.jpg" alt="StreamFlix Video Player Controls" />
+      <img src="docs/screenshots/player-controls.jpg" alt="StreamFlix Video Player Controls and Skip Intro Pill" />
       <br />
-      <sub><b>12. Netflix-Style Video Player</b> — Slim red scrubber, 10s/30s skip, Episodes &amp; Seasons drawer, Audio &amp; Subtitles popover &amp; Picture-in-Picture</sub>
+      <sub><b>14. Netflix-Style Video Player &amp; Skip Intro Pill</b> — Frosted-glass Skip Intro / Credits pill (Intro Skipper &amp; MediaSegments), Episodes drawer &amp; track popover</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/player-paused.jpg" alt="StreamFlix Video Player Pause Overlay" />
       <br />
-      <sub><b>13. &ldquo;You're Watching&rdquo; Pause Screen</b> — ClearLogo artwork, runtime &amp; synopsis overlay while paused</sub>
+      <sub><b>15. &ldquo;You're Watching&rdquo; Pause Screen</b> — ClearLogo artwork, runtime &amp; synopsis overlay while paused</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/screenshots/edit-profile.jpg" alt="StreamFlix Edit Profile Modal" />
       <br />
-      <sub><b>14. Profile Customization &amp; Security</b> — 64 avatars, 14 accent colors, maturity ratings, Kids mode, multi-auth account lock &amp; PIN</sub>
+      <sub><b>16. Profile Customization &amp; Kids Bedtime</b> — 64 avatars, 14 accent colors, maturity ratings, Kids-only Bedtime Window, SSO lock &amp; PIN</sub>
     </td>
     <td width="50%" align="center" valign="top">
-      <img src="docs/screenshots/v09-admin-console.jpg" alt="StreamFlix Tabbed Admin Dashboard Console" />
+      <img src="docs/screenshots/v09-admin-console.jpg" alt="StreamFlix Organized 6-Tab Admin Dashboard Console" />
       <br />
-      <sub><b>15. 7-Tab Plugin Administration</b> — Streamlined console for Profiles, Sign-In &amp; SSO, Active Devices, Guest Passes, Home &amp; Hero, and Seerr</sub>
+      <sub><b>17. 6-Tab Plugin Administration</b> — Focused console for Profiles, Appearance &amp; Home, Sign-In &amp; SSO, Features &amp; Requests, Active Devices &amp; System Backup</sub>
     </td>
   </tr>
 </table>
 
 <p align="center">
-  <sub>Demo library media courtesy of <a href="https://studio.blender.org/films/">Blender Studio Open Movies</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY</a>) — featuring <i>Sintel</i> and <i>Cosmos Laundromat</i> (&copy; Blender Foundation).</sub>
+  <sub>Demo library media courtesy of <a href="https://studio.blender.org/films/">Blender Studio Open Movies</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY</a>) — featuring <i>Charge</i>, <i>Sintel</i>, <i>Cosmos Laundromat</i>, <i>Tears of Steel</i>, and <i>Sprite Fright</i> (&copy; Blender Foundation).</sub>
 </p>
 
 ---
@@ -123,33 +135,31 @@ Runs entirely inside your existing Jellyfin server — no reverse-proxy sidecar,
 ## Highlights
 
 ### Flexible Multi-Auth Sign-In, Custom OIDC, Guest Passes & Security
-- **Google OAuth, Custom OpenID Connect, Jellyfin Login, Household Password, or Hybrid Mode.** Household sign-in is enforced before *"Who's watching?"* so zero library artwork or metadata is exposed pre-login. Enable any combination of progressive-disclosure **Sign-In Methods**: server-verified **Google Sign-In** (with one-click **Test OAuth Config**), self-hosted or cloud **Custom OpenID Connect (OIDC)** (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc. via Authorization Code + PKCE `S256`, RSA/ECDSA JWKS verification, RFC 6749 `client_secret_basic` / `client_secret_post` fallback, and one-click **Test OIDC Discovery**), **Jellyfin Username & Password Login**, **Household Password**, or **Bypass Sign-In Gate on Home Network (LAN)**.
+- **Google OAuth, Custom OpenID Connect, Jellyfin Login, Household Password, or Hybrid Mode.** Household sign-in is enforced before *"Who's watching?"* so zero library artwork or metadata is exposed pre-login. Enable any combination of progressive-disclosure **Sign-In Methods**: server-verified **Google Sign-In** (with one-click **Test OAuth Config**), self-hosted or cloud **Custom OpenID Connect (OIDC)** (`Authentik`, `Authelia`, `Pocket ID`, `Keycloak`, `Kanidm`, `Zitadel`, `Okta`, etc. via Authorization Code + PKCE `S256`, RSA/ECDSA JWKS verification, RFC 6749 `client_secret_basic` / `client_secret_post` fallback, and one-click **Test OIDC Discovery**), **Jellyfin Username & Password Login**, **Household Password**, or **Bypass Sign-In Gate on Home Network (LAN)** (with optional **Tailscale / Mesh VPN `100.64.0.0/10`** recognition).
 - **Temporary SVG QR Guest Passes & native phone Share sheet.** Generate expiring invite links, pass codes, and zero-dependency server-rendered SVG QR codes locked to a single non-administrator profile with configurable duration (`1h`–`30d`) and device limits — plus a one-tap **Share** button (`navigator.share`) on mobile phones. Link-preview bots cannot burn redemptions, guests cannot switch into other profiles or view admin routes, and revoking or expiring a pass deletes it and terminates active Jellyfin sessions immediately.
 - **Opt-in Admin-Only Password Fallback (off by default).** Optionally add a subtle **Admin Sign-In** link on SSO screens that strictly enforces `IsAdministrator` on the backend (rejecting non-admin and disabled Jellyfin accounts with HTTP `403`), with an optional **LAN-only** IP restriction.
 - **Multi-auth profile locks & randomized plugin passwords.** Protect any profile with a **4–8 digit PIN** (with target-scoped brute-force lockout) and/or lock it to a **Google email, OIDC email/username/`sub`, or Jellyfin username** — displaying a matching provider badge on the profile tile. Dedicated Jellyfin users created by StreamFlix receive a cryptographically randomized 256-bit password automatically (while manually created Jellyfin accounts are never modified), secrets stay masked and strictly server-side, and plugin configuration is mirrored atomically to persistent Jellyfin storage.
-- **Tabbed Admin Console, Active Devices manager & global sign-out.** Manage everything from the 7-tab **Dashboard → Plugins → StreamFlix** console (`All Settings`, `Profiles`, `Sign-In & SSO`, `Active Devices`, `Guest Passes`, `Home & Hero`, `Seerr`). Filter `All Devices`, `Online Now`, and `Guest Passes`, inspect live playback/profile status, **sign out individual devices**, or trigger **Sign out all devices** server-wide.
+- **6-Tab Admin Console, Active Devices manager & JSON Config Backup.** Manage everything from the focused 6-tab **Dashboard → Plugins → StreamFlix** console (`Profiles`, `Appearance & Home`, `Sign-In & SSO`, `Features & Requests`, `Active Devices`, and `System & Backup`, plus `All`), jump straight to sections from the 6 live status cards, inspect signed-in device playback/profile status, sign out individual or all devices, run the 8-point proxy/OAuth health check, and export/import sanitized **Configuration & Profile Backups** in 1 click.
 
 ### Real Multi-User Profiles, Dedicated Kids Mode & Watch Together
-- **Separate history for everyone.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, and parental controls** completely independent.
-- **Dedicated Kids Profile Mode & Parental Exit Lock.** Activating a Kids profile launches a child-safe experience with a **`KIDS`** header badge, interactive **Kids World filter bubbles** (`All Kids`, `Animation`, `Family`, `Adventure`, `Silly & Funny`, `Magic & Fantasy`, `Quick Watch`), defense-in-depth maturity ceiling enforcement across Hero, rows, search, and *Surprise Me* alongside Jellyfin's server-side `MaxParentalAgeRating`, and stripped admin/request chrome. Leaving Kids mode enforces a **Parental Exit Lock** — verifying an adult profile PIN/SSO lock, or presenting a 4-word **Grown-Up Check** when no adult PINs are configured.
+- **Separate history for everyone.** Every *"Who's watching?"* tile maps to its own Jellyfin Server User, keeping **Continue Watching, Next Up, My List, played state, Jellyfin Home section order (`OrderedViews`), and parental controls** completely independent.
+- **Dedicated Kids Profile Mode, Kids Bedtime Window & Parental Exit Lock.** Activating a Kids profile launches a child-safe experience with a **`KIDS`** header badge, interactive **Kids World filter bubbles**, defense-in-depth maturity ceiling enforcement across Hero, rows, search, and *Surprise Me* alongside Jellyfin's server-side `MaxParentalAgeRating`, an optional **Kids Bedtime Window** (*"Time for Bed 🌙"* screen with tonight-only Adult PIN unlock), and a **Parental Exit Lock** when leaving Kids mode.
 - **Server-Authoritative Watch Together with 1-Click Guest Invites.** Host or join real-time synced watch parties powered by StreamFlix's server-authoritative sync engine (play, pause, seek, drift correction, and automatic episode transitions) from any **Title Details** modal, the **Account Pill Menu**, or the **Video Player OSD** — surfacing a live room badge only while actively connected. Choose **Everyone Controls** vs **Host Only**, **Start at 0:00** vs **Resume**, share 6-character room codes or `?watchparty=` household links, or generate a **6-hour Guest Pass + Watch Party** combo link so friends without a Jellyfin login jump straight into your stream in sync.
-- **Redesigned non-clipping User Settings & Phone Client Settings.** Opening **Settings** upgrades Jellyfin's preference screens (`Overview`, `Profile`, `Display`, `Home`, `Playback`, `Subtitles`, and `Controls`) into a full-bleed dark-glass hub with an active **Profile Hero Card**, wrapping non-clipping section pills, the per-device **StreamFlix Home** toggle, and direct **Client Settings** access on phones (bridging into Jellyfin Android / iOS `NativeShell.openClientSettings` or mobile app settings).
-- **Customizable branding, avatars, accents, Cast & Quick Connect.** Customize the upper-left brand wordmark, pick from 64 categorized icons and 14 accent colors (with one-click Shuffle), reorder profiles freely, launch **Cast**, and authorize Smart TVs or apps directly from the Account Pill Menu's 6-character **Quick Connect** modal.
+- **1-Click Visual Presets, Card Density & Grouped User Settings Hub.** Personalize server defaults or individual profiles inside **Settings → Appearance & Home** with 4 curated **Visual Presets** (`Netflix Classic`, `OLED Pure Black`, `Cinema Glass`, `Prime Midnight`), 3 **Card Density** sizes (`Compact`, `Standard`, `Large`), and a per-device **StreamFlix Home** toggle — organized alongside grouped **Playback & Subtitles**, **Display & Libraries**, **Administration**, and **Account & Session** cards plus the mobile **Client Settings** bridge.
+- **Customizable branding, avatars, accents, Cast & Quick Connect.** Customize the upper-left brand wordmark and accent color, pick from 64 categorized icons and 14 accent colors (with one-click Shuffle), reorder profiles freely, launch **Cast**, and authorize Smart TVs or apps directly from the Account Menu's 6-character **Quick Connect** modal.
 
-### Cinematic Home, Smart Collections, Seerr Requests & Discovery
-- **Native Seerr / Jellyseerr / Overseerr requests & live download tracker.** Connect your Seerr instance in plugin settings (with one-click **Test Seerr Connection** and SSRF protection) to surface *Available to Request* Movie & TV Season cards directly inside Live Search, see live Radarr/Sonarr download progress (`Downloading · X%`) on cards and modals, and follow requests in the **Media Requests** tracker (`All` / `In Progress` / `Available` filters with one-click **Open** in library) — keeping your API key strictly server-side with optional Kids/Guest profile gates.
-- **Opt-In Live TV Compatibility (off by default).** Enable **Live TV in StreamFlix** under **Dashboard → Plugins → StreamFlix → Home & Hero** to add a **Live TV** tab to the top navigation bar (and Account Menu) with live channels, **On Now** broadcasts with live airing progress bars, favorite channels, DVR recordings, instant Live TV channel search, upcoming channel schedules, and 1-click access to Jellyfin's full timeline **TV Guide (EPG)** & **Schedule** — automatically respecting per-user Jellyfin Live TV permissions and Kids Mode safety.
-- **Configurable Hero Billboard, Smart Collections & Surprise Me.** Edge-to-edge hero with configurable slide count, auto-rotation interval (`0` to pause), content type, and library source filtering — paired with a frosted category bar (`Home`, `Shows`, `Movies`, `Collections`, `Top 10`, `My List`, `/` quick search, and a **Surprise Me** unwatched shuffler) plus automatic smart rows (*Critically Acclaimed*, *Hidden Gems*, *Under 90 Minutes*, *Revisited Favorites*, *Because You Watched…*).
-- **Dynamic Top 10 with `#1`–`#10` badges.** Rank by server-wide most played, highest community rating, recently added, daily spotlight, or per-session randomized picks — complete with bold Netflix-style `#1`–`#10` badges and rank numerals.
-- **Rich More Info & hover previews.** Detailed modals showcase ClearLogo title artwork, movie/series taglines, resume progress, audio/subtitle stream pickers, and **clickable Genre, Director & Cast chips** — alongside hover preview cards with one-click **Remove from Continue Watching (`×`)** + Undo.
+### Cinematic Home, Editorial Details, Live TV EPG, Music Mini-Player & Seerr
+- **Native Seerr / Jellyseerr / Overseerr requests & live download tracker.** Connect your Seerr instance in plugin settings (with one-click **Test Seerr Connection** and SSRF protection) to surface *Available to Request* Movie & TV Season cards directly inside Live Search, see live Radarr/Sonarr download progress (`Downloading · X%`) on cards and modals, and follow requests in the **Media Requests** tracker (`All` / `In Progress` / `Available` filters with one-click **Open** in library).
+- **Opt-In Live TV with Inline 3-Hour EPG Timeline & 1-Click DVR Recording.** Enable **Live TV in StreamFlix** under **Features & Requests** to add a **Live TV** hub with live channels, **On Now** broadcasts, an interactive **3-hour EPG timeline grid**, 1-click **DVR Record / Cancel** scheduling, favorite channels, recordings, and instant Live TV search — respecting per-user Jellyfin Live TV permissions and Kids Mode safety.
+- **Configurable Hero Billboard (with Muted YouTube Trailer Previews), Smart Collections & Jellyfin Home Sync.** Edge-to-edge hero with optional muted **YouTube / local trailer background previews**, configurable slide count, rotation interval, and library filtering — paired with **New & Popular** (*Trending*, *Coming Soon*, *Just Added*), automatic smart rows, and full respect for Jellyfin **Home Screen Sections 1–9** and **Configured Library Order (`OrderedViews`)**.
+- **Decluttered 2-Column Editorial Title Details & Persistent Music/Audiobook Mini-Player.** Opening **More Info** presents a clean 2-column layout with ClearLogo artwork, inline **YouTube Trailer** playback, a **`⋯` More Options** menu, optional **Rich Technical Quality Badges** (`4K UHD`, `Dolby Vision`, `HDR10+`, `Dolby Atmos`, `DTS:X`, `7.1`/`5.1`, `AV1`, `CC`, Critic `%`, and `Studio` credits — toggleable in Admin Settings), non-clipping Audio & Subtitles selectors, clickable comma-separated Cast/Director/Genre links, and a **Shuffle** button on TV Series. Clicking Music or Audiobook items launches a persistent frosted-glass **Audio Mini-Player** docked along the bottom edge while you keep browsing.
 
-### Netflix-Style Video Player
-- **Streamlined controls.** Slim red scrubber, centered title, 10s/30s skip buttons, play/pause pulse feedback, live Watch Together sync pill, and a *"You're watching"* ClearLogo pause screen.
-- **In-player drawers & popovers.** Switch episodes instantly from the slide-in **Episodes & Seasons** drawer and change tracks live in the unified two-column **Audio & Subtitles** popover.
-- **Seamless binge watching.** End-of-episode **Next Episode** countdown card (*Play Next* / *Watch Credits*) so multi-episode sessions keep flowing automatically.
+### Netflix-Style Video Player & Skip Intro / Credits Pill
+- **Skip Intro, Recap & Credits Support (`MediaSegments` + Intro Skipper).** Automatically detects intro, recap, preview, commercial, and outro/credits segments from **Jellyfin 10.10+/12 `MediaSegments`**, the **Intro Skipper** plugin (v1 & v2 endpoints), and MKV chapter markers (toggleable via **Enable Skip Intro & Credits Pill** in Admin Settings) — rendering a frosted-glass pill with live progress fill, remaining seconds, **`S` keyboard shortcut**, **`×` dismiss**, and Smart TV D-pad focus.
+- **Streamlined controls, drawers & binge watching.** Slim red scrubber, centered title, 10s/30s skip buttons, play/pause pulse feedback, live Watch Together sync pill, *"You're watching"* ClearLogo pause screen, slide-in **Episodes & Seasons** drawer, unified **Audio & Subtitles** popover, and end-of-episode **Next Episode** countdown card.
 
 ### Desktop, Liquid-Glass Mobile Dock & Smart TV Ready
-- **Mobile-tuned with spring-animated floating capsule dock.** Liquid-glass bottom navigation dock on phones (`Home`, `New & Hot`, `Search`, and `My <Brand>`) with zero duplicate top-right header avatars, clean outlined category pills, a bottom-anchored **Phone Account Sheet** (*Switch Profile*, *My List*, *Surprise Me*, *Cast*, *Quick Connect*, *Watch Together*, *Settings*, *Client Settings*, *Media Requests*, *Guest Passes*), touch-swipe hero billboard, 3-up snap-scrolling poster rows, and a collision-free landscape player.
+- **Mobile-tuned with spring-animated floating capsule dock.** Liquid-glass bottom navigation dock on phones (`Home`, `New & Hot`, `Search`, and `My <Brand>`) with zero duplicate top-right header avatars, clean outlined category pills, an edge-to-edge bottom **Phone Account Sheet** with enlarged touch targets (*Switch Profile*, *My List*, *Surprise Me*, *Cast*, *Quick Connect*, *Watch Together*, *Media Requests*, *Guest Passes*, *Settings*, *Client Settings*, and side-by-side *StreamFlix* / *Dashboard* admin shortcuts), touch-swipe hero billboard, 3-up snap-scrolling poster rows, and a collision-free landscape player.
 - **10-foot Smart TV mode.** Automatically activates on `.layout-tv`, TV browsers, or `?tv=1` with overscan-safe margins, oversized poster/profile tiles, crisp focus halos, and full 2D spatial D-pad / remote navigation.
 
 ---
@@ -219,7 +229,7 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
     ├── PluginServiceRegistrator.cs      # DI registration for services & startup filter
     ├── Configuration/
     │   ├── PluginConfiguration.cs       # Profiles, Kids Mode, Watch Together, multi-auth, Guest Pass & Seerr config
-    │   └── configPage.html              # 7-tab Admin UI (Dashboard → Plugins → StreamFlix)
+    │   └── configPage.html              # 6-tab Admin UI (Dashboard → Plugins → StreamFlix)
     ├── Controllers/
     │   ├── StreamFlixDtos.cs            # Request & response DTO models (explicit camelCase JSON contracts)
     │   ├── StreamFlixController.cs      # Core config, ETag asset endpoints & caller context
@@ -244,8 +254,9 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
 
 ## Compatible Plugins
 
-StreamFlix works out of the box alongside supported third-party Jellyfin plugins (more integrations will be added over time):
+StreamFlix works out of the box alongside supported third-party Jellyfin plugins and native segment providers (more integrations will be added over time):
 
+- **[Intro Skipper](https://github.com/intro-skipper/intro-skipper) &amp; Jellyfin `MediaSegments` (Skip Intro / Credits)** — Automatically detected with zero extra configuration (supports `Intro Skipper` v1/v2 endpoints, native Jellyfin 10.10+/12 `MediaSegments`, and MKV chapter markers to surface the frosted-glass **Skip Intro / Recap / Credits** pill in the StreamFlix player).
 - **[WebGPU Player](https://github.com/alchemyyy/jellyfin-plugin-webgpu-player)** — Automatically detected when installed with zero configuration required (uses WebGPU on supported desktop browsers and automatically falls back to Jellyfin's standard player on mobile, TV, plain HTTP, or incompatible media streams).
 
 ## Credits

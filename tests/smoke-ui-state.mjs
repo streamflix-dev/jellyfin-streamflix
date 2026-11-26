@@ -327,6 +327,8 @@ assert.match(css02, /@supports\s+not\s*\(aspect-ratio:\s*1\s*\/\s*1\)/, 'Card as
 assert.match(combinedJs, /function\s+canOpenExternalSystemBrowser\s*\(/, 'JMP external system-browser SSO detection helper must be present');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopBegin/, 'Desktop Google OAuth relay begin endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/GoogleDesktopPoll/, 'Desktop Google OAuth relay poll endpoint must be wired');
+assert.match(combinedJs, /\/StreamFlix\/Auth\/DesktopLaunch\?kind=/, 'Single-history DesktopLaunch browser tab opener must be wired for reliable window.close()');
+assert.match(combinedJs, /streamflix_desktop_sso_v1/, 'BroadcastChannel auto-close notification for DesktopLaunch tab must be wired');
 assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto-closing desktop SSO browser tab helper must be wired');
 assert.match(combinedJs, /function\s+checkFlexGapSupport\s*\(/, 'Chromium 83 Flexbox gap runtime feature detection must be wired');
 const css09 = fs.readFileSync(path.join(cssDir, '09-kids-and-watch-together.css'), 'utf8');
@@ -1008,6 +1010,12 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.match(combinedJs, /\/LiveTv\/Timers\/Defaults\?programId=/, 'DVR recording must fetch Jellyfin /LiveTv/Timers/Defaults');
     assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose EnableHeroTrailerPreview toggle');
     assert.match(configHtml, /id="StreamFlixHomeRowsEditor"/, 'configPage.html must expose Home Page Row Order & Visibility editor');
+    assert.match(configHtml, /data-cfg-tab="profiles"/, 'configPage.html must expose organized Profiles tab');
+    assert.match(configHtml, /data-cfg-tab="home"[^>]*>Appearance &amp; Home</, 'configPage.html must expose organized Appearance & Home tab');
+    assert.match(configHtml, /data-cfg-tab="signin"/, 'configPage.html must expose organized Sign-In & SSO tab');
+    assert.match(configHtml, /data-cfg-tab="features"[^>]*>Features &amp; Requests</, 'configPage.html must expose organized Features & Requests tab');
+    assert.match(configHtml, /data-cfg-tab="devices"/, 'configPage.html must expose organized Active Devices tab');
+    assert.match(configHtml, /data-cfg-tab="system"[^>]*>System &amp; Backup</, 'configPage.html must expose organized System & Backup tab');
 
     console.log('[PASS] End-to-End VM YouTube Hero & Modal Trailers, Live TV EPG Timeline, DVR Record, Home Row Customizer & New & Popular Hub verified');
 
@@ -1381,7 +1389,273 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
             'Saving Jellyfin Home Preferences must immediately invalidate SWR cache and update Home row order (#23)'
         );
         assert.equal(updatedRowIds.includes('nextup'), false, 'Setting Next Up to None in Jellyfin Home Preferences must hide Next Up on Home (#23)');
+        assert.match(combinedJs, /streamflix-kids-bedtime-opt'\s*\+\s*\(draft\.isKids\s*\?\s*''\s*:\s*' is-hidden'\)/, 'Bedtime Window customization must only appear for Kids profiles');
+        assert.match(combinedJs, /!p\.isKids\s*\|\|\s*p\.isAdmin\s*\|\|\s*!p\.bedtimeStart/, 'Bedtime lock enforcement must only apply to Kids profiles');
+        assert.equal(doc23.getElementById('streamflix-header-bell-btn'), null, 'Header notification bell icon must not be rendered');
         console.log('[PASS] Issue #23 Jellyfin Home Sections 1–9, Configured Library Order (OrderedViews), HidePlayedInLatest & Live Sync verified');
+    }
+
+    // -------------------------------------------------------------------------
+    // v0.9.9 Feature & Declutter Suite: Rich Detail Badges toggle, Series Shuffle,
+    // Skip Intro Pill, Visual Presets & Card Density, Audio Mini-Player & Watch Activity
+    // -------------------------------------------------------------------------
+    {
+        const ls99 = makeStorage();
+        const ss99 = makeStorage();
+        const doc99 = createLiveTvHubDom();
+        const body99 = doc99.body;
+
+        const prof99 = {
+            id: 'prof_99',
+            name: 'Alex',
+            icon: '🎬',
+            color: '#E50914',
+            isAdmin: true,
+            isOwner: true,
+            isKids: false,
+            allowLiveTv: false,
+            canActivate: true,
+            jellyfinUserId: '99999999999999999999999999999999',
+            jellyfinUsername: 'Alex',
+            accessToken: 'tok_99',
+        };
+        ls99.setItem('streamflix_session_v7', JSON.stringify({
+            token: 'signed.99.token',
+            email: 'alex@example.com',
+            authKind: 'google',
+            isAdmin: true,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        }));
+        ls99.setItem('jellyfin_credentials', JSON.stringify({
+            Servers: [{ Id: 'srv_99', UserId: prof99.jellyfinUserId, AccessToken: 'tok_99', ManualAddress: 'https://jellyfin.example.com' }],
+        }));
+        ls99.setItem('streamflix_active_profile_v64', JSON.stringify(prof99));
+        ss99.setItem('streamflix_tab_profile_v1', JSON.stringify(prof99));
+
+        const idSeries99 = 'b9999999999999999999999999999991';
+        const idAudio99  = 'a9999999999999999999999999999992';
+        const idEp1_99   = 'e9999999999999999999999999999993';
+        const idEp2_99   = 'e9999999999999999999999999999994';
+
+        const seriesItem99 = {
+            Id: idSeries99,
+            Name: 'Cosmos Laundromat',
+            Type: 'Series',
+            ProductionYear: 2015,
+            OfficialRating: 'PG',
+            CommunityRating: 7.8,
+            CriticRating: 94,
+            RunTimeTicks: 7200000000,
+            Genres: ['Animation', 'Sci-Fi'],
+            Studios: [{ Name: 'Blender Studio' }],
+            Overview: 'A sheep steps through a portal into infinite worlds.',
+            ImageTags: { Primary: 'p_cos' },
+            BackdropImageTags: ['b_cos'],
+            ExternalUrls: [{ Name: 'IMDb', Url: 'https://www.imdb.com/title/tt4938464' }],
+            MediaStreams: [
+                { Type: 'Video', Index: 0, Codec: 'hevc', Width: 3840, Height: 2160, VideoRange: 'HDR', VideoRangeType: 'DOVIWithHDR10', DisplayTitle: '4K Dolby Vision' },
+                { Type: 'Audio', Index: 1, Codec: 'eac3', Profile: 'Dolby Atmos', Channels: 6, Language: 'eng', IsDefault: true, DisplayTitle: 'English Atmos 5.1' },
+                { Type: 'Subtitle', Index: 2, Codec: 'subrip', Language: 'eng', IsDefault: true, DisplayTitle: 'English SDH' },
+            ],
+        };
+        const audioItem99 = {
+            Id: idAudio99,
+            Name: 'Snow Fight',
+            Album: 'Sintel OST',
+            Artists: ['Jan Morgenstern'],
+            Type: 'Audio',
+            RunTimeTicks: 1800000000,
+            ImageTags: { Primary: 'p_aud' },
+            UserData: { PlaybackPositionTicks: 300000000 },
+        };
+
+        let richBadgesCfg = true;
+        let visualPresetCfg = 'oled';
+        let cardDensityCfg = 'large';
+        const loc99 = {
+            href: 'https://jellyfin.example.com/web/index.html#/home',
+            origin: 'https://jellyfin.example.com',
+            pathname: '/web/index.html',
+            search: '',
+            hash: '#/home',
+        };
+        const makePubCfg99 = () => ({
+            version: '0.9.9.0',
+            serverId: 'srv_99',
+            enableStreamFlixUi: true,
+            requireGoogleAuth: true,
+            enableGoogleSignIn: true,
+            googleConfigured: true,
+            hasAccess: true,
+            isAdmin: true,
+            enableWatchTogether: true,
+            enableRichDetailBadges: richBadgesCfg,
+            enableSkipIntro: true,
+            visualPreset: visualPresetCfg,
+            cardDensity: cardDensityCfg,
+            profiles: [prof99],
+        });
+
+        const win99 = {
+            location: loc99,
+            history: { length: 1, replaceState() {}, pushState() {}, back() {} },
+            document: doc99,
+            localStorage: ls99,
+            sessionStorage: ss99,
+            navigator: { userAgent: 'Mozilla/5.0 Chrome/128.0', maxTouchPoints: 0 },
+            innerWidth: 1440,
+            innerHeight: 900,
+            screen: { width: 1920, height: 1080 },
+            matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+            getComputedStyle: () => ({ display: 'block', visibility: 'visible', opacity: '1', getPropertyValue: () => '' }),
+            requestAnimationFrame: (fn) => setTimeout(fn, 0),
+            cancelAnimationFrame: clearTimeout,
+            setTimeout,
+            clearTimeout,
+            setInterval: () => 1,
+            clearInterval() {},
+            addEventListener() {},
+            removeEventListener() {},
+            dispatchEvent() {},
+            scrollTo() {},
+            CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
+            Event: class { constructor(t) { this.type = t; } },
+            MutationObserver: class { observe() {} disconnect() {} },
+            IntersectionObserver: class { observe() {} disconnect() {} },
+            AbortController,
+            URL,
+            URLSearchParams,
+            Headers,
+            Response,
+            ApiClient: {
+                _serverInfo: { Id: 'srv_99', UserId: prof99.jellyfinUserId, AccessToken: 'tok_99' },
+                accessToken: () => 'tok_99',
+                getCurrentUserId: () => prof99.jellyfinUserId,
+                serverId: () => 'srv_99',
+                deviceId: () => 'dev_99',
+            },
+            fetch: async (input, init) => {
+                const u = typeof input === 'string' ? input : input.url;
+                if (u.includes('/StreamFlix/PublicConfig')) {
+                    return new Response(JSON.stringify(makePubCfg99()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/StreamFlix/Hub/Bootstrap')) {
+                    return new Response(JSON.stringify({
+                        userId: prof99.jellyfinUserId,
+                        serverId: 'srv_99',
+                        views: [{ Id: 'c9999999999999999999999999999999', Name: 'Shows', CollectionType: 'tvshows' }],
+                        userHomePreferences: { hasCustomHomeSections: false, homeSections: [], orderedViews: [], latestItemsExcludes: [], myMediaExcludes: [], hidePlayedInLatest: false },
+                        libraryLatest: [],
+                        resumeItems: [seriesItem99],
+                        resumeAudioItems: [audioItem99],
+                        resumeBookItems: [],
+                        nextUpItems: [],
+                        favoriteItems: [],
+                        allMovies: [],
+                        allSeries: [seriesItem99],
+                        collectionsItems: [],
+                        filteredHeroPool: [seriesItem99],
+                        popularScores: {},
+                        totalMoviesCount: 0,
+                        totalSeriesCount: 1,
+                        totalCollectionsCount: 0,
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/Shows/') && u.includes('/Episodes')) {
+                    return new Response(JSON.stringify({
+                        Items: [
+                            { Id: idEp1_99, Name: 'First Cycle', SeriesId: idSeries99, SeriesName: 'Cosmos Laundromat', Type: 'Episode', ParentIndexNumber: 1, IndexNumber: 1, RunTimeTicks: 7200000000 },
+                            { Id: idEp2_99, Name: 'Second Cycle', SeriesId: idSeries99, SeriesName: 'Cosmos Laundromat', Type: 'Episode', ParentIndexNumber: 1, IndexNumber: 2, RunTimeTicks: 7000000000 },
+                        ],
+                    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/IntroSkipperSegments')) {
+                    return new Response(JSON.stringify({ Introduction: { Start: 10, End: 76 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/MediaSegments/')) {
+                    return new Response(JSON.stringify({ Items: [{ Type: 'Intro', StartTicks: 100000000, EndTicks: 760000000 }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes('/Sessions')) {
+                    if (init && init.method === 'POST') {
+                        return new Response(null, { status: 204 });
+                    }
+                    return new Response(JSON.stringify([{
+                        Id: 'sess_99',
+                        PlayState: { AudioStreamIndex: 1, SubtitleStreamIndex: 2 },
+                        NowPlayingItem: { ...seriesItem99, Id: idEp1_99, Type: 'Episode', SeriesId: idSeries99, SeriesName: 'Cosmos Laundromat', ParentIndexNumber: 1, IndexNumber: 1, Name: 'First Cycle' },
+                    }]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes(idSeries99) || u.includes(idEp1_99)) {
+                    return new Response(JSON.stringify(seriesItem99), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                if (u.includes(idAudio99)) {
+                    return new Response(JSON.stringify(audioItem99), { status: 200, headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ Items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            },
+        };
+        win99.window = win99;
+        win99.self = win99;
+        vm.runInContext(combinedJs, vm.createContext(win99));
+        await new Promise((r) => setTimeout(r, 90));
+
+        // 1. Visual Preset & Card Density applied from PublicConfig
+        assert.equal(body99.getAttribute('data-bfx-preset'), 'oled', 'VisualPreset must apply data-bfx-preset="oled" on body');
+        assert.equal(body99.getAttribute('data-bfx-density'), 'large', 'CardDensity must apply data-bfx-density="large" on body');
+
+        // 2. Detail Modal with EnableRichDetailBadges=true + 2-column credits + More menu + Series Shuffle
+        assert.match(combinedJs, /id="streamflix-modal-quality-badges"/, 'Detail modal must include quality badges slot');
+        assert.match(combinedJs, /id="streamflix-modal-more-btn"/, 'Detail modal must include decluttered More Options button');
+        assert.match(combinedJs, /id="streamflix-modal-shuffle-ep-btn"/, 'Series detail modal must include episode Shuffle button');
+
+        const hub99 = doc99.getElementById('streamflix-cinema-hub');
+        assert.ok(hub99, 'Cinema hub must mount for v0.9.9 suite');
+
+        // 3. Compact Account Dropdown (no Watch Activity or Appearance & Layout in menu; Settings + side-by-side Admin/Dashboard)
+        const profBtn99 = doc99.getElementById('streamflix-header-profile-btn');
+        assert.ok(profBtn99, 'Header profile button must mount');
+        profBtn99.click();
+        assert.equal(doc99.getElementById('streamflix-dd-watch-activity'), null, 'Watch Activity must be removed from Account Dropdown');
+        assert.equal(doc99.getElementById('streamflix-dd-appearance'), null, 'Appearance & Layout must be moved out of Account Dropdown into Settings');
+        const settingsBtn99 = doc99.getElementById('streamflix-dd-user-prefs');
+        assert.ok(settingsBtn99 && />Settings</.test(settingsBtn99.innerHTML), 'Account dropdown must expose concise Settings item');
+        assert.ok(doc99.getElementById('streamflix-dd-plugin-settings') && doc99.getElementById('streamflix-dd-dashboard'), 'Admin account dropdown must expose side-by-side StreamFlix & Dashboard buttons');
+        assert.doesNotMatch(combinedJs, /Profiles\/Activity|openWatchActivityModal/, 'Watch Activity client/API hooks must be completely removed');
+        assert.match(combinedJs, /data-bfx-customize-nav="1"[\s\S]*?Appearance, Navigation &amp; Home Layout/, 'User Settings must expose Appearance, Navigation & Home Layout card');
+
+        // 3b. Organized & Decluttered User Settings Menu (#/mypreferencesmenu)
+        assert.match(combinedJs, /data-bfx-group="appearance"/, 'Settings menu must group Appearance & Home together');
+        assert.match(combinedJs, /data-bfx-group="playback"/, 'Settings menu must group Playback & Subtitles together');
+        assert.match(combinedJs, /data-bfx-group="display"/, 'Settings menu must group Display & Libraries together');
+        assert.match(combinedJs, /id="bfx-prefs-admin-group"/, 'Settings menu must consolidate Administration into a single unified group');
+        assert.match(combinedJs, /data-bfx-group="account"/, 'Settings menu must group Account & Session together');
+        assert.match(combinedJs, /Libraries & Home Sections/, 'Settings menu must clarify native Home row as Libraries & Home Sections');
+        assert.match(combinedJs, /Account & Password/, 'Settings menu must clarify native Profile row as Account & Password');
+        assert.match(combinedJs, /data-bfx-vis-preset-pill="1"/, 'Appearance row must live-sync active visual preset pill');
+
+        // 4. Persistent Music & Audiobook Glass Mini-Player + Skip Intro Pill regex & OSD checks
+        assert.match(combinedJs, /id\s*=\s*'bfx-audio-miniplayer'|bfx-audio-miniplayer/, 'Persistent glass audio mini-player must be wired');
+        assert.match(combinedJs, /IntroSkipperSegments/, 'Intro Skipper v2 endpoint must be supported in Skip Intro engine');
+        assert.match(combinedJs, /IntroTimestamps/, 'Intro Skipper v1 endpoint must be supported in Skip Intro engine');
+        assert.match(combinedJs, /\/MediaSegments\//, 'Jellyfin 10.10+/12 MediaSegments endpoint must be supported in Skip Intro engine');
+        assert.match(combinedJs, /streamflix-osd-skip-pill/, 'Upgraded frosted-glass OSD Skip Intro pill must be wired');
+        assert.doesNotMatch(combinedJs, /\/Download\?api_key=/, 'Audio & media Download fallback URLs must use native ?ApiKey= instead of legacy ?api_key=');
+        assert.match(css02, /body\.bfx-active\.streamflix-modal-open/, 'Modal scroll lock must be scoped to body.bfx-active.streamflix-modal-open');
+
+        // 5. Live PublicConfig visual preset refresh + Sign-Out cleanup of Audio Mini-Player & Detail Modal state
+        richBadgesCfg = false;
+        visualPresetCfg = 'midnight';
+        cardDensityCfg = 'compact';
+        await win99.__STREAMFLIX_REFRESH_CONFIG__();
+        await new Promise((r) => setTimeout(r, 35));
+        assert.equal(body99.getAttribute('data-bfx-preset'), 'midnight', 'Live PublicConfig refresh must immediately update data-bfx-preset on body');
+        assert.equal(body99.getAttribute('data-bfx-density'), 'compact', 'Live PublicConfig refresh must immediately update data-bfx-density on body');
+
+        win99.__STREAMFLIX_SIGN_OUT_LOCAL__(true);
+        assert.equal(doc99.getElementById('bfx-audio-miniplayer'), null, 'Household sign-out must remove #bfx-audio-miniplayer');
+        assert.equal(doc99.getElementById('bfx-audio-engine'), null, 'Household sign-out must remove #bfx-audio-engine');
+        assert.equal(body99.classList.contains('streamflix-modal-open'), false, 'Household sign-out must clear streamflix-modal-open class');
+        console.log('[PASS] v0.9.9 Visual Presets, Rich Detail Badges, Decluttered Editorial Modal, Compact Account Menu, Settings Appearance Card, Skip Intro Pill & Audio Mini-Player verified');
     }
 }
 

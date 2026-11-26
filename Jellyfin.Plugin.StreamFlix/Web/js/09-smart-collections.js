@@ -242,15 +242,22 @@
             var normCardId = normalizeGuid(itemId);
             var item = itemMap[itemId] || (normCardId ? itemMap[normCardId] : null) || findCachedItemById(itemId) || { Id: itemId };
             card.__bfxItem = item;
-            var isNativeReaderOrAudioItem = Boolean(
-                item && (item.Type === 'Book' || item.Type === 'Audio' || item.Type === 'AudioBook')
+            var isAudioMiniPlayerItem = Boolean(
+                item && (item.Type === 'Audio' || item.Type === 'AudioBook' || item.Type === 'MusicAlbum')
+            );
+            var isNativeReaderItem = Boolean(
+                item && item.Type === 'Book'
             );
             var openNativeItemRoute = function () {
                 var srv = item.ServerId || (state.config && state.config.serverId) || '';
                 window.location.hash = '#/details?id=' + encodeURIComponent(item.Id) + (srv ? ('&serverId=' + encodeURIComponent(srv)) : '');
             };
             var openCardDetail = function () {
-                if (isNativeReaderOrAudioItem && item.Id) {
+                if (isAudioMiniPlayerItem && item.Id && typeof playStreamFlixAudioItem === 'function') {
+                    playStreamFlixAudioItem(item);
+                    return;
+                }
+                if (isNativeReaderItem && item.Id) {
                     openNativeItemRoute();
                     return;
                 }
@@ -267,7 +274,11 @@
                     ev.stopPropagation();
                     var act = actionBtn.getAttribute('data-action');
                     if (act === 'play') {
-                        if (isNativeReaderOrAudioItem && item.Id) {
+                        if (isAudioMiniPlayerItem && item.Id && typeof playStreamFlixAudioItem === 'function') {
+                            playStreamFlixAudioItem(item);
+                            return;
+                        }
+                        if (isNativeReaderItem && item.Id) {
                             openNativeItemRoute();
                             return;
                         }
@@ -923,20 +934,78 @@
             }
         });
 
+        var hasExplicitPillPrefs = Boolean(profPrefs && Array.isArray(profPrefs.hiddenBuiltIns));
+        var hasServerHiddenBuiltIns = Array.isArray(cfg.navHiddenBuiltIns) && cfg.navHiddenBuiltIns.length > 0;
         if (!hiddenBuiltInMap.collections && !suppressBuiltIn.collections) {
             pills.push({
                 id: 'collections',
                 label: 'Collections',
-                hide: !d.collectionsItems.length && !buildSmartCollections(d).length
+                hide: !d.collectionsItems.length && !(hasExplicitPillPrefs || hasServerHiddenBuiltIns)
             });
         }
-        if (!hiddenBuiltInMap.top10) {
+        // Top 10 already lives on Home and inside New & Popular -> Trending; keep top nav uncluttered unless New & Popular is hidden or user opted in
+        var showTop10Tab = !hiddenBuiltInMap.top10 && (Boolean(hiddenBuiltInMap.hot) || hasExplicitPillPrefs);
+        if (showTop10Tab) {
             pills.push({ id: 'top10', label: 'Top 10', hide: !d.top10Items.length });
         }
         if (!hiddenBuiltInMap.mylist) {
             pills.push({ id: 'mylist', label: 'My List', hide: false });
         }
         return pills;
+    }
+
+    function getProfileVisualPrefs() {
+        var pid = state.activeProfile && state.activeProfile.id;
+        if (!pid) {
+            return null;
+        }
+        var stored = loadJson(VISUAL_PREF_PREFIX + pid, null);
+        if (!stored || typeof stored !== 'object' || !stored.customized) {
+            return null;
+        }
+        return stored;
+    }
+
+    function saveProfileVisualPrefs(prefs) {
+        var pid = state.activeProfile && state.activeProfile.id;
+        if (!pid) {
+            return;
+        }
+        saveJson(VISUAL_PREF_PREFIX + pid, prefs || null);
+    }
+
+    function getEffectiveVisualPrefs() {
+        var prof = getProfileVisualPrefs();
+        var cfg = state.config || {};
+        var rawPreset = String((prof && prof.preset) || cfg.visualPreset || 'netflix').trim().toLowerCase();
+        var preset = (rawPreset === 'oled' || rawPreset === 'glass' || rawPreset === 'midnight') ? rawPreset : 'netflix';
+        var rawDensity = String((prof && prof.density) || cfg.cardDensity || 'standard').trim().toLowerCase();
+        var density = (rawDensity === 'compact' || rawDensity === 'large') ? rawDensity : 'standard';
+        return {
+            preset: preset,
+            density: density,
+            customized: Boolean(prof && prof.customized)
+        };
+    }
+
+    function applyVisualPresetAndDensity(overridePreset, overrideDensity) {
+        if (!document.body) {
+            return;
+        }
+        if (typeof isAdminConfigRoute === 'function' && isAdminConfigRoute()) {
+            document.body.removeAttribute('data-bfx-preset');
+            document.body.removeAttribute('data-bfx-density');
+            return;
+        }
+        var eff = getEffectiveVisualPrefs();
+        var p = overridePreset || eff.preset;
+        var d = overrideDensity || eff.density;
+        if (document.body.getAttribute('data-bfx-preset') !== p) {
+            document.body.setAttribute('data-bfx-preset', p);
+        }
+        if (document.body.getAttribute('data-bfx-density') !== d) {
+            document.body.setAttribute('data-bfx-density', d);
+        }
     }
 
     function openNavCustomizeModal() {
@@ -995,19 +1064,52 @@
             : '<div class="streamflix-modal-text" style="margin:4px 0 0;">No accessible media libraries loaded yet.</div>';
 
         var profRowPrefs = getProfileHomeRowPrefs();
+        var profVisualPrefs = getProfileVisualPrefs();
+        var effVisual = getEffectiveVisualPrefs();
+        var draftPreset = effVisual.preset;
+        var draftDensity = effVisual.density;
         var effRowPlan = getEffectiveHomeRowPlan();
         var draftRowOrder = effRowPlan.order.slice();
         var draftRowHidden = {};
         Object.keys(effRowPlan.hiddenMap).forEach(function (k) { draftRowHidden[k] = true; });
+
+        var presetSpecs = [
+            { id: 'netflix', label: 'Netflix Classic', sub: '#141414 cinema dark', swatch: '#141414' },
+            { id: 'oled', label: 'OLED Pure Black', sub: 'True #000000 pitch black', swatch: '#000000' },
+            { id: 'glass', label: 'Cinema Glass', sub: 'Frosted sapphire glow', swatch: '#0d1526' },
+            { id: 'midnight', label: 'Prime Midnight', sub: 'Deep slate theater', swatch: '#0f172a' }
+        ];
+        var densitySpecs = [
+            { id: 'compact', label: 'Compact' },
+            { id: 'standard', label: 'Standard' },
+            { id: 'large', label: 'Large' }
+        ];
+        var presetsHtml = presetSpecs.map(function (ps) {
+            var act = ps.id === draftPreset ? ' is-active' : '';
+            return ''
+                + '<button type="button" class="bfx-preset-tile' + act + '" data-vis-preset="' + ps.id + '">'
+                + '  <span class="bfx-preset-swatch" style="background:' + ps.swatch + ';"></span>'
+                + '  <span class="bfx-preset-copy"><b>' + escapeHtml(ps.label) + '</b><small>' + escapeHtml(ps.sub) + '</small></span>'
+                + '</button>';
+        }).join('');
+        var densityHtml = densitySpecs.map(function (ds) {
+            var act = ds.id === draftDensity ? ' is-active' : '';
+            return '<button type="button" class="bfx-density-pill' + act + '" data-vis-density="' + ds.id + '">' + escapeHtml(ds.label) + '</button>';
+        }).join('');
 
         var profName = (state.activeProfile && state.activeProfile.name) || 'this profile';
         var m = openModal(''
             + '<div class="bfx-cs-head">'
             + '  <div class="bfx-cs-head-ico">' + icon('sliders') + '</div>'
             + '  <div class="bfx-cs-head-copy">'
-            + '    <h2>Navigation &amp; Home Layout</h2>'
-            + '    <p class="streamflix-modal-text">Customize top-bar categories, Jellyfin libraries, and Home screen row order for <strong>' + escapeHtml(profName) + '</strong>.</p>'
+            + '    <h2>Appearance, Navigation &amp; Home Layout</h2>'
+            + '    <p class="streamflix-modal-text">Personalize visual preset, card density, top-bar categories, and Home screen row order for <strong>' + escapeHtml(profName) + '</strong>.</p>'
             + '  </div>'
+            + '</div>'
+            + '<div class="bfx-nav-cust-section">'
+            + '  <div class="bfx-nav-cust-label">Visual Preset &amp; Poster Density</div>'
+            + '  <div class="bfx-preset-grid" id="bfx-vis-preset-grid">' + presetsHtml + '</div>'
+            + '  <div class="bfx-density-row"><span>Card Size</span><div class="bfx-density-pills" id="bfx-vis-density-pills">' + densityHtml + '</div></div>'
             + '</div>'
             + '<div class="bfx-nav-cust-section">'
             + '  <div class="bfx-nav-cust-label">Built-In Tabs</div>'
@@ -1022,7 +1124,7 @@
             + '  <div class="bfx-home-rows-cust-list" id="bfx-prof-home-rows-list"></div>'
             + '</div>'
             + '<div class="streamflix-modal-actions" style="justify-content:space-between;">'
-            + ((profPrefs || profRowPrefs)
+            + ((profPrefs || profRowPrefs || profVisualPrefs)
                 ? '  <button type="button" class="streamflix-ghost-btn" data-nav-act="reset">Use Server Default</button>'
                 : '  <span></span>')
             + '  <div style="display:flex;gap:8px;">'
@@ -1030,6 +1132,25 @@
             + '    <button type="button" class="streamflix-btn-primary" data-nav-act="save">Save</button>'
             + '  </div>'
             + '</div>', { className: 'bfx-nav-customize-modal' });
+
+        Array.prototype.forEach.call(m.modal.querySelectorAll('[data-vis-preset]'), function (pBtn) {
+            pBtn.addEventListener('click', function () {
+                draftPreset = pBtn.getAttribute('data-vis-preset') || 'netflix';
+                Array.prototype.forEach.call(m.modal.querySelectorAll('[data-vis-preset]'), function (b) {
+                    b.classList.toggle('is-active', b === pBtn);
+                });
+                applyVisualPresetAndDensity(draftPreset, draftDensity);
+            });
+        });
+        Array.prototype.forEach.call(m.modal.querySelectorAll('[data-vis-density]'), function (dBtn) {
+            dBtn.addEventListener('click', function () {
+                draftDensity = dBtn.getAttribute('data-vis-density') || 'standard';
+                Array.prototype.forEach.call(m.modal.querySelectorAll('[data-vis-density]'), function (b) {
+                    b.classList.toggle('is-active', b === dBtn);
+                });
+                applyVisualPresetAndDensity(draftPreset, draftDensity);
+            });
+        });
 
         var rowHostEl = m.modal.querySelector('#bfx-prof-home-rows-list');
         var liveTvOnNowAllowed = typeof isLiveTvEnabledForCurrentProfile === 'function' && isLiveTvEnabledForCurrentProfile();
@@ -1093,18 +1214,28 @@
 
         var cancelBtn = m.modal.querySelector('[data-nav-act="cancel"]');
         if (cancelBtn) {
-            cancelBtn.addEventListener('click', function () { m.close(false); });
+            cancelBtn.addEventListener('click', function () {
+                applyVisualPresetAndDensity();
+                m.close(false);
+            });
         }
         var resetBtn = m.modal.querySelector('[data-nav-act="reset"]');
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
                 saveProfileNavPrefs(null);
                 saveProfileHomeRowPrefs(null);
+                saveProfileVisualPrefs(null);
+                applyVisualPresetAndDensity();
+                var effDefVis = getEffectiveVisualPrefs();
+                var defMap = { netflix: 'Netflix Classic', oled: 'OLED Pure Black', glass: 'Cinema Glass', midnight: 'Prime Midnight' };
+                Array.prototype.forEach.call(document.querySelectorAll('[data-bfx-vis-preset-pill="1"]'), function (p) {
+                    p.textContent = defMap[effDefVis.preset] || 'Netflix Classic';
+                });
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
                 }
-                showToast('Navigation & Home layout reset to server defaults.', 'info');
+                showToast('Appearance, navigation & Home layout reset to server defaults.', 'info');
             });
         }
         var saveBtn = m.modal.querySelector('[data-nav-act="save"]');
@@ -1133,11 +1264,21 @@
                     order: draftRowOrder.slice(),
                     hiddenRows: Object.keys(draftRowHidden).filter(function (k) { return Boolean(draftRowHidden[k]); })
                 });
+                saveProfileVisualPrefs({
+                    customized: true,
+                    preset: draftPreset,
+                    density: draftDensity
+                });
+                applyVisualPresetAndDensity();
+                var savedMap = { netflix: 'Netflix Classic', oled: 'OLED Pure Black', glass: 'Cinema Glass', midnight: 'Prime Midnight' };
+                Array.prototype.forEach.call(document.querySelectorAll('[data-bfx-vis-preset-pill="1"]'), function (p) {
+                    p.textContent = savedMap[draftPreset] || 'Netflix Classic';
+                });
                 m.close(true);
                 if (document.getElementById('streamflix-cinema-hub')) {
                     renderCinemaHubContents();
                 }
-                showToast('Navigation & Home layout updated.', 'success');
+                showToast('Appearance & Home layout updated.', 'success');
             });
         }
         return m;
@@ -2825,7 +2966,7 @@
             + '  <nav class="streamflix-FilterPills" aria-label="Browse">' + pillsHtml + '</nav>'
             + '  <div class="streamflix-subnav-right">'
             + (canSurprise
-                ? '    <button type="button" id="streamflix-surprise-btn" class="streamflix-surprise-btn" title="Surprise Me" aria-label="Surprise Me">' + icon('shuffle') + '<span>Surprise Me</span></button>'
+                ? '    <button type="button" id="streamflix-surprise-btn" class="streamflix-surprise-btn" data-bfx-tip="Surprise Me" aria-label="Surprise Me">' + icon('shuffle') + '<span>Surprise Me</span></button>'
                 : '')
             + '    <div class="streamflix-search-box' + (state.searchQuery ? ' has-value' : '') + '">'
             + '      <span class="streamflix-search-icon">' + icon('search') + '</span>'

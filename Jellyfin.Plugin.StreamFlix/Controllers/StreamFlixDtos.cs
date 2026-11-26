@@ -255,6 +255,14 @@ public class SaveAdminConfigRequest
 
     public bool EnableHeroTrailerPreview { get; set; } = true;
 
+    public bool EnableRichDetailBadges { get; set; } = true;
+
+    public bool EnableSkipIntro { get; set; } = true;
+
+    public string? VisualPreset { get; set; }
+
+    public string? CardDensity { get; set; }
+
     public List<string>? HomeRowOrder { get; set; }
 
     public List<string>? HomeHiddenRows { get; set; }
@@ -341,6 +349,14 @@ public class ImportConfigBackupRequest
     public List<string>? NavLibraryIds { get; set; }
 
     public bool? EnableHeroTrailerPreview { get; set; }
+
+    public bool? EnableRichDetailBadges { get; set; }
+
+    public bool? EnableSkipIntro { get; set; }
+
+    public string? VisualPreset { get; set; }
+
+    public string? CardDensity { get; set; }
 
     public List<string>? HomeRowOrder { get; set; }
 

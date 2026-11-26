@@ -143,6 +143,10 @@ public partial class StreamFlixController
             heroContentType = NormalizeHeroContentType(config.HeroContentType),
             heroLibraryIds = (config.HeroLibraryIds ?? new List<string>()).ToList(),
             enableHeroTrailerPreview = config.EnableHeroTrailerPreview,
+            enableRichDetailBadges = config.EnableRichDetailBadges,
+            enableSkipIntro = config.EnableSkipIntro,
+            visualPreset = NormalizeVisualPreset(config.VisualPreset),
+            cardDensity = NormalizeCardDensity(config.CardDensity),
             homeRowOrder = NormalizeHomeRowIds(config.HomeRowOrder),
             homeHiddenRows = NormalizeHomeRowIds(config.HomeHiddenRows),
             showLibrariesInNav = config.ShowLibrariesInNav,
@@ -319,6 +323,26 @@ public partial class StreamFlixController
                 config.MigratedHeroYouTubeTrailers = true;
             }
 
+            if (request.EnableRichDetailBadges.HasValue)
+            {
+                config.EnableRichDetailBadges = request.EnableRichDetailBadges.Value;
+            }
+
+            if (request.EnableSkipIntro.HasValue)
+            {
+                config.EnableSkipIntro = request.EnableSkipIntro.Value;
+            }
+
+            if (request.VisualPreset != null)
+            {
+                config.VisualPreset = NormalizeVisualPreset(request.VisualPreset);
+            }
+
+            if (request.CardDensity != null)
+            {
+                config.CardDensity = NormalizeCardDensity(request.CardDensity);
+            }
+
             if (request.HomeRowOrder != null)
             {
                 config.HomeRowOrder = NormalizeHomeRowIds(request.HomeRowOrder);
@@ -473,8 +497,12 @@ public partial class StreamFlixController
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList(),
                         SeerrRequestQuota = Math.Clamp(src.SeerrRequestQuota, -1, 500),
-                        BedtimeStart = NormalizeTimeString(src.BedtimeStart),
-                        BedtimeEnd = NormalizeTimeString(src.BedtimeEnd),
+                        BedtimeStart = src.IsKids && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeStart)) && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeEnd))
+                            ? NormalizeTimeString(src.BedtimeStart)
+                            : string.Empty,
+                        BedtimeEnd = src.IsKids && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeStart)) && !string.IsNullOrEmpty(NormalizeTimeString(src.BedtimeEnd))
+                            ? NormalizeTimeString(src.BedtimeEnd)
+                            : string.Empty,
                         JellyfinUserId = prevProf?.JellyfinUserId,
                         JellyfinUsername = !string.IsNullOrWhiteSpace(src.JellyfinUsername) ? src.JellyfinUsername.Trim() : prevProf?.JellyfinUsername,
                         IsPluginCreatedJellyfinUser = prevProf?.IsPluginCreatedJellyfinUser ?? false,

@@ -199,7 +199,8 @@ body.bfx-kids-mode .streamflix-FilterPills .streamflix-pill.active {
     background: rgba(99, 102, 241, 0.09);
     border: 1px solid rgba(129, 140, 248, 0.24);
 }
-.streamflix-kids-lock-opt.is-hidden {
+.streamflix-kids-lock-opt.is-hidden,
+.streamflix-kids-bedtime-opt.is-hidden {
     display: none !important;
 }
 .bfx-kids-lock-head {
@@ -320,7 +321,7 @@ button.headerSyncButton {
 /* Account Menu Non-Truncating Layout, Watch Together Row & Media Detail Modal Button */
 @media (min-width: 641px) {
     #streamflix-account-dropdown {
-        width: 344px !important;
+        width: 332px !important;
         max-width: calc(100vw - 24px) !important;
     }
 }
@@ -1452,8 +1453,7 @@ html.bfx-no-flex-gap .streamflix-carousel-track > * + *,
 html.bfx-no-flex-gap .streamflix-dd-active-header > * + *,
 html.bfx-no-flex-gap .streamflix-google-btn > * + *,
 html.bfx-no-flex-gap .streamflix-oidc-btn > * + *,
-html.bfx-no-flex-gap .streamflix-pin-boxes > * + *,
-html.bfx-no-flex-gap .bfx-notif-row > * + * {
+html.bfx-no-flex-gap .streamflix-pin-boxes > * + * {
     margin-left: 12px;
 }
 html.bfx-no-flex-gap .streamflix-episode-row > * + * {

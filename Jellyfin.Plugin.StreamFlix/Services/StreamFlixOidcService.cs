@@ -41,7 +41,14 @@ public static class StreamFlixOidcService
     private static readonly ConcurrentDictionary<string, Task<OidcDiscoveryDoc>> DiscoveryInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, CachedJwks> JwksCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, PendingOidcFlow> PendingOidcFlows = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, DesktopRelayStatusEntry> DesktopRelayStatuses = new(StringComparer.Ordinal);
     private static readonly object PendingFlowsLock = new();
+
+    public sealed record DesktopRelayStatusEntry(
+        string Status,
+        string Who,
+        string? ErrorMessage,
+        DateTimeOffset ExpiresAt);
 
     public sealed record OidcStatePayload(
         string StateId,
@@ -98,6 +105,10 @@ public static class StreamFlixOidcService
         public OidcHandoffPayload? CompletedHandoff { get; set; }
 
         public string? ErrorMessage { get; set; }
+
+        public string? AuthRedirectUrl { get; set; }
+
+        public string? LoginHint { get; set; }
     }
 
     public static string GetDisplayProviderName(PluginConfiguration config)
@@ -238,10 +249,25 @@ public static class StreamFlixOidcService
             sb.Append("&login_hint=").Append(Uri.EscapeDataString(loginHint.Trim()));
         }
 
-        return (sb.ToString(), stateId, signedCookie, pollSecret);
+        var builtAuthUrl = sb.ToString();
+        lock (PendingFlowsLock)
+        {
+            if (PendingOidcFlows.TryGetValue(stateId, out var registeredFlow))
+            {
+                registeredFlow.AuthRedirectUrl = builtAuthUrl;
+                registeredFlow.LoginHint = (loginHint ?? string.Empty).Trim();
+            }
+        }
+
+        if (desktopRelay)
+        {
+            DesktopRelayStatuses[stateId] = new DesktopRelayStatusEntry("pending", string.Empty, null, DateTimeOffset.UtcNow.AddMinutes(10));
+        }
+
+        return (builtAuthUrl, stateId, signedCookie, pollSecret);
     }
 
-    public static (string StateId, string PollSecret) CreateDesktopRelayFlow(string? pendingProfileId)
+    public static (string StateId, string PollSecret) CreateDesktopRelayFlow(string? pendingProfileId, string? loginHint = null)
     {
         var stateId = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         var pollSecret = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
@@ -252,9 +278,58 @@ public static class StreamFlixOidcService
             Nonce: string.Empty,
             RedirectUri: string.Empty,
             ReturnWebBase: string.Empty,
-            PendingProfileId: (pendingProfileId ?? string.Empty).Trim());
-        RegisterPendingFlow(statePayload, pollSecretHash);
+            PendingProfileId: (pendingProfileId ?? string.Empty).Trim(),
+            DesktopRelay: true);
+        RegisterPendingFlow(statePayload, pollSecretHash, loginHint);
+        DesktopRelayStatuses[stateId] = new DesktopRelayStatusEntry("pending", string.Empty, null, DateTimeOffset.UtcNow.AddMinutes(10));
         return (stateId, pollSecret);
+    }
+
+    public static (bool Found, string? AuthRedirectUrl, string? LoginHint) TryGetPendingDesktopLaunchInfo(string? rawStateId)
+    {
+        var clean = (rawStateId ?? string.Empty).Trim().ToLowerInvariant();
+        if (clean.Length < 16 || clean.Length > 64)
+        {
+            return (false, null, null);
+        }
+
+        PrunePendingFlows();
+        lock (PendingFlowsLock)
+        {
+            if (PendingOidcFlows.TryGetValue(clean, out var flow)
+                && !flow.StateConsumed
+                && DateTimeOffset.UtcNow < flow.StateExpiresAt)
+            {
+                return (true, flow.AuthRedirectUrl, flow.LoginHint);
+            }
+        }
+
+        return (false, null, null);
+    }
+
+    public static DesktopRelayStatusEntry PeekDesktopRelayStatus(string? rawStateId)
+    {
+        var clean = (rawStateId ?? string.Empty).Trim().ToLowerInvariant();
+        if (clean.Length < 16 || clean.Length > 64)
+        {
+            return new DesktopRelayStatusEntry("invalid", string.Empty, null, DateTimeOffset.MinValue);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kv in DesktopRelayStatuses)
+        {
+            if (now >= kv.Value.ExpiresAt)
+            {
+                DesktopRelayStatuses.TryRemove(kv.Key, out _);
+            }
+        }
+
+        if (DesktopRelayStatuses.TryGetValue(clean, out var entry) && now < entry.ExpiresAt)
+        {
+            return entry;
+        }
+
+        return new DesktopRelayStatusEntry("expired", string.Empty, null, DateTimeOffset.MinValue);
     }
 
     public static string? PeekPendingProfileId(string? rawStateId)
@@ -326,6 +401,19 @@ public static class StreamFlixOidcService
         if (clean.Length < 16 || clean.Length > 64)
         {
             return;
+        }
+
+        var statusExp = DateTimeOffset.UtcNow.AddMinutes(3);
+        if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            DesktopRelayStatuses[clean] = new DesktopRelayStatusEntry("error", string.Empty, errorMessage, statusExp);
+        }
+        else if (handoff != null)
+        {
+            var who = !string.IsNullOrWhiteSpace(handoff.Email)
+                ? handoff.Email
+                : (!string.IsNullOrWhiteSpace(handoff.Username) ? handoff.Username : (handoff.Name ?? string.Empty));
+            DesktopRelayStatuses[clean] = new DesktopRelayStatusEntry("complete", who, null, statusExp);
         }
 
         lock (PendingFlowsLock)
@@ -405,7 +493,7 @@ public static class StreamFlixOidcService
         }
     }
 
-    private static void RegisterPendingFlow(OidcStatePayload statePayload, byte[] pollSecretHash)
+    private static void RegisterPendingFlow(OidcStatePayload statePayload, byte[] pollSecretHash, string? loginHint = null)
     {
         PrunePendingFlows();
         lock (PendingFlowsLock)
@@ -432,6 +520,7 @@ public static class StreamFlixOidcService
                 HandoffExpiresAt = now.AddMinutes(10),
                 StateConsumed = false,
                 PollClaimed = false,
+                LoginHint = (loginHint ?? string.Empty).Trim(),
             };
         }
     }

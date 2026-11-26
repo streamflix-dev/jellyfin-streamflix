@@ -525,4 +525,92 @@ public class StreamFlixCoreTests
             },
             customParsed.Sections);
     }
+
+    [Theory]
+    [InlineData("oled", "oled")]
+    [InlineData("  GLASS ", "glass")]
+    [InlineData("Midnight", "midnight")]
+    [InlineData("netflix", "netflix")]
+    [InlineData("invalid_theme", "netflix")]
+    [InlineData("", "netflix")]
+    [InlineData(null, "netflix")]
+    public void NormalizeVisualPreset_ValidatesAndFallsBackToNetflix(string? input, string expected)
+    {
+        Assert.Equal(expected, StreamFlixController.NormalizeVisualPreset(input));
+    }
+
+    [Theory]
+    [InlineData("compact", "compact")]
+    [InlineData("  LARGE ", "large")]
+    [InlineData("Standard", "standard")]
+    [InlineData("huge", "standard")]
+    [InlineData("", "standard")]
+    [InlineData(null, "standard")]
+    public void NormalizeCardDensity_ValidatesAndFallsBackToStandard(string? input, string expected)
+    {
+        Assert.Equal(expected, StreamFlixController.NormalizeCardDensity(input));
+    }
+
+    [Fact]
+    public void PluginConfiguration_DefaultsForV099Features_AreEnabledAndStandard()
+    {
+        var cfg = new PluginConfiguration();
+        Assert.True(cfg.EnableRichDetailBadges);
+        Assert.True(cfg.EnableSkipIntro);
+        Assert.Equal("netflix", cfg.VisualPreset);
+        Assert.Equal("standard", cfg.CardDensity);
+        Assert.False(Plugin.HasMeaningfulUserConfig(cfg));
+
+        // Customizing any v0.9.9 setting marks configuration as meaningful for shadow backup persistence
+        var presetCfg = new PluginConfiguration { VisualPreset = "oled" };
+        Assert.True(Plugin.HasMeaningfulUserConfig(presetCfg));
+
+        var densityCfg = new PluginConfiguration { CardDensity = "large" };
+        Assert.True(Plugin.HasMeaningfulUserConfig(densityCfg));
+
+        var skipDisabledCfg = new PluginConfiguration { EnableSkipIntro = false };
+        Assert.True(Plugin.HasMeaningfulUserConfig(skipDisabledCfg));
+
+        var badgesDisabledCfg = new PluginConfiguration { EnableRichDetailBadges = false };
+        Assert.True(Plugin.HasMeaningfulUserConfig(badgesDisabledCfg));
+    }
+
+    [Fact]
+    public void DesktopRelayFlow_LaunchInfoAndNonConsumingStatusSurvivePollClaim()
+    {
+        var (stateId, pollSecret) = StreamFlixOidcService.CreateDesktopRelayFlow("prof_1", "smith@example.com");
+
+        var launchInfo = StreamFlixOidcService.TryGetPendingDesktopLaunchInfo(stateId);
+        Assert.True(launchInfo.Found);
+        Assert.Equal("smith@example.com", launchInfo.LoginHint);
+
+        var initialStatus = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("pending", initialStatus.Status);
+
+        var handoff = new StreamFlixOidcService.OidcHandoffPayload(
+            SessionToken: "secret_session_token_abc",
+            ProviderName: "Google",
+            Email: "smith@example.com",
+            Username: string.Empty,
+            Name: "Smith",
+            Picture: string.Empty,
+            ExpiresAt: DateTimeOffset.UtcNow.AddDays(30).ToString("O"),
+            PendingProfileId: "prof_1");
+        StreamFlixOidcService.StoreCompletedFlow(stateId, handoff, errorMessage: null);
+
+        // PeekDesktopRelayStatus must report completion without consuming JMP's one-time pollSecret
+        var peekBeforeClaim = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("complete", peekBeforeClaim.Status);
+        Assert.Equal("smith@example.com", peekBeforeClaim.Who);
+
+        // JMP desktop app claims the one-time flow with pollSecret
+        var claimed = StreamFlixOidcService.PollOrClaimFlow(stateId, pollSecret);
+        Assert.Equal("complete", claimed.Status);
+        Assert.Equal("secret_session_token_abc", claimed.Handoff?.SessionToken);
+
+        // Even after JMP claims & removes the flow, the browser launcher tab can still observe completion to auto-close
+        var peekAfterClaim = StreamFlixOidcService.PeekDesktopRelayStatus(stateId);
+        Assert.Equal("complete", peekAfterClaim.Status);
+        Assert.Equal("smith@example.com", peekAfterClaim.Who);
+    }
 }

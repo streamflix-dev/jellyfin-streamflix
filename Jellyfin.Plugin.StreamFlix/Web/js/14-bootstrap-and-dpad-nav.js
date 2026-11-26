@@ -43,6 +43,13 @@
                     document.body.classList.remove(cls);
                 });
             }
+            if (typeof stopStreamFlixAudioMiniPlayer === 'function') {
+                stopStreamFlixAudioMiniPlayer();
+            }
+            if (document.body) {
+                document.body.removeAttribute('data-bfx-preset');
+                document.body.removeAttribute('data-bfx-density');
+            }
             [
                 '#streamflix-overlay-root',
                 '#streamflix-overlay-root-closing',
@@ -58,7 +65,10 @@
                 '#streamflix-mobile-dock',
                 '#streamflix-playback-loader',
                 '#bfx-wp-osd-banner',
-                '#bfx-wp-autoplay-unlock'
+                '#bfx-wp-autoplay-unlock',
+                '#streamflix-osd-skip-pill',
+                '#bfx-audio-miniplayer',
+                '#bfx-audio-engine'
             ].forEach(function (sel) {
                 var el = document.querySelector(sel);
                 if (el && el.parentNode) {

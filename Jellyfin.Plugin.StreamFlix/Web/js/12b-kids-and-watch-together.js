@@ -656,7 +656,7 @@
 
     function isProfileCurrentlyInBedtime(profile) {
         var p = profile || state.activeProfile;
-        if (!p || !p.id || p.isAdmin || !p.bedtimeStart || !p.bedtimeEnd) {
+        if (!p || !p.id || !p.isKids || p.isAdmin || !p.bedtimeStart || !p.bedtimeEnd) {
             return false;
         }
         if (hasActiveBedtimeOverrideTonight(p.id)) {
@@ -682,12 +682,12 @@
             return false;
         }
 
-        // Pause any playing HTML5 video element immediately when bedtime triggers
+        // Pause any playing HTML5 video or audio element immediately when bedtime triggers
         try {
-            var vids = document.querySelectorAll('video');
-            Array.prototype.forEach.call(vids, function (v) {
-                if (v && !v.paused) {
-                    v.pause();
+            var mediaEls = document.querySelectorAll('video, audio');
+            Array.prototype.forEach.call(mediaEls, function (mEl) {
+                if (mEl && !mEl.paused) {
+                    mEl.pause();
                 }
             });
         } catch (ePause) {}

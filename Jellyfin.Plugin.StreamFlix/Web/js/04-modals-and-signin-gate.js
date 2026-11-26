@@ -350,7 +350,7 @@
 
         return {
             el: backdrop,
-            modal: backdrop.firstChild,
+            modal: backdrop.firstElementChild || backdrop.firstChild || backdrop,
             close: close,
             isClosed: function () { return closed; }
         };

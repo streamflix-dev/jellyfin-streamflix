@@ -257,7 +257,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
     }
 
-    private static bool HasMeaningfulUserConfig(PluginConfiguration? cfg)
+    internal static bool HasMeaningfulUserConfig(PluginConfiguration? cfg)
     {
         if (cfg == null)
         {
@@ -287,6 +287,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             || !cfg.EnableWatchTogether
             || cfg.EnableLiveTv
             || !cfg.EnableHeroTrailerPreview
+            || !cfg.EnableRichDetailBadges
+            || !cfg.EnableSkipIntro
+            || !string.Equals(Controllers.StreamFlixController.NormalizeVisualPreset(cfg.VisualPreset), "netflix", StringComparison.Ordinal)
+            || !string.Equals(Controllers.StreamFlixController.NormalizeCardDensity(cfg.CardDensity), "standard", StringComparison.Ordinal)
             || !cfg.EnableStreamFlixUi
             || !cfg.ShowLibrariesInNav
             || !string.Equals((cfg.CustomAccentColor ?? "#E50914").Trim(), "#E50914", StringComparison.OrdinalIgnoreCase)
@@ -473,6 +477,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 HeroSelectionMode = Val(root, nameof(PluginConfiguration.HeroSelectionMode)) ?? "recent",
                 HeroContentType = Val(root, nameof(PluginConfiguration.HeroContentType)) ?? "all",
                 EnableHeroTrailerPreview = BoolVal(root, nameof(PluginConfiguration.EnableHeroTrailerPreview), true),
+                EnableRichDetailBadges = BoolVal(root, nameof(PluginConfiguration.EnableRichDetailBadges), true),
+                EnableSkipIntro = BoolVal(root, nameof(PluginConfiguration.EnableSkipIntro), true),
+                VisualPreset = Controllers.StreamFlixController.NormalizeVisualPreset(Val(root, nameof(PluginConfiguration.VisualPreset))),
+                CardDensity = Controllers.StreamFlixController.NormalizeCardDensity(Val(root, nameof(PluginConfiguration.CardDensity))),
                 MigratedHeroYouTubeTrailers = BoolVal(root, nameof(PluginConfiguration.MigratedHeroYouTubeTrailers), false),
                 ShowLibrariesInNav = BoolVal(root, nameof(PluginConfiguration.ShowLibrariesInNav), true),
                 EnableCustomOidc = BoolVal(root, nameof(PluginConfiguration.EnableCustomOidc), false),
@@ -709,6 +717,20 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             if (string.IsNullOrWhiteSpace(cfg.HeroContentType))
             {
                 cfg.HeroContentType = "all";
+                dirty = true;
+            }
+
+            var normalizedPreset = Controllers.StreamFlixController.NormalizeVisualPreset(cfg.VisualPreset);
+            if (!string.Equals(cfg.VisualPreset, normalizedPreset, StringComparison.Ordinal))
+            {
+                cfg.VisualPreset = normalizedPreset;
+                dirty = true;
+            }
+
+            var normalizedDensity = Controllers.StreamFlixController.NormalizeCardDensity(cfg.CardDensity);
+            if (!string.Equals(cfg.CardDensity, normalizedDensity, StringComparison.Ordinal))
+            {
+                cfg.CardDensity = normalizedDensity;
                 dirty = true;
             }
 

@@ -5,38 +5,38 @@
     var USER_PREFS_SUBPAGES = {
         profile: {
             icon: 'user',
-            title: 'Profile & Password',
-            subtitle: 'Jellyfin account image, password & profile lock settings',
+            title: 'Account & Password',
+            subtitle: 'Jellyfin password & server account image',
             selector: '#userProfilePage:not(.hide), .userProfilePage:not(.hide)'
         },
         display: {
             icon: 'tv',
             title: 'Display',
-            subtitle: 'Display language, date/time format, theme & browsing behavior',
+            subtitle: 'App language, date/time format & browsing behavior',
             selector: '#displayPreferencesPage:not(.hide), .displayPreferencesPage:not(.hide)'
         },
         home: {
-            icon: 'home',
-            title: 'Home',
-            subtitle: 'Home screen experience, library order & classic Jellyfin sections',
+            icon: 'grid',
+            title: 'Libraries & Home Sections',
+            subtitle: 'Configured library order & classic Jellyfin sections',
             selector: '#homePreferencesPage:not(.hide), .homePreferencesPage:not(.hide)'
         },
         playback: {
             icon: 'play',
             title: 'Playback',
-            subtitle: 'Preferred audio language, streaming quality, skip intervals & autoplay',
+            subtitle: 'Streaming quality, preferred audio language & autoplay',
             selector: '#languagePreferencesPage:not(.hide), #playbackPreferencesPage:not(.hide), .languagePreferencesPage:not(.hide)'
         },
         subtitles: {
             icon: 'subtitles',
             title: 'Subtitles',
-            subtitle: 'Subtitle language, delivery mode, font styling & appearance',
+            subtitle: 'Subtitle language, burn-in & caption appearance',
             selector: '#subtitlePreferencesPage:not(.hide), .subtitlePreferencesPage:not(.hide)'
         },
         controls: {
             icon: 'sliders',
             title: 'Controls',
-            subtitle: 'Keyboard shortcuts, remote keys & controller navigation',
+            subtitle: 'Keyboard shortcuts & controller navigation',
             selector: '#controlsPreferencesPage:not(.hide), .controlsPreferencesPage:not(.hide)'
         }
     };
@@ -147,27 +147,46 @@
     function buildCinemaHubToggleCardHtml() {
         var brand = escapeHtml(getBrandName());
         var hubOn = state.cinemaHubEnabled !== false;
+        var visPrefs = typeof getEffectiveVisualPrefs === 'function'
+            ? getEffectiveVisualPrefs()
+            : { preset: 'netflix', density: 'standard' };
+        var presetLabelMap = {
+            netflix: 'Netflix Classic',
+            oled: 'OLED Pure Black',
+            glass: 'Cinema Glass',
+            midnight: 'Prime Midnight'
+        };
+        var activePresetLabel = presetLabelMap[visPrefs.preset] || 'Netflix Classic';
         return ''
-            + '<div class="bfx-prefs-feature-card" data-bfx-hub-card="1">'
-            + '  <div class="bfx-prefs-feature-ico">' + icon('home') + '</div>'
-            + '  <div class="bfx-prefs-feature-copy">'
-            + '    <div class="bfx-prefs-feature-title-row">'
-            + '      <span class="bfx-prefs-feature-title">' + brand + ' Home</span>'
-            + '      <span class="bfx-prefs-status-pill' + (hubOn ? ' is-on' : '') + '" data-bfx-hub-pill="1">' + (hubOn ? 'Active' : 'Classic') + '</span>'
+            + '<div class="bfx-prefs-group" data-bfx-group="appearance">'
+            + '  <div class="bfx-prefs-group-label">Appearance &amp; Home</div>'
+            + '  <div class="bfx-prefs-group-card">'
+            + '    <div class="bfx-prefs-feature-card" data-bfx-customize-nav="1" role="button" tabindex="0">'
+            + '      <div class="bfx-prefs-feature-ico">' + icon('sliders') + '</div>'
+            + '      <div class="bfx-prefs-feature-copy">'
+            + '        <div class="bfx-prefs-feature-title-row">'
+            + '          <span class="bfx-prefs-feature-title">Appearance, Navigation &amp; Home Layout</span>'
+            + '        </div>'
+            + '        <div class="bfx-prefs-feature-desc">Theme preset, card size, top-bar tabs &amp; Home row order</div>'
+            + '      </div>'
+            + '      <div class="bfx-prefs-row-trail">'
+            + '        <span class="bfx-prefs-status-pill is-on" data-bfx-vis-preset-pill="1">' + escapeHtml(activePresetLabel) + '</span>'
+            + '        <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
+            + '      </div>'
             + '    </div>'
-            + '    <div class="bfx-prefs-feature-desc">Netflix-style hero billboard, Top 10 row, and profile carousels on Home. Turn off to use classic Jellyfin Home on this device.</div>'
+            + '    <div class="bfx-prefs-feature-card" data-bfx-hub-card="1">'
+            + '      <div class="bfx-prefs-feature-ico is-brand">' + icon('home') + '</div>'
+            + '      <div class="bfx-prefs-feature-copy">'
+            + '        <div class="bfx-prefs-feature-title-row">'
+            + '          <span class="bfx-prefs-feature-title">' + brand + ' Home</span>'
+            + '        </div>'
+            + '        <div class="bfx-prefs-feature-desc">Billboard hero, Top 10 &amp; personalized carousels on this device</div>'
+            + '      </div>'
+            + '      <button type="button" role="switch" aria-checked="' + (hubOn ? 'true' : 'false') + '" aria-label="Toggle ' + brand + ' Home" class="bfx-prefs-toggle-btn" data-bfx-toggle-cinema-hub="1">'
+            + '        <span class="bfx-switch' + (hubOn ? ' on' : '') + '"><i></i></span>'
+            + '      </button>'
+            + '    </div>'
             + '  </div>'
-            + '  <button type="button" role="switch" aria-checked="' + (hubOn ? 'true' : 'false') + '" aria-label="Toggle ' + brand + ' Home" class="bfx-prefs-toggle-btn" data-bfx-toggle-cinema-hub="1">'
-            + '    <span class="bfx-switch' + (hubOn ? ' on' : '') + '"><i></i></span>'
-            + '  </button>'
-            + '</div>'
-            + '<div class="bfx-prefs-feature-card" data-bfx-customize-nav="1" role="button" tabindex="0" style="cursor:pointer;margin-top:10px;">'
-            + '  <div class="bfx-prefs-feature-ico">' + icon('sliders') + '</div>'
-            + '  <div class="bfx-prefs-feature-copy">'
-            + '    <div class="bfx-prefs-feature-title-row"><span class="bfx-prefs-feature-title">Navigation Bar Items</span></div>'
-            + '    <div class="bfx-prefs-feature-desc">Select which built-in categories and Jellyfin libraries appear in the top navigation bar for this profile.</div>'
-            + '  </div>'
-            + '  <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
             + '</div>';
     }
 
@@ -182,10 +201,6 @@
                 if (sw) {
                     sw.classList.toggle('on', enabled);
                 }
-            });
-            Array.prototype.forEach.call(document.querySelectorAll('[data-bfx-hub-pill="1"]'), function (p) {
-                p.classList.toggle('is-on', enabled);
-                p.textContent = enabled ? 'Active' : 'Classic';
             });
         };
 
@@ -264,92 +279,221 @@
         return pageEl;
     }
 
-    function enhanceNativePrefsMenuRows(menuPage) {
+    function ensureOrganizedPrefsGroups(heroHost, isAdmin, brandName) {
+        if (!heroHost) {
+            return null;
+        }
+        var root = document.getElementById('bfx-prefs-groups');
+        if (root && root.parentNode !== heroHost) {
+            if (root.parentNode) {
+                root.parentNode.removeChild(root);
+            }
+            root = null;
+        }
+        if (!root) {
+            root = document.createElement('div');
+            root.id = 'bfx-prefs-groups';
+            root.className = 'bfx-prefs-groups';
+            root.innerHTML = ''
+                + '<div class="bfx-prefs-group" data-bfx-group="playback" data-bfx-empty-group="1">'
+                + '  <div class="bfx-prefs-group-label">Playback &amp; Subtitles</div>'
+                + '  <div class="bfx-prefs-group-card" data-bfx-group-list="playback"></div>'
+                + '</div>'
+                + '<div class="bfx-prefs-group" data-bfx-group="display" data-bfx-empty-group="1">'
+                + '  <div class="bfx-prefs-group-label">Display &amp; Libraries</div>'
+                + '  <div class="bfx-prefs-group-card" data-bfx-group-list="display"></div>'
+                + '</div>'
+                + '<div class="bfx-prefs-group" id="bfx-prefs-admin-group" data-bfx-group="admin" data-bfx-empty-group="1"></div>'
+                + '<div class="bfx-prefs-group" data-bfx-group="account" data-bfx-empty-group="1">'
+                + '  <div class="bfx-prefs-group-label">Account &amp; Session</div>'
+                + '  <div class="bfx-prefs-group-card" data-bfx-group-list="account"></div>'
+                + '</div>'
+                + '<div class="bfx-prefs-group" data-bfx-group="other" data-bfx-empty-group="1">'
+                + '  <div class="bfx-prefs-group-label">More Options</div>'
+                + '  <div class="bfx-prefs-group-card" data-bfx-group-list="other"></div>'
+                + '</div>';
+            var heroEl = document.getElementById('bfx-prefs-hero');
+            if (heroEl && heroEl.parentNode === heroHost) {
+                heroHost.insertBefore(root, heroEl.nextSibling);
+            } else {
+                heroHost.insertBefore(root, heroHost.firstChild);
+            }
+        } else {
+            var heroRef = document.getElementById('bfx-prefs-hero');
+            if (heroRef && heroRef.parentNode === heroHost && heroRef.nextSibling !== root) {
+                heroHost.insertBefore(root, heroRef.nextSibling);
+            }
+        }
+
+        var adminGroupEl = root.querySelector('#bfx-prefs-admin-group');
+        if (adminGroupEl) {
+            var adminSig = String(Boolean(isAdmin)) + '|' + String(brandName || '');
+            if (adminGroupEl.getAttribute('data-sig') !== adminSig) {
+                adminGroupEl.setAttribute('data-sig', adminSig);
+                if (isAdmin) {
+                    adminGroupEl.removeAttribute('data-bfx-empty-group');
+                    adminGroupEl.innerHTML = ''
+                        + '<div class="bfx-prefs-group-label">Administration</div>'
+                        + '<div class="bfx-prefs-group-card">'
+                        + '  <a href="#/configurationpage?name=StreamFlix" class="bfx-prefs-row" data-bfx-admin-route="#/configurationpage?name=StreamFlix">'
+                        + '    <div class="bfx-prefs-feature-ico">' + icon('sliders') + '</div>'
+                        + '    <div class="bfx-prefs-feature-copy">'
+                        + '      <div class="bfx-prefs-feature-title">' + escapeHtml(brandName) + ' Administration</div>'
+                        + '      <div class="bfx-prefs-feature-desc">Authentication, Household Profiles, Guest Passes &amp; Seerr</div>'
+                        + '    </div>'
+                        + '    <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
+                        + '  </a>'
+                        + '  <a href="#/configurationpage?name=StreamFlix&tab=devices" class="bfx-prefs-row" data-bfx-admin-route="#/configurationpage?name=StreamFlix&tab=devices">'
+                        + '    <div class="bfx-prefs-feature-ico">' + icon('smartphone') + '</div>'
+                        + '    <div class="bfx-prefs-feature-copy">'
+                        + '      <div class="bfx-prefs-feature-title">Active Devices</div>'
+                        + '      <div class="bfx-prefs-feature-desc">Inspect signed-in TVs, phones &amp; browsers or revoke sessions</div>'
+                        + '    </div>'
+                        + '    <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
+                        + '  </a>'
+                        + '  <a href="#/dashboard" class="bfx-prefs-row" data-bfx-admin-route="#/dashboard">'
+                        + '    <div class="bfx-prefs-feature-ico">' + icon('grid') + '</div>'
+                        + '    <div class="bfx-prefs-feature-copy">'
+                        + '      <div class="bfx-prefs-feature-title">Server Dashboard</div>'
+                        + '      <div class="bfx-prefs-feature-desc">Libraries, transcoding, users &amp; Jellyfin plugins</div>'
+                        + '    </div>'
+                        + '    <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
+                        + '  </a>'
+                        + '</div>';
+                    Array.prototype.forEach.call(adminGroupEl.querySelectorAll('[data-bfx-admin-route]'), function (admBtn) {
+                        admBtn.addEventListener('click', function (ev) {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            openStreamFlixAdminRoute(admBtn.getAttribute('data-bfx-admin-route') || '#/configurationpage?name=StreamFlix');
+                        });
+                    });
+                } else {
+                    adminGroupEl.setAttribute('data-bfx-empty-group', '1');
+                    adminGroupEl.innerHTML = '';
+                }
+            }
+        }
+        return root;
+    }
+
+    function enhanceNativePrefsMenuRows(menuPage, heroHost, isAdmin, brandName) {
         if (!menuPage) {
-            return false;
+            return;
         }
         menuPage.classList.add('bfx-prefs-menu-enhanced');
         var hasNativeClientApi = Boolean(
             (window.NativeShell && typeof window.NativeShell.openClientSettings === 'function')
             || (window.NativeInterface && typeof window.NativeInterface.openClientSettings === 'function')
         );
-        var hasVisibleNativeClientRow = false;
+        var isPhoneUi = Boolean(document.body && document.body.classList.contains('bfx-phone-mode'));
 
-        var rows = menuPage.querySelectorAll('a.emby-button, .listItem-border');
+        var groupsRoot = ensureOrganizedPrefsGroups(heroHost, isAdmin, brandName);
+        var buckets = {
+            playback: [],
+            display: [],
+            account: [],
+            other: []
+        };
+
+        var rows = menuPage.querySelectorAll('a.emby-button, button.listItem-border, .listItem-border');
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
-            if (!row || row.closest('#bfx-prefs-hero')) {
+            if (!row || (row.closest && (row.closest('#bfx-prefs-hero') || row.closest('#bfx-prefs-admin-group')))) {
                 continue;
             }
             var cls = (row.className || '').toLowerCase();
             var href = (row.getAttribute('href') || '').toLowerCase();
+            var existingKind = row.getAttribute('data-bfx-row-kind') || '';
             var labelEl = row.querySelector('.listItemBodyText') || row.querySelector('.listItemBody');
             var rawLabel = ((labelEl && labelEl.textContent) || '').trim().toLowerCase();
 
-            var rowKind = '';
+            var rowKind = existingKind;
             var rowSub = '';
-            if (cls.indexOf('lnkuserprofile') !== -1 || href.indexOf('userprofile') !== -1 || rawLabel === 'profile') {
+            var rowIcon = 'gear';
+            var rowTitleOverride = '';
+            var rowGroup = 'other';
+            var rowRank = 90;
+
+            if (rowKind === 'profile' || (!rowKind && (cls.indexOf('lnkuserprofile') !== -1 || href.indexOf('userprofile') !== -1 || rawLabel === 'profile'))) {
                 rowKind = 'profile';
-                rowSub = 'Password, Jellyfin avatar & account security';
-            } else if (cls.indexOf('clientsettings') !== -1 || cls.indexOf('lnkclientsettings') !== -1 || rawLabel === 'client settings') {
+                rowIcon = 'user';
+                rowTitleOverride = 'Account & Password';
+                rowSub = 'Jellyfin password & server account image';
+                rowGroup = 'account';
+                rowRank = 10;
+            } else if (rowKind === 'clientsettings' || (!rowKind && (cls.indexOf('clientsettings') !== -1 || cls.indexOf('lnkclientsettings') !== -1 || rawLabel === 'client settings'))) {
                 rowKind = 'clientsettings';
+                rowIcon = 'smartphone';
                 rowSub = 'App video player, downloads & device options';
+                rowGroup = 'display';
+                rowRank = 40;
                 if (hasNativeClientApi) {
                     row.classList.remove('hide');
-                    var parentSec = row.closest('.verticalSection');
-                    if (parentSec) {
-                        parentSec.classList.remove('hide');
-                    }
                 }
-                if (!row.classList.contains('hide')) {
-                    hasVisibleNativeClientRow = true;
-                }
-            } else if (cls.indexOf('downloadsettings') !== -1 || cls.indexOf('lnkdownloadpreferences') !== -1 || rawLabel === 'downloads' || rawLabel === 'download settings') {
+            } else if (rowKind === 'downloads' || (!rowKind && (cls.indexOf('downloadsettings') !== -1 || cls.indexOf('lnkdownloadpreferences') !== -1 || rawLabel === 'downloads' || rawLabel === 'download settings'))) {
                 rowKind = 'downloads';
+                rowIcon = 'download';
                 rowSub = 'Offline media storage & sync preferences';
-            } else if (cls.indexOf('lnkdisplaypreferences') !== -1 || href.indexOf('mypreferencesdisplay') !== -1 || rawLabel === 'display') {
+                rowGroup = 'display';
+                rowRank = 50;
+            } else if (rowKind === 'display' || (!rowKind && (cls.indexOf('lnkdisplaypreferences') !== -1 || href.indexOf('mypreferencesdisplay') !== -1 || rawLabel === 'display'))) {
                 rowKind = 'display';
-                rowSub = 'Language, date format, theme & browsing layout';
-            } else if (cls.indexOf('lnkhomepreferences') !== -1 || href.indexOf('mypreferenceshome') !== -1 || rawLabel === 'home') {
+                rowIcon = 'tv';
+                rowSub = 'App language, date format & browsing options';
+                rowGroup = 'display';
+                rowRank = 10;
+            } else if (rowKind === 'home' || (!rowKind && (cls.indexOf('lnkhomepreferences') !== -1 || href.indexOf('mypreferenceshome') !== -1 || rawLabel === 'home'))) {
                 rowKind = 'home';
-                rowSub = 'Library order, sections & classic home rows';
-            } else if (cls.indexOf('lnklanguagepreferences') !== -1 || cls.indexOf('lnkplaybackpreferences') !== -1 || href.indexOf('mypreferencesplayback') !== -1 || rawLabel === 'playback') {
+                rowIcon = 'grid';
+                rowTitleOverride = 'Libraries & Home Sections';
+                rowSub = 'Configured library order & classic Jellyfin sections';
+                rowGroup = 'display';
+                rowRank = 20;
+            } else if (rowKind === 'playback' || (!rowKind && (cls.indexOf('lnklanguagepreferences') !== -1 || cls.indexOf('lnkplaybackpreferences') !== -1 || href.indexOf('mypreferencesplayback') !== -1 || rawLabel === 'playback'))) {
                 rowKind = 'playback';
-                rowSub = 'Audio language, video quality, streaming & autoplay';
-            } else if (cls.indexOf('lnksubtitlepreferences') !== -1 || href.indexOf('mypreferencessubtitles') !== -1 || rawLabel === 'subtitles') {
+                rowIcon = 'play';
+                rowSub = 'Streaming quality, preferred audio language & autoplay';
+                rowGroup = 'playback';
+                rowRank = 10;
+            } else if (rowKind === 'subtitles' || (!rowKind && (cls.indexOf('lnksubtitlepreferences') !== -1 || href.indexOf('mypreferencessubtitles') !== -1 || rawLabel === 'subtitles'))) {
                 rowKind = 'subtitles';
-                rowSub = 'Subtitle language, burn-in, font size & styling';
-            } else if (cls.indexOf('lnkcontrolspreferences') !== -1 || href.indexOf('mypreferencescontrols') !== -1 || rawLabel === 'controls') {
+                rowIcon = 'subtitles';
+                rowSub = 'Subtitle language, burn-in & caption appearance';
+                rowGroup = 'playback';
+                rowRank = 20;
+            } else if (rowKind === 'controls' || (!rowKind && (cls.indexOf('lnkcontrolspreferences') !== -1 || href.indexOf('mypreferencescontrols') !== -1 || rawLabel === 'controls'))) {
                 rowKind = 'controls';
+                rowIcon = 'sliders';
                 rowSub = 'Keyboard shortcuts & controller navigation';
-            } else if (cls.indexOf('lnkquickconnectpreferences') !== -1 || cls.indexOf('quickconnect') !== -1 || href.indexOf('mypreferencesquickconnect') !== -1 || rawLabel === 'quick connect') {
+                rowGroup = 'display';
+                rowRank = 30;
+                row.classList.toggle('bfx-prefs-hidden-row', isPhoneUi);
+            } else if (rowKind === 'quickconnect' || (!rowKind && (cls.indexOf('lnkquickconnectpreferences') !== -1 || cls.indexOf('quickconnect') !== -1 || href.indexOf('mypreferencesquickconnect') !== -1 || rawLabel === 'quick connect'))) {
                 rowKind = 'quickconnect';
-                row.classList.add('hide');
-            } else if (cls.indexOf('lnkdashboard') !== -1 || href.indexOf('dashboard') !== -1 || rawLabel === 'dashboard') {
+                row.classList.add('hide', 'bfx-prefs-hidden-row');
+            } else if (rowKind === 'dashboard' || (!rowKind && (cls.indexOf('lnkdashboard') !== -1 || href.indexOf('dashboard') !== -1 || rawLabel === 'dashboard'))) {
                 rowKind = 'dashboard';
-                rowSub = 'Server administration, libraries, users & plugins';
-            } else if (cls.indexOf('btnlogout') !== -1 || rawLabel === 'sign out' || rawLabel === 'log out') {
+                row.classList.add('bfx-prefs-hidden-row');
+            } else if (rowKind === 'logout' || (!rowKind && (cls.indexOf('btnlogout') !== -1 || rawLabel === 'sign out' || rawLabel === 'log out'))) {
                 rowKind = 'logout';
-                rowSub = 'Sign out of ' + getBrandName() + ' on this device';
-            } else if (cls.indexOf('btnselectserver') !== -1 || cls.indexOf('selectserver') !== -1 || rawLabel === 'select server') {
+                rowIcon = 'logout';
+                rowTitleOverride = isGuestPassSession() ? 'Exit Guest Pass' : 'Sign out';
+                rowSub = (isGuestPassSession() ? 'Exit Guest Pass on ' : 'Sign out of ') + brandName + ' on this device';
+                rowGroup = 'account';
+                rowRank = 30;
+            } else if (rowKind === 'server' || (!rowKind && (cls.indexOf('btnselectserver') !== -1 || cls.indexOf('selectserver') !== -1 || rawLabel === 'select server'))) {
                 rowKind = 'server';
+                rowIcon = 'gear';
                 rowSub = 'Switch or manage connected Jellyfin servers';
+                rowGroup = 'account';
+                rowRank = 20;
             }
 
             if (rowKind && row.getAttribute('data-bfx-row-kind') !== rowKind) {
                 row.setAttribute('data-bfx-row-kind', rowKind);
             }
-            if (rowKind === 'quickconnect') {
+            if (rowKind === 'quickconnect' || rowKind === 'dashboard') {
                 continue;
-            }
-
-            if (rowKind === 'dashboard' && row.getAttribute('data-bfx-dash-bound') !== '1') {
-                row.setAttribute('data-bfx-dash-bound', '1');
-                row.addEventListener('click', function (ev) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    openStreamFlixAdminRoute('#/dashboard');
-                }, true);
             }
 
             if (rowKind === 'logout' && row.getAttribute('data-bfx-logout-bound') !== '1') {
@@ -370,55 +514,100 @@
                 }, true);
             }
 
-            if (row.getAttribute('data-bfx-row-enhanced') === '1') {
-                continue;
+            if (row.getAttribute('data-bfx-row-enhanced') !== '1') {
+                var bodyEl = row.querySelector('.listItemBody');
+                if (bodyEl) {
+                    row.setAttribute('data-bfx-row-enhanced', '1');
+                    var titleNode = row.querySelector('.listItemBodyText');
+                    if (titleNode && rowTitleOverride) {
+                        titleNode.textContent = rowTitleOverride;
+                    }
+                    if (rowSub && !bodyEl.querySelector('.bfx-prefs-row-sub')) {
+                        var subDiv = document.createElement('div');
+                        subDiv.className = 'bfx-prefs-row-sub';
+                        subDiv.textContent = rowSub;
+                        bodyEl.appendChild(subDiv);
+                    }
+                    var iconEl = row.querySelector('.listItemIcon');
+                    if (iconEl) {
+                        iconEl.classList.add('bfx-svg-ico');
+                        iconEl.innerHTML = icon(rowIcon);
+                    }
+                    if (rowKind !== 'logout' && !row.querySelector('.bfx-prefs-row-chev')) {
+                        var chev = document.createElement('span');
+                        chev.className = 'bfx-prefs-row-chev';
+                        chev.setAttribute('aria-hidden', 'true');
+                        chev.innerHTML = icon('chevronRight');
+                        var innerItem = row.querySelector('.listItem') || row;
+                        innerItem.appendChild(chev);
+                    }
+                }
+            } else if (rowKind === 'logout') {
+                var logoutTitleNode = row.querySelector('.listItemBodyText');
+                if (logoutTitleNode && rowTitleOverride && logoutTitleNode.textContent !== rowTitleOverride) {
+                    logoutTitleNode.textContent = rowTitleOverride;
+                }
             }
-            var bodyEl = row.querySelector('.listItemBody');
-            if (!bodyEl) {
-                continue;
-            }
-            row.setAttribute('data-bfx-row-enhanced', '1');
-            if (rowSub && !bodyEl.querySelector('.bfx-prefs-row-sub')) {
-                var subDiv = document.createElement('div');
-                subDiv.className = 'bfx-prefs-row-sub';
-                subDiv.textContent = rowSub;
-                bodyEl.appendChild(subDiv);
-            }
-            if (rowKind !== 'logout' && !row.querySelector('.bfx-prefs-row-chev')) {
-                var chev = document.createElement('span');
-                chev.className = 'bfx-prefs-row-chev';
-                chev.setAttribute('aria-hidden', 'true');
-                chev.innerHTML = icon('chevronRight');
-                var innerItem = row.querySelector('.listItem') || row;
-                innerItem.appendChild(chev);
+
+            if (buckets[rowGroup]) {
+                buckets[rowGroup].push({ row: row, rank: rowRank, idx: i });
+            } else {
+                buckets.other.push({ row: row, rank: rowRank, idx: i });
             }
         }
 
-        // Collapse any native .verticalSection whose rows are all hidden (e.g. Quick Connect section)
+        if (groupsRoot) {
+            ['playback', 'display', 'account', 'other'].forEach(function (gKey) {
+                var groupWrap = groupsRoot.querySelector('[data-bfx-group="' + gKey + '"]');
+                var listHost = groupsRoot.querySelector('[data-bfx-group-list="' + gKey + '"]');
+                if (!groupWrap || !listHost) {
+                    return;
+                }
+                var entries = buckets[gKey] || [];
+                entries.sort(function (a, b) {
+                    return (a.rank - b.rank) || (a.idx - b.idx);
+                });
+                var hasVisible = false;
+                for (var e = 0; e < entries.length; e++) {
+                    var rEl = entries[e].row;
+                    if (rEl.parentNode !== listHost || listHost.children[e] !== rEl) {
+                        listHost.appendChild(rEl);
+                    }
+                    if (!rEl.classList.contains('hide') && !rEl.classList.contains('bfx-prefs-hidden-row')) {
+                        hasVisible = true;
+                    }
+                }
+                if (hasVisible) {
+                    groupWrap.removeAttribute('data-bfx-empty-group');
+                } else {
+                    groupWrap.setAttribute('data-bfx-empty-group', '1');
+                }
+            });
+        }
+
+        // Collapse original emptied native .verticalSection wrappers
         var sections = menuPage.querySelectorAll('.verticalSection');
         for (var s = 0; s < sections.length; s++) {
             var sec = sections[s];
-            if (!sec || sec.closest('#bfx-prefs-hero')) {
+            if (!sec || (sec.closest && (sec.closest('#bfx-prefs-hero') || sec.closest('#bfx-prefs-groups')))) {
                 continue;
             }
-            var secRows = sec.querySelectorAll('a.emby-button, .listItem-border');
-            if (secRows.length > 0) {
-                var anyVisible = false;
-                for (var r = 0; r < secRows.length; r++) {
-                    if (!secRows[r].classList.contains('hide') && secRows[r].getAttribute('data-bfx-row-kind') !== 'quickconnect') {
-                        anyVisible = true;
-                        break;
-                    }
-                }
-                if (anyVisible) {
-                    sec.removeAttribute('data-bfx-empty-section');
-                } else {
-                    sec.setAttribute('data-bfx-empty-section', '1');
+            var secRows = sec.querySelectorAll('a.emby-button, button.listItem-border, .listItem-border');
+            var anyVisible = false;
+            for (var r = 0; r < secRows.length; r++) {
+                if (!secRows[r].classList.contains('hide')
+                    && !secRows[r].classList.contains('bfx-prefs-hidden-row')
+                    && secRows[r].getAttribute('data-bfx-row-kind') !== 'quickconnect') {
+                    anyVisible = true;
+                    break;
                 }
             }
+            if (anyVisible) {
+                sec.removeAttribute('data-bfx-empty-section');
+            } else {
+                sec.setAttribute('data-bfx-empty-section', '1');
+            }
         }
-
-        return hasVisibleNativeClientRow;
     }
 
     function clearUserPreferencesEnhancements() {
@@ -461,13 +650,6 @@
                 if (!menuPage) {
                     return;
                 }
-                var hasVisibleNativeClientRow = enhanceNativePrefsMenuRows(menuPage);
-                var showSynthClientCard = !isGuest
-                    && !active.isKids
-                    && !hasVisibleNativeClientRow
-                    && typeof shouldShowClientSettingsAction === 'function'
-                    && shouldShowClientSettingsAction();
-
                 var heroHost = findPrefsContentHost(menuPage);
 
                 var googleEmail = state.googleUser && state.googleUser.email;
@@ -485,6 +667,7 @@
                             || (state.config && state.config.bypassLoginGateOnLan && state.config.isLocalLan ? ('Home Network · ' + (active.jellyfinUsername || active.name)) : '')
                             || ('Linked Jellyfin user: ' + (active.jellyfinUsername || active.name))));
 
+                var effVis = typeof getEffectiveVisualPrefs === 'function' ? getEffectiveVisualPrefs() : { preset: 'netflix' };
                 var sig = [
                     'menu',
                     active.id,
@@ -496,7 +679,7 @@
                     Boolean(isAdmin),
                     Boolean(isGuest),
                     Boolean(state.cinemaHubEnabled !== false),
-                    Boolean(showSynthClientCard),
+                    effVis.preset || 'netflix',
                     brandName,
                     accountSubLabel
                 ].join('|');
@@ -528,7 +711,7 @@
                     existingHero.innerHTML = ''
                         + '<div class="bfx-prefs-topbar">'
                         + '  <a href="#/home" class="bfx-prefs-back-btn" data-bfx-prefs-home="1">' + icon('chevronLeft') + '<span>Back to ' + escapeHtml(brandName) + '</span></a>'
-                        + '  <span class="bfx-prefs-kicker">Account &amp; Settings</span>'
+                        + '  <span class="bfx-prefs-kicker">Settings</span>'
                         + '</div>'
                         + '<div class="bfx-prefs-profile-card">'
                         + '  <div class="bfx-prefs-avatar" style="background:' + escapeHtml(active.color || '#E50914') + ';">' + escapeHtml(active.icon || '🎬') + '</div>'
@@ -546,43 +729,7 @@
                                 + '    <button type="button" class="bfx-prefs-pill-btn" data-bfx-prefs-switch-profile="1">' + icon('users') + '<span>Switch Profile</span></button>'
                                 + '  </div>'))
                         + '</div>'
-                        + buildCinemaHubToggleCardHtml()
-                        + (showSynthClientCard
-                            ? ('<button type="button" class="bfx-prefs-client-card" data-bfx-prefs-client-settings="1" data-bfx-synth-client="1">'
-                                + '  <div class="bfx-prefs-feature-ico is-client">' + icon('smartphone') + '</div>'
-                                + '  <div class="bfx-prefs-feature-copy">'
-                                + '    <div class="bfx-prefs-feature-title-row">'
-                                + '      <span class="bfx-prefs-feature-title">Client Settings</span>'
-                                + '    </div>'
-                                + '    <div class="bfx-prefs-feature-desc">App video player, streaming quality, downloads &amp; phone options</div>'
-                                + '  </div>'
-                                + '  <span class="bfx-prefs-row-chev" aria-hidden="true">' + icon('chevronRight') + '</span>'
-                                + '</button>')
-                            : '')
-                        + (isAdmin
-                            ? ('<div class="bfx-prefs-admin-card">'
-                                + '  <div class="bfx-prefs-feature-ico is-admin">' + icon('shield') + '</div>'
-                                + '  <div class="bfx-prefs-feature-copy">'
-                                + '    <div class="bfx-prefs-feature-title-row">'
-                                + '      <span class="bfx-prefs-feature-title">' + escapeHtml(brandName) + ' Plugin &amp; Active Devices</span>'
-                                + '      <span class="bfx-prefs-status-pill is-admin">Admin</span>'
-                                + '    </div>'
-                                + '    <div class="bfx-prefs-feature-desc">Inspect active TVs, phones &amp; browsers, sign out individual devices, and configure Guest Passes, SSO &amp; Seerr.</div>'
-                                + '  </div>'
-                                + '  <div class="bfx-prefs-admin-actions">'
-                                + '    <a href="#/configurationpage?name=StreamFlix&tab=devices" class="bfx-prefs-pill-btn is-accent" data-bfx-admin-route="#/configurationpage?name=StreamFlix&tab=devices">' + icon('smartphone') + '<span>Active Devices</span></a>'
-                                + '    <a href="#/configurationpage?name=StreamFlix" class="bfx-prefs-pill-btn" data-bfx-admin-route="#/configurationpage?name=StreamFlix">' + icon('gear') + '<span>Plugin Settings</span></a>'
-                                + '  </div>'
-                                + '</div>')
-                            : '');
-
-                    Array.prototype.forEach.call(existingHero.querySelectorAll('[data-bfx-admin-route]'), function (admBtn) {
-                        admBtn.addEventListener('click', function (ev) {
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            openStreamFlixAdminRoute(admBtn.getAttribute('data-bfx-admin-route') || '#/configurationpage?name=StreamFlix');
-                        });
-                    });
+                        + buildCinemaHubToggleCardHtml();
 
                     var homeBtn = existingHero.querySelector('[data-bfx-prefs-home="1"]');
                     if (homeBtn) {
@@ -600,17 +747,10 @@
                             window.__STREAMFLIX_OPEN_PROFILE_PICKER__(false);
                         });
                     }
-                    var clientSettingsBtn = existingHero.querySelector('[data-bfx-prefs-client-settings="1"]');
-                    if (clientSettingsBtn) {
-                        clientSettingsBtn.addEventListener('click', function () {
-                            if (typeof openClientSettingsAction === 'function') {
-                                openClientSettingsAction();
-                            }
-                        });
-                    }
                     bindCinemaHubToggleCards(existingHero);
                 }
 
+                enhanceNativePrefsMenuRows(menuPage, heroHost, isAdmin, brandName);
                 return;
             }
 
@@ -667,15 +807,15 @@
 
                 var tabItems = [
                     { key: 'menu', label: 'Overview', href: '#/mypreferencesmenu' },
-                    { key: 'profile', label: 'Profile', href: '#/userprofile.html' + uidSuffix },
-                    { key: 'display', label: 'Display', href: '#/mypreferencesdisplay.html' + uidSuffix },
-                    { key: 'home', label: 'Home', href: '#/mypreferenceshome.html' + uidSuffix },
                     { key: 'playback', label: 'Playback', href: '#/mypreferencesplayback.html' + uidSuffix },
-                    { key: 'subtitles', label: 'Subtitles', href: '#/mypreferencessubtitles.html' + uidSuffix }
+                    { key: 'subtitles', label: 'Subtitles', href: '#/mypreferencessubtitles.html' + uidSuffix },
+                    { key: 'display', label: 'Display', href: '#/mypreferencesdisplay.html' + uidSuffix },
+                    { key: 'home', label: 'Libraries & Home', href: '#/mypreferenceshome.html' + uidSuffix }
                 ];
                 if (showControlsTab) {
                     tabItems.push({ key: 'controls', label: 'Controls', href: '#/mypreferencescontrols.html' + uidSuffix });
                 }
+                tabItems.push({ key: 'profile', label: 'Account', href: '#/userprofile.html' + uidSuffix });
 
                 var tabsHtml = tabItems.map(function (t) {
                     var isAct = t.key === kind;

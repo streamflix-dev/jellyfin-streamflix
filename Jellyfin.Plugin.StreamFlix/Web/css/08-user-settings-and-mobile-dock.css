@@ -284,7 +284,33 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
     color: #ffffff !important;
 }
 
-/* Feature Toggle Card (<Brand> Home), Client Settings Card & Admin Quick Card */
+/* Grouped Settings Cards (.bfx-prefs-group) & Unified Calm Monochrome Icons */
+.bfx-prefs-group {
+    margin: 0 0 16px 0;
+    box-sizing: border-box;
+}
+.bfx-prefs-group[data-bfx-empty-group="1"],
+#myPreferencesMenuPage .bfx-prefs-hidden-row {
+    display: none !important;
+}
+.bfx-prefs-group-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin: 0 0 7px 4px;
+    line-height: 1.2;
+}
+.bfx-prefs-group-card {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.085);
+    border-radius: 16px;
+    padding: 4px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.bfx-prefs-row,
 .bfx-prefs-feature-card,
 .bfx-prefs-client-card,
 .bfx-prefs-admin-card,
@@ -293,32 +319,50 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
     align-items: center;
     gap: 14px;
     width: 100%;
-    padding: 15px 18px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: transparent;
+    border: none;
+    margin: 0;
     box-sizing: border-box;
     font-family: inherit;
     text-align: left;
-    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
-}
-.bfx-prefs-feature-card,
-.bfx-prefs-client-card {
+    text-decoration: none !important;
+    color: inherit;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
+.bfx-prefs-context-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    cursor: default;
+}
+.bfx-prefs-group-card > :not(.hide):not(.bfx-prefs-hidden-row) ~ :not(.hide):not(.bfx-prefs-hidden-row) {
+    position: relative;
+}
+.bfx-prefs-group-card > :not(.hide):not(.bfx-prefs-hidden-row) ~ :not(.hide):not(.bfx-prefs-hidden-row)::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 68px;
+    right: 14px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    pointer-events: none;
+}
+.bfx-prefs-row:hover,
 .bfx-prefs-feature-card:hover,
 .bfx-prefs-client-card:hover {
-    background: rgba(255, 255, 255, 0.068);
-    border-color: rgba(255, 255, 255, 0.17);
+    background: rgba(255, 255, 255, 0.06);
 }
+.bfx-prefs-row:hover .bfx-prefs-row-chev,
+.bfx-prefs-feature-card:hover .bfx-prefs-row-chev,
 .bfx-prefs-client-card:hover .bfx-prefs-row-chev {
     color: #e5e7eb;
     transform: translateX(2px);
-}
-.bfx-prefs-admin-card {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
-    border-color: rgba(129, 140, 248, 0.24);
 }
 .bfx-prefs-context-av {
     width: 44px;
@@ -333,30 +377,25 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
 }
 
 .bfx-prefs-feature-ico {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    background: rgba(229, 9, 20, 0.16);
-    border: 1px solid rgba(229, 9, 20, 0.34);
-    color: #f87171;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.065);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
-.bfx-prefs-feature-ico.is-client {
-    background: rgba(14, 165, 233, 0.16);
-    border-color: rgba(56, 189, 248, 0.36);
-    color: #7dd3fc;
-}
-.bfx-prefs-feature-ico.is-admin {
-    background: rgba(99, 102, 241, 0.18);
-    border-color: rgba(129, 140, 248, 0.4);
-    color: #a5b4fc;
+.bfx-prefs-feature-ico.is-brand {
+    background: rgba(229, 9, 20, 0.14);
+    border-color: rgba(229, 9, 20, 0.3);
+    color: #fca5a5;
 }
 .bfx-prefs-feature-ico svg {
-    width: 20px;
-    height: 20px;
+    width: 19px;
+    height: 19px;
 }
 
 .bfx-prefs-feature-copy {
@@ -373,7 +412,7 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
 
 .bfx-prefs-feature-title {
     font-size: 15px;
-    font-weight: 800;
+    font-weight: 700;
     color: #ffffff;
     line-height: 1.25;
 }
@@ -381,32 +420,34 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
 .bfx-prefs-status-pill {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
+    padding: 3px 9px;
     border-radius: 999px;
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.13);
     color: #d1d5db;
+    flex-shrink: 0;
 }
 .bfx-prefs-status-pill.is-on {
-    background: rgba(16, 185, 129, 0.18);
-    border-color: rgba(16, 185, 129, 0.42);
-    color: #6ee7b7;
-}
-.bfx-prefs-status-pill.is-admin {
-    background: rgba(99, 102, 241, 0.22);
-    border-color: rgba(129, 140, 248, 0.45);
-    color: #c7d2fe;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #f3f4f6;
 }
 
 .bfx-prefs-feature-desc {
-    margin-top: 3px;
+    margin-top: 2px;
     font-size: 12.5px;
-    line-height: 1.45;
+    line-height: 1.38;
     color: #9ca3af;
+}
+
+.bfx-prefs-row-trail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .bfx-prefs-toggle-btn {
@@ -422,7 +463,7 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
     flex-shrink: 0;
 }
 
-/* ---------- Enhanced Native Menu Rows (#myPreferencesMenuPage) ---------- */
+/* ---------- Enhanced & Organized Native Menu Rows (#myPreferencesMenuPage) ---------- */
 #myPreferencesMenuPage.bfx-prefs-menu-enhanced .headerUsername,
 #myPreferencesMenuPage [data-bfx-row-kind="quickconnect"],
 #myPreferencesMenuPage .lnkQuickConnectPreferences,
@@ -434,43 +475,43 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
     background: rgba(255, 255, 255, 0.035) !important;
     border: 1px solid rgba(255, 255, 255, 0.085) !important;
     border-radius: 16px !important;
-    padding: 6px !important;
-    margin: 0 0 14px 0 !important;
+    padding: 4px !important;
+    margin: 0 0 16px 0 !important;
     box-sizing: border-box !important;
 }
 
 #myPreferencesMenuPage.bfx-prefs-menu-enhanced .sectionTitle:not(.headerUsername) {
     font-size: 11px !important;
     font-weight: 800 !important;
-    letter-spacing: 1.4px !important;
+    letter-spacing: 1.3px !important;
     text-transform: uppercase !important;
     color: #9ca3af !important;
     margin: 0 !important;
     padding: 8px 12px 4px 12px !important;
 }
 
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced a.emby-button:not(.hide):not([data-bfx-row-kind="quickconnect"]),
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem-border:not(.hide):not([data-bfx-row-kind="quickconnect"]) {
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced a.emby-button:not(.hide):not(.bfx-prefs-hidden-row):not([data-bfx-row-kind="quickconnect"]),
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem-border:not(.hide):not(.bfx-prefs-hidden-row):not([data-bfx-row-kind="quickconnect"]) {
     display: block !important;
-    margin: 2px 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     border-radius: 12px !important;
     background: transparent !important;
     text-decoration: none !important;
-    transition: background 0.16s ease, transform 0.16s ease !important;
+    transition: background 0.15s ease !important;
 }
 
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced a.emby-button:not(.hide):not([data-bfx-row-kind="quickconnect"]):hover,
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem-border:not(.hide):not([data-bfx-row-kind="quickconnect"]):hover {
-    background: rgba(255, 255, 255, 0.065) !important;
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced a.emby-button:not(.hide):not(.bfx-prefs-hidden-row):not([data-bfx-row-kind="quickconnect"]):hover,
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem-border:not(.hide):not(.bfx-prefs-hidden-row):not([data-bfx-row-kind="quickconnect"]):hover {
+    background: rgba(255, 255, 255, 0.06) !important;
 }
 
 #myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem {
     display: flex !important;
     align-items: center !important;
     gap: 14px !important;
-    padding: 11px 12px !important;
+    padding: 12px 14px !important;
     background: transparent !important;
     border: none !important;
     box-sizing: border-box !important;
@@ -486,54 +527,28 @@ body.bfx-settings-route .bfx-prefs-subpage-enhanced form {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 20px !important;
-    background: rgba(255, 255, 255, 0.07) !important;
+    font-size: 19px !important;
+    background: rgba(255, 255, 255, 0.065) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     color: #e5e7eb !important;
     flex-shrink: 0 !important;
 }
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItemIcon.bfx-svg-ico::before,
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItemIcon.bfx-svg-ico::after {
+    content: none !important;
+    display: none !important;
+}
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItemIcon.bfx-svg-ico svg {
+    width: 19px !important;
+    height: 19px !important;
+}
 
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="profile"] .listItemIcon {
-    background: rgba(229, 9, 20, 0.15) !important;
-    border-color: rgba(229, 9, 20, 0.32) !important;
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="logout"] .listItemIcon {
+    background: rgba(239, 68, 68, 0.13) !important;
+    border-color: rgba(248, 113, 113, 0.28) !important;
     color: #fca5a5 !important;
 }
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="clientsettings"] .listItemIcon,
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="display"] .listItemIcon {
-    background: rgba(14, 165, 233, 0.15) !important;
-    border-color: rgba(56, 189, 248, 0.32) !important;
-    color: #7dd3fc !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="home"] .listItemIcon {
-    background: rgba(245, 158, 11, 0.15) !important;
-    border-color: rgba(251, 191, 36, 0.32) !important;
-    color: #fcd34d !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="playback"] .listItemIcon,
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="downloads"] .listItemIcon {
-    background: rgba(16, 185, 129, 0.15) !important;
-    border-color: rgba(52, 211, 153, 0.32) !important;
-    color: #6ee7b7 !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="subtitles"] .listItemIcon {
-    background: rgba(168, 85, 247, 0.16) !important;
-    border-color: rgba(192, 132, 252, 0.34) !important;
-    color: #d8b4fe !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="controls"] .listItemIcon {
-    background: rgba(6, 182, 212, 0.15) !important;
-    border-color: rgba(34, 211, 238, 0.32) !important;
-    color: #67e8f9 !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="dashboard"] .listItemIcon,
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="server"] .listItemIcon {
-    background: rgba(99, 102, 241, 0.17) !important;
-    border-color: rgba(129, 140, 248, 0.36) !important;
-    color: #a5b4fc !important;
-}
-#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="logout"] .listItemIcon {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-color: rgba(248, 113, 113, 0.32) !important;
+#myPreferencesMenuPage.bfx-prefs-menu-enhanced [data-bfx-row-kind="logout"] .listItemBodyText {
     color: #fca5a5 !important;
 }
 
@@ -1028,29 +1043,17 @@ body.bfx-settings-route button:focus-visible {
     height: 18px;
 }
 .bfx-cs-row-ico.is-brand {
-    background: rgba(229, 9, 20, 0.16);
-    border-color: rgba(229, 9, 20, 0.34);
+    background: rgba(229, 9, 20, 0.14);
+    border-color: rgba(229, 9, 20, 0.3);
     color: #fca5a5;
 }
-.bfx-cs-row-ico.is-play {
-    background: rgba(16, 185, 129, 0.16);
-    border-color: rgba(52, 211, 153, 0.34);
-    color: #6ee7b7;
-}
-.bfx-cs-row-ico.is-sub {
-    background: rgba(168, 85, 247, 0.16);
-    border-color: rgba(192, 132, 252, 0.34);
-    color: #d8b4fe;
-}
-.bfx-cs-row-ico.is-disp {
-    background: rgba(14, 165, 233, 0.16);
-    border-color: rgba(56, 189, 248, 0.34);
-    color: #7dd3fc;
-}
+.bfx-cs-row-ico.is-play,
+.bfx-cs-row-ico.is-sub,
+.bfx-cs-row-ico.is-disp,
 .bfx-cs-row-ico.is-srv {
-    background: rgba(99, 102, 241, 0.16);
-    border-color: rgba(129, 140, 248, 0.34);
-    color: #a5b4fc;
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e5e7eb;
 }
 .bfx-cs-row-body {
     flex: 1 1 0%;
@@ -1092,41 +1095,79 @@ body.bfx-settings-route button:focus-visible {
     .bfx-prefs-admin-card,
     .bfx-prefs-context-card {
         flex-wrap: wrap;
-        align-items: flex-start;
-        padding: 15px;
+        align-items: center;
+        padding: 16px;
+        gap: 14px;
     }
     .bfx-prefs-avatar {
-        width: 54px;
-        height: 54px;
-        border-radius: 14px;
-        font-size: 27px;
+        width: 56px;
+        height: 56px;
+        border-radius: 15px;
+        font-size: 28px;
     }
     .bfx-prefs-profile-meta {
-        flex: 1 1 calc(100% - 72px);
+        flex: 1 1 calc(100% - 76px);
     }
     .bfx-prefs-profile-actions,
     .bfx-prefs-admin-actions,
     .bfx-prefs-context-card > .bfx-prefs-pill-btn {
         width: 100%;
-        padding-top: 6px;
+        padding-top: 4px;
     }
     .bfx-prefs-profile-actions > .bfx-prefs-pill-btn,
     .bfx-prefs-admin-actions > .bfx-prefs-pill-btn,
     .bfx-prefs-context-card > .bfx-prefs-pill-btn {
         flex: 1 1 136px;
-        min-height: 38px;
+        min-height: 42px;
         height: auto;
-        padding: 8px 12px;
+        padding: 9px 14px;
+        font-size: 14px;
         white-space: normal;
         text-align: center;
     }
+    .bfx-prefs-row,
     .bfx-prefs-feature-card,
-    .bfx-prefs-client-card {
-        padding: 14px;
-        gap: 12px;
+    .bfx-prefs-client-card,
+    #myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItem {
+        padding: 13px 14px !important;
+        gap: 13px !important;
+        min-height: 58px;
+    }
+    .bfx-prefs-feature-ico,
+    #myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItemIcon {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        border-radius: 12px !important;
+    }
+    .bfx-prefs-feature-title,
+    #myPreferencesMenuPage.bfx-prefs-menu-enhanced .listItemBodyText {
+        font-size: 15.5px !important;
+    }
+    .bfx-prefs-feature-desc,
+    .bfx-prefs-row-sub {
+        font-size: 13px;
+    }
+    .bfx-prefs-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .bfx-prefs-tabs::-webkit-scrollbar {
+        display: none;
+    }
+    .bfx-prefs-tab {
+        height: 38px;
+        padding: 0 15px;
+        font-size: 13.5px;
     }
     body.bfx-settings-subpage .verticalSection:not(.hide) {
-        padding: 14px 15px !important;
+        padding: 15px 16px !important;
+    }
+}
+@media (max-width: 520px) {
+    .bfx-prefs-status-pill[data-bfx-vis-preset-pill="1"] {
+        display: none;
     }
 }
 
@@ -1318,24 +1359,124 @@ body.bfx-settings-route button:focus-visible {
         pointer-events: none !important;
     }
 
-    /* Anchor Account Sheet cleanly right above the floating dock for thumb reachability */
+    /* Anchor Account Sheet cleanly right above the floating dock with generous touch-sized controls */
     html:not(.layout-tv) body.bfx-phone-mode.bfx-mobile-dock-ready:not(.bfx-tv-mode) #streamflix-account-dropdown {
         top: auto !important;
         bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
         left: 12px !important;
         right: 12px !important;
+        width: auto !important;
+        max-width: none !important;
+        padding: 12px !important;
         max-height: calc(100vh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
         max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
-        border-radius: 22px !important;
+        border-radius: 24px !important;
         transform-origin: bottom center !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown {
+        padding: 12px !important;
+        border-radius: 24px !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-header {
+        padding: 10px 8px 10px 10px;
+        gap: 13px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 15px;
+        font-size: 25px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-name {
+        font-size: 17px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-active-sub {
+        font-size: 13px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-close {
+        width: 38px;
+        height: 38px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-profiles {
+        gap: 8px;
+        padding: 8px 4px 10px 4px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof {
+        flex: 0 0 74px;
+        gap: 7px;
+        padding: 7px 3px;
+        border-radius: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-av {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        font-size: 24px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-manage .bfx-dd-prof-av .bfx-icon {
+        width: 22px;
+        height: 22px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-prof-name {
+        max-width: 72px;
+        font-size: 12.5px;
     }
     html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tiles {
         grid-auto-flow: row !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 8px !important;
+        gap: 9px !important;
+        padding: 4px 4px 10px 4px !important;
     }
     html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tiles > .bfx-dd-tile:last-child:nth-child(odd) {
         grid-column: 1 / -1 !important;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile {
+        min-height: 50px;
+        padding: 9px 12px 9px 10px;
+        gap: 11px;
+        border-radius: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-ico .bfx-icon {
+        width: 18px;
+        height: 18px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-tile-label {
+        font-size: 14px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .streamflix-dd-item {
+        min-height: 48px;
+        padding: 10px 12px;
+        gap: 14px;
+        border-radius: 13px;
+        font-size: 15.5px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-ico {
+        width: 24px;
+        height: 24px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-ico .bfx-icon {
+        width: 20px;
+        height: 20px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo {
+        gap: 9px;
+        padding: 6px 4px 4px 4px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo-btn {
+        height: 46px;
+        border-radius: 13px;
+        font-size: 14px;
+        gap: 8px;
+    }
+    html:not(.layout-tv) body.bfx-phone-mode:not(.bfx-tv-mode) #streamflix-account-dropdown .bfx-dd-duo-btn .bfx-icon {
+        width: 17px;
+        height: 17px;
     }
 
     /* De-clutter Mobile Subnav: clean individual Netflix-style category pills, edge-to-edge scroll without gutter clipping */

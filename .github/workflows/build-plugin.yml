@@ -15,15 +15,17 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: "0.9.3.3"
+  PLUGIN_VERSION: "0.9.10.0"
   PLUGIN_GUID: "7cc1a505-91f6-4661-b4f9-7eee8be33b19"
   PLUGIN_NAME: "StreamFlix"
   PLUGIN_OVERVIEW: "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin"
-  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, opt-in Live TV compatibility, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
+  PLUGIN_DESCRIPTION: "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, Skip Intro & Credits support (Intro Skipper & MediaSegments), opt-in Live TV compatibility, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users."
   PLUGIN_CHANGELOG: |
-    - **Jellyfin Home Screen Sections & Configured Library Order (#23)**: StreamFlix Home now honors your Jellyfin **User Settings → Home** configuration end-to-end — rendering Sections 1–9 (`My Media`, `Continue Watching`, `Next Up`, `Recently Added Media`, `Continue Reading`, `Live TV`, `Continue Listening`, `Active Recordings`, and `None` to hide removed sections) in exact sequence, ordering **`My Media`** tiles, per-library **`Recently Added in {Library}`** rows, and top navigation library pills strictly by your **Configured Library Order (`OrderedViews`)**, honoring `LatestItemsExcludes`, `MyMediaExcludes`, and **`Hide watched content from 'Recently Added Media'` (`HidePlayedInLatest`)**, syncing live immediately upon saving `#/mypreferenceshome.html`, and fixing checkbox label alignment on Home settings.
-    - **3-Second Hero Billboard YouTube Trailer Preview**: Caps active Hero Billboard trailer playback at 3 seconds (`HERO_PREVIEW_MAX_PLAY_MS = 3000` with a 10-second studio-logo skip) before smoothly cross-fading back to artwork, while keeping full-length trailers available via the Detail Modal **Trailer** button.
-    - **Profile & Media Scope Hardening**: Enforces per-profile `IsVisible` and `AllowedLibraryIds` checks across trailer resolution and Watch Together rooms, guards SSO-locked profiles during Jellyfin auto-linking, and cleans up Watch Together sync state on sign-out.
+    - **Skip Intro & Credits Support (`Intro Skipper` & `MediaSegments`)**: Automatically detects intro, recap, preview, commercial, and credits segments across Jellyfin 10.10+/12 `MediaSegments`, the **Intro Skipper** plugin (v1 & v2 endpoints), and MKV chapter markers — surfacing a frosted-glass Skip pill with live progress fill, countdown timer, `S` keyboard shortcut, `×` dismiss, and Smart TV D-pad focus.
+    - **1-Click Visual Presets & Poster Card Density**: Personalize server defaults or individual profiles inside **Settings → Appearance & Home** with 4 curated themes (`Netflix Classic`, `OLED Pure Black`, `Cinema Glass`, `Prime Midnight`) and 3 card density sizes (`Compact`, `Standard`, `Large`).
+    - **2-Column Editorial Title Details, Quality Badges & Audio Mini-Player**: Redesigned *More Info* modal with optional `4K UHD` / `Dolby Vision` / `HDR10+` / `Dolby Atmos` / `DTS:X` / `AV1` / `CC` / Critic `%` / Studio badges, `⋯` More Options menu, TV Series **Shuffle**, and a persistent frosted-glass **Music & Audiobook Mini-Player** while browsing.
+    - **Reorganized 6-Tab Dashboard Console, Grouped User Settings & Touch Polish**: Organized **Dashboard → Plugins → StreamFlix** into 6 focused tabs (`Profiles`, `Appearance & Home`, `Sign-In & SSO`, `Features & Requests`, `Active Devices`, `System & Backup`), grouped `#/mypreferencesmenu` into clean sections, streamlined the Account Menu, and restored crisp desktop & enlarged smartphone touch sizing.
+    - **Auto-Closing Windows / Desktop SSO Browser Tab**: Signing in with Google or Custom OIDC from Jellyfin Media Player / Jellyfin Desktop on Windows now automatically closes both the auth popup and external browser tab via `/StreamFlix/Auth/DesktopLaunch` and fixes the **Close Tab** button.
 
 jobs:
   build-and-publish:

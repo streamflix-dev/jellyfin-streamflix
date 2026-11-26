@@ -620,6 +620,10 @@
 
         // 1. Immediately close any open StreamFlix detail modal AND show the dark playback transition loader
         // so the card disappears right away instead of staying stuck on screen!
+        if (state.activeDetailModal && typeof state.activeDetailModal.close === 'function') {
+            try { state.activeDetailModal.close(true); } catch (eDmPlay) {}
+            state.activeDetailModal = null;
+        }
         var openModals = document.querySelectorAll('.streamflix-modal-backdrop');
         for (var m = 0; m < openModals.length; m++) {
             if (openModals[m].parentNode) {
@@ -628,12 +632,34 @@
         }
         document.body.classList.remove('streamflix-modal-open');
         hidePlaybackLoader();
+
+        if (itemObj && (itemObj.Type === 'Audio' || itemObj.Type === 'AudioBook' || itemObj.Type === 'MusicAlbum') && typeof playStreamFlixAudioItem === 'function') {
+            playStreamFlixAudioItem(itemObj);
+            return;
+        }
+        if (itemObj && itemObj.Type === 'Book') {
+            var bookSrv = itemObj.ServerId || resolveKnownServerId();
+            window.location.hash = '#/details?id=' + encodeURIComponent(targetId) + (bookSrv ? '&serverId=' + encodeURIComponent(bookSrv) : '');
+            return;
+        }
+
         showPlaybackLoader(isWpFollow ? 'Syncing Watch Party…' : 'Starting playback…');
 
         var hasCustomTracks = (audioStreamIndex !== undefined && audioStreamIndex !== null && audioStreamIndex !== '')
             || (subtitleStreamIndex !== undefined && subtitleStreamIndex !== null && subtitleStreamIndex !== '');
 
         resolvePlayableItem(itemObj || targetId).then(function (playableItem) {
+            if (playableItem && (playableItem.Type === 'Audio' || playableItem.Type === 'AudioBook' || playableItem.Type === 'MusicAlbum') && typeof playStreamFlixAudioItem === 'function') {
+                hidePlaybackLoader();
+                playStreamFlixAudioItem(playableItem);
+                return;
+            }
+            if (playableItem && playableItem.Type === 'Book') {
+                hidePlaybackLoader();
+                var resolvedBookSrv = playableItem.ServerId || resolveKnownServerId();
+                window.location.hash = '#/details?id=' + encodeURIComponent(playableItem.Id || targetId) + (resolvedBookSrv ? '&serverId=' + encodeURIComponent(resolvedBookSrv) : '');
+                return;
+            }
             var playableId = (playableItem && playableItem.Id) || targetId;
             state.lastPlayNormId = normalizeGuid(playableId);
             state.lastPlayRawTarget = playableItem || playableId;
@@ -1457,9 +1483,6 @@
                 loadPersonalRows(false);
             }
         }, 1200);
-        if (typeof refreshNotificationsSilently === 'function') {
-            refreshNotificationsSilently();
-        }
     }
 
     var HUB_SWR_KEY_PREFIX = 'streamflix_hub_swr_v2_';
@@ -3138,10 +3161,10 @@
         var isPlayed = item.UserData && item.UserData.Played;
         return ''
             + '<div class="streamflix-card-quick-btns">'
-            + '  <button type="button" class="streamflix-qbtn play" data-action="play" title="Play" aria-label="Play">' + icon('play') + '</button>'
-            + '  <button type="button" class="streamflix-qbtn' + (isFav ? ' active' : '') + '" data-action="fav" title="' + (isFav ? 'Remove from My List' : 'Add to My List') + '" aria-label="My List">' + icon(isFav ? 'check' : 'plus') + '</button>'
-            + (withPlayed ? '  <button type="button" class="streamflix-qbtn' + (isPlayed ? ' active' : '') + '" data-action="played" title="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '" aria-label="Watched">' + icon('eye') + '</button>' : '')
-            + '  <button type="button" class="streamflix-qbtn streamflix-qbtn-end" data-action="info" title="Details" aria-label="Details">' + icon('chevronDown') + '</button>'
+            + '  <button type="button" class="streamflix-qbtn play" data-action="play" aria-label="Play">' + icon('play') + '</button>'
+            + '  <button type="button" class="streamflix-qbtn' + (isFav ? ' active' : '') + '" data-action="fav" aria-label="' + (isFav ? 'Remove from My List' : 'Add to My List') + '">' + icon(isFav ? 'check' : 'plus') + '</button>'
+            + (withPlayed ? '  <button type="button" class="streamflix-qbtn' + (isPlayed ? ' active' : '') + '" data-action="played" aria-label="' + (isPlayed ? 'Mark unwatched' : 'Mark watched') + '">' + icon('eye') + '</button>' : '')
+            + '  <button type="button" class="streamflix-qbtn streamflix-qbtn-end" data-action="info" aria-label="More Info">' + icon('chevronDown') + '</button>'
             + '</div>';
     }
 
