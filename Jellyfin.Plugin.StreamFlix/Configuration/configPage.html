@@ -8,54 +8,74 @@
     <div id="StreamFlixConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <style>
             #StreamFlixConfigPage .hide, #StreamFlixConfigPage .bfx-tab-hidden, .bfx-portal-backdrop.hide { display:none !important; }
-            #StreamFlixConfigPage .bfx-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:18px; }
+            #StreamFlixConfigPage .content-primary { max-width:980px !important; margin:0 auto !important; padding-top:12px !important; }
+            #StreamFlixConfigPage .bfx-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,.08); }
             #StreamFlixConfigPage .bfx-brand { display:flex; align-items:center; gap:14px; }
-            #StreamFlixConfigPage .bfx-logo { background:#E50914; color:#fff; font-weight:900; font-size:20px; letter-spacing:3px; padding:8px 16px; border-radius:7px; box-shadow:0 6px 22px rgba(229,9,20,.38); }
-            #StreamFlixConfigPage .bfx-head h2 { margin:0; font-size:1.35em; }
-            #StreamFlixConfigPage .bfx-sub { opacity:.68; font-size:.9em; margin-top:2px; }
-            #StreamFlixConfigPage .bfx-btn { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:inherit; padding:8px 14px; border-radius:7px; font:inherit; font-size:.9em; font-weight:600; cursor:pointer; touch-action:manipulation; text-decoration:none; transition:background .15s, border-color .15s, transform .15s; }
-            #StreamFlixConfigPage .bfx-btn:hover:not(:disabled) { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3); }
-            #StreamFlixConfigPage .bfx-btn:active:not(:disabled) { transform:scale(.97); }
+            #StreamFlixConfigPage .bfx-logo { background:#E50914; color:#fff; font-weight:900; font-size:18px; letter-spacing:2.6px; padding:8px 15px; border-radius:8px; box-shadow:0 6px 20px rgba(229,9,20,.34); }
+            #StreamFlixConfigPage .bfx-head h2 { margin:0; font-size:1.3em; font-weight:800; letter-spacing:-.01em; }
+            #StreamFlixConfigPage .bfx-sub { opacity:.66; font-size:.86em; margin-top:2px; }
+            #StreamFlixConfigPage .bfx-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:inherit; min-height:36px; padding:7px 14px; border-radius:9px; font:inherit; font-size:.88em; font-weight:600; cursor:pointer; touch-action:manipulation; text-decoration:none; box-sizing:border-box; transition:background .15s, border-color .15s, transform .15s; }
+            #StreamFlixConfigPage .bfx-btn:hover:not(:disabled) { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.28); }
+            #StreamFlixConfigPage .bfx-btn:active:not(:disabled) { transform:scale(.98); }
             #StreamFlixConfigPage .bfx-btn:disabled { opacity:.35; cursor:default; }
             #StreamFlixConfigPage .bfx-btn-red { background:#E50914; border-color:#E50914; color:#fff; }
             #StreamFlixConfigPage .bfx-btn-red:hover:not(:disabled) { background:#f6121d; border-color:#f6121d; }
-            #StreamFlixConfigPage .bfx-btn-danger { background:rgba(229,9,20,.14); color:#ff8a80; border-color:rgba(229,9,20,.6); }
-            #StreamFlixConfigPage .bfx-btn-danger:hover:not(:disabled) { background:rgba(229,9,20,.26); border-color:#ff5252; color:#fff; }
-            #StreamFlixConfigPage .bfx-btn-sm { padding:5px 10px; font-size:.8em; }
-            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(152px, 1fr)); gap:10px; margin-bottom:16px; }
-            #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:12px 14px; cursor:pointer; transition:border-color .16s, background .16s, transform .16s; text-align:left; font:inherit; color:inherit; }
-            #StreamFlixConfigPage .bfx-card:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.22); transform:translateY(-1px); }
-            #StreamFlixConfigPage .bfx-card-label { font-size:.72em; text-transform:uppercase; letter-spacing:.08em; opacity:.58; }
-            #StreamFlixConfigPage .bfx-card-value { font-size:.98em; font-weight:700; margin-top:5px; display:flex; align-items:center; gap:8px; }
-            #StreamFlixConfigPage .bfx-cfg-tabs { display:flex; align-items:center; gap:7px; overflow-x:auto; padding:4px 2px 14px; margin-bottom:6px; scrollbar-width:none; }
+            #StreamFlixConfigPage .bfx-btn-danger { background:rgba(229,9,20,.13); color:#fca5a5; border-color:rgba(229,9,20,.48); }
+            #StreamFlixConfigPage .bfx-btn-danger:hover:not(:disabled) { background:rgba(229,9,20,.24); border-color:#ff5252; color:#fff; }
+            #StreamFlixConfigPage .bfx-btn-sm { min-height:30px; padding:4px 10px; font-size:.8em; border-radius:7px; }
+            #StreamFlixConfigPage .bfx-cards { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:8px; margin-bottom:14px; }
+            #StreamFlixConfigPage .bfx-card { background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.085); border-radius:12px; padding:10px 12px; cursor:pointer; transition:border-color .16s, background .16s, transform .16s; text-align:left; font:inherit; color:inherit; min-width:0; }
+            #StreamFlixConfigPage .bfx-card:hover { background:rgba(255,255,255,.065); border-color:rgba(255,255,255,.2); transform:translateY(-1px); }
+            #StreamFlixConfigPage .bfx-card-label { font-size:.68em; font-weight:700; text-transform:uppercase; letter-spacing:.07em; opacity:.56; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            #StreamFlixConfigPage .bfx-card-value { font-size:.86em; font-weight:700; margin-top:4px; display:flex; align-items:center; gap:6px; line-height:1.25; }
+            #StreamFlixConfigPage .bfx-cfg-tabs { display:flex; align-items:center; gap:5px; overflow-x:auto; padding:5px; margin-bottom:16px; border-radius:13px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.085); scrollbar-width:none; }
             #StreamFlixConfigPage .bfx-cfg-tabs::-webkit-scrollbar { display:none; }
-            #StreamFlixConfigPage .bfx-cfg-tab { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); color:rgba(255,255,255,.78); padding:8px 14px; border-radius:999px; font:inherit; font-size:.86em; font-weight:700; cursor:pointer; transition:background .16s, border-color .16s, color .16s; }
-            #StreamFlixConfigPage .bfx-cfg-tab:hover { background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.24); color:#fff; }
-            #StreamFlixConfigPage .bfx-cfg-tab.is-active { background:#E50914; border-color:#E50914; color:#fff; box-shadow:0 6px 18px rgba(229,9,20,.32); }
-            #StreamFlixConfigPage .bfx-cfg-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:19px; padding:0 6px; border-radius:999px; font-size:.76em; font-weight:800; background:rgba(255,255,255,.14); color:#fff; }
+            #StreamFlixConfigPage .bfx-cfg-tab { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; border:1px solid transparent; background:transparent; color:rgba(255,255,255,.72); height:35px; padding:0 13px; border-radius:9px; font:inherit; font-size:.85em; font-weight:700; cursor:pointer; transition:background .15s, color .15s; }
+            #StreamFlixConfigPage .bfx-cfg-tab:hover { background:rgba(255,255,255,.07); color:#fff; }
+            #StreamFlixConfigPage .bfx-cfg-tab.is-active { background:#E50914; color:#fff; box-shadow:0 4px 14px rgba(229,9,20,.34); }
+            #StreamFlixConfigPage .bfx-cfg-tab.is-all-tab { margin-left:auto; font-weight:600; opacity:.82; }
+            #StreamFlixConfigPage .bfx-cfg-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:18px; padding:0 5px; border-radius:999px; font-size:.75em; font-weight:800; background:rgba(255,255,255,.14); color:#fff; }
             #StreamFlixConfigPage .bfx-cfg-tab.is-active .bfx-cfg-tab-count { background:rgba(0,0,0,.28); }
-            #StreamFlixConfigPage .bfx-dot { width:9px; height:9px; border-radius:50%; background:#666; flex:none; }
-            #StreamFlixConfigPage .bfx-dot.ok { background:#46d369; box-shadow:0 0 8px rgba(70,211,105,.6); }
-            #StreamFlixConfigPage .bfx-dot.warn { background:#f5b041; box-shadow:0 0 8px rgba(245,176,65,.5); }
-            #StreamFlixConfigPage .bfx-dot.bad { background:#E50914; box-shadow:0 0 8px rgba(229,9,20,.6); }
-            #StreamFlixConfigPage .bfx-section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:18px 20px; margin-bottom:18px; }
-            #StreamFlixConfigPage .bfx-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
-            #StreamFlixConfigPage .bfx-section h3 { margin:0 0 3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-            #StreamFlixConfigPage .bfx-method-stack { display:flex; flex-direction:column; gap:10px; margin:12px 0 14px; }
-            #StreamFlixConfigPage .bfx-method-card { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.09); border-radius:9px; padding:12px 15px; transition:border-color .16s, background .16s; }
-            #StreamFlixConfigPage .bfx-method-card.is-on { background:rgba(255,255,255,.035); border-color:rgba(255,255,255,.2); }
+            #StreamFlixConfigPage .bfx-dot { width:8px; height:8px; border-radius:50%; background:#666; flex:none; }
+            #StreamFlixConfigPage .bfx-dot.ok { background:#46d369; box-shadow:0 0 8px rgba(70,211,105,.55); }
+            #StreamFlixConfigPage .bfx-dot.warn { background:#f5b041; box-shadow:0 0 8px rgba(245,176,65,.45); }
+            #StreamFlixConfigPage .bfx-dot.bad { background:#E50914; box-shadow:0 0 8px rgba(229,9,20,.55); }
+            #StreamFlixConfigPage .bfx-section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.085); border-radius:16px; padding:20px 22px; margin-bottom:18px; }
+            #StreamFlixConfigPage .bfx-section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+            #StreamFlixConfigPage .bfx-section h3 { margin:0 0 3px; font-size:1.12em; font-weight:800; letter-spacing:-.01em; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+            #StreamFlixConfigPage .bfx-group-kicker { font-size:.73em; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.52); margin:16px 0 8px 2px; }
+            #StreamFlixConfigPage .bfx-method-stack { display:flex; flex-direction:column; gap:9px; margin:8px 0 14px; }
+            #StreamFlixConfigPage .bfx-method-card { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.085); border-radius:11px; padding:12px 15px; transition:border-color .16s, background .16s; }
+            #StreamFlixConfigPage .bfx-method-card.is-on { background:rgba(255,255,255,.035); border-color:rgba(255,255,255,.18); }
             #StreamFlixConfigPage .bfx-method-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
             #StreamFlixConfigPage .bfx-method-top .checkboxContainer { margin:0; flex:1; min-width:220px; }
             #StreamFlixConfigPage .bfx-method-body { margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
             #StreamFlixConfigPage .bfx-collapse-body { margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
-            #StreamFlixConfigPage .bfx-pill { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:.7em; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:rgba(255,255,255,.08); color:rgba(255,255,255,.55); flex:none; }
-            #StreamFlixConfigPage .bfx-pill.ok { background:rgba(70,211,105,.18); color:#8de5a6; border:1px solid rgba(70,211,105,.35); }
-            #StreamFlixConfigPage .bfx-pill.warn { background:rgba(245,176,65,.18); color:#ffd280; border:1px solid rgba(245,176,65,.38); }
-            #StreamFlixConfigPage .bfx-details { background:rgba(0,0,0,.26); border:1px solid rgba(255,255,255,.09); border-radius:8px; padding:10px 13px; margin:10px 0 14px; }
-            #StreamFlixConfigPage .bfx-details summary { cursor:pointer; font-weight:600; font-size:.88em; opacity:.88; user-select:none; }
-            #StreamFlixConfigPage .bfx-details[open] summary { margin-bottom:10px; }
-            #StreamFlixConfigPage .bfx-subbox { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:14px 16px; margin:10px 0 14px; }
-            #StreamFlixConfigPage .bfx-subbox-title { font-size:.8em; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.72; margin-bottom:10px; }
+            #StreamFlixConfigPage .bfx-pill { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:.7em; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:rgba(255,255,255,.08); color:rgba(255,255,255,.58); flex:none; }
+            #StreamFlixConfigPage .bfx-pill.ok { background:rgba(70,211,105,.16); color:#8de5a6; border:1px solid rgba(70,211,105,.34); }
+            #StreamFlixConfigPage .bfx-pill.warn { background:rgba(245,176,65,.16); color:#ffd280; border:1px solid rgba(245,176,65,.36); }
+            #StreamFlixConfigPage .bfx-details { background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.085); border-radius:10px; padding:11px 14px; margin:10px 0 0; }
+            #StreamFlixConfigPage .bfx-details summary { cursor:pointer; font-weight:700; font-size:.88em; opacity:.9; user-select:none; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+            #StreamFlixConfigPage .bfx-details[open] summary { margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,.07); }
+            #StreamFlixConfigPage .bfx-subbox { background:rgba(0,0,0,.2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:15px 17px; margin:0 0 14px; }
+            #StreamFlixConfigPage .bfx-subbox:last-child { margin-bottom:0; }
+            #StreamFlixConfigPage .bfx-subbox-title { font-size:.78em; font-weight:800; text-transform:uppercase; letter-spacing:.08em; opacity:.72; margin-bottom:10px; }
+            #StreamFlixConfigPage input[is="emby-input"],
+            #StreamFlixConfigPage select[is="emby-select"],
+            #StreamFlixConfigPage textarea.bfx-textarea { background:rgba(0,0,0,.32); border:1px solid rgba(255,255,255,.15); color:inherit; border-radius:8px; padding:8px 11px; box-sizing:border-box; font:inherit; }
+            #StreamFlixConfigPage input[is="emby-input"]:focus,
+            #StreamFlixConfigPage select[is="emby-select"]:focus,
+            #StreamFlixConfigPage textarea.bfx-textarea:focus { outline:none; border-color:#E50914; }
+            @media (max-width: 980px) {
+                #StreamFlixConfigPage .bfx-cards { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+            }
+            @media (max-width: 640px) {
+                #StreamFlixConfigPage .bfx-section { padding:15px 15px; border-radius:14px; }
+                #StreamFlixConfigPage .bfx-subbox { padding:13px 13px; }
+                #StreamFlixConfigPage .bfx-btn { min-height:40px; }
+                #StreamFlixConfigPage .bfx-cfg-tab { height:38px; padding:0 14px; font-size:.88em; }
+                #StreamFlixConfigPage .bfx-cards { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+            }
             #StreamFlixConfigPage .bfx-grid-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
             #StreamFlixConfigPage .bfx-grid-4 { display:grid; grid-template-columns:repeat(auto-fit, minmax(185px, 1fr)); gap:12px; align-items:end; }
             #StreamFlixConfigPage .bfx-session-row { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-top:12px; margin-top:6px; border-top:1px solid rgba(255,255,255,.07); }
@@ -166,23 +186,20 @@
                             <div class="bfx-logo" id="StreamFlixConfigLogo">STREAMFLIX</div>
                             <div>
                                 <h2>StreamFlix</h2>
-                                <div class="bfx-sub">Netflix-style UI, household profiles &amp; session security <span id="StreamFlixVersionLabel"></span></div>
+                                <div class="bfx-sub">Server administration &amp; household configuration <span id="StreamFlixVersionLabel"></span></div>
                             </div>
                         </div>
                         <div class="bfx-row">
-                            <a class="bfx-btn" href="#/home" id="StreamFlixBackHomeBtn">← Home</a>
-                            <button type="button" class="bfx-btn" id="StreamFlixHealthCheckBtn">🩺 Health Check</button>
-                            <button type="button" class="bfx-btn" id="StreamFlixExportBackupBtn">⬇ Export JSON</button>
-                            <button type="button" class="bfx-btn" id="StreamFlixImportBackupBtn">⬆ Import JSON</button>
-                            <input type="file" id="StreamFlixImportFileInput" accept=".json,application/json" class="hide" />
-                            <button type="button" class="bfx-btn" id="StreamFlixManageProfilesBtn">✎ Manage profiles</button>
+                            <a class="bfx-btn" href="#/home" id="StreamFlixBackHomeBtn">← Back to Home</a>
                             <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixOpenPickerBtn">Who's watching?</button>
                         </div>
                     </div>
 
-                    <div class="bfx-oauth-results hide" id="StreamFlixHealthCheckPanel" role="status" aria-live="polite" style="margin:0 0 16px;"></div>
-
                     <div class="bfx-cards">
+                        <button type="button" class="bfx-card" data-jump-tab="profiles">
+                            <div class="bfx-card-label">Profiles</div>
+                            <div class="bfx-card-value" id="StreamFlixStatusProfiles">…</div>
+                        </button>
                         <button type="button" class="bfx-card" data-jump-tab="signin">
                             <div class="bfx-card-label">Household sign-in</div>
                             <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusGateDot"></span><span id="StreamFlixStatusGate">…</span></div>
@@ -203,32 +220,29 @@
                             <div class="bfx-card-label">Seerr requests</div>
                             <div class="bfx-card-value"><span class="bfx-dot" id="StreamFlixStatusSeerrDot"></span><span id="StreamFlixStatusSeerr">…</span></div>
                         </button>
-                        <button type="button" class="bfx-card" data-jump-tab="profiles">
-                            <div class="bfx-card-label">Profiles</div>
-                            <div class="bfx-card-value" id="StreamFlixStatusProfiles">…</div>
-                        </button>
                     </div>
 
                     <div class="bfx-cfg-tabs" id="StreamFlixConfigTabs" role="tablist" aria-label="StreamFlix configuration sections">
-                        <button type="button" class="bfx-cfg-tab is-active" data-cfg-tab="all" role="tab" aria-selected="true">All Settings</button>
-                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="profiles" role="tab" aria-selected="false">Profiles</button>
+                        <button type="button" class="bfx-cfg-tab is-active" data-cfg-tab="profiles" role="tab" aria-selected="true">Profiles</button>
+                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="home" role="tab" aria-selected="false">Appearance &amp; Home</button>
                         <button type="button" class="bfx-cfg-tab" data-cfg-tab="signin" role="tab" aria-selected="false">Sign-In &amp; SSO</button>
+                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="features" role="tab" aria-selected="false">Features &amp; Requests</button>
                         <button type="button" class="bfx-cfg-tab" data-cfg-tab="devices" role="tab" aria-selected="false">Active Devices <span class="bfx-cfg-tab-count" id="StreamFlixTabDevicesBadge">0</span></button>
-                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="guests" role="tab" aria-selected="false">Guest Passes</button>
-                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="home" role="tab" aria-selected="false">Home &amp; Hero</button>
-                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="seerr" role="tab" aria-selected="false">Seerr</button>
+                        <button type="button" class="bfx-cfg-tab" data-cfg-tab="system" role="tab" aria-selected="false">System &amp; Backup</button>
+                        <button type="button" class="bfx-cfg-tab is-all-tab" data-cfg-tab="all" role="tab" aria-selected="false">All</button>
                     </div>
 
                     <!-- 1. Profiles -->
                     <div class="bfx-section" data-cfg-section="profiles">
                         <div class="bfx-section-head">
                             <div>
-                                <h3>Profiles</h3>
-                                <div class="fieldDescription">Each profile maps to its own Jellyfin user so Continue Watching, Next Up, and My List stay separate. Set PINs or account locks from <strong>Manage profiles</strong>.</div>
+                                <h3>Household Profiles</h3>
+                                <div class="fieldDescription">Each profile maps to its own Jellyfin user so Continue Watching, Next Up, and My List stay separate.</div>
                             </div>
+                            <button type="button" class="bfx-btn" id="StreamFlixManageProfilesBtn">Manage Profiles</button>
                         </div>
                         <div class="bfx-callout red hide" id="StreamFlixOwnerWarning">
-                            The <strong>Owner</strong> profile is linked to an administrator account without a PIN or account lock. Protect it in <strong>Manage profiles</strong> so anyone signed into the household cannot open admin settings.
+                            The <strong>Owner</strong> profile is linked to an administrator account without a PIN or account lock. Protect it in <strong>Manage Profiles</strong> so anyone signed into the household cannot open admin settings.
                         </div>
                         <div class="bfx-profiles" id="StreamFlixProfilesGrid">
                             <div class="bfx-skeleton"></div><div class="bfx-skeleton"></div><div class="bfx-skeleton"></div>
@@ -242,52 +256,254 @@
                         </div>
                     </div>
 
-                    <!-- 2. Interface & Sign-In Gate (Progressive Disclosure) -->
-                    <div class="bfx-section" data-cfg-section="signin">
-                        <h3>Interface &amp; Sign-In</h3>
-                        <div class="fieldDescription" style="margin-bottom:12px;">Household sign-in is always required before "Who's watching?". Enable the sign-in methods you want to offer — configuration fields appear automatically when turned on.</div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="EnableStreamFlixUi" name="EnableStreamFlixUi" type="checkbox" is="emby-checkbox" />
-                                <span>Enable the StreamFlix interface (server-wide)</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Applies the dark cinema home, Top 10 rows, profile switcher, and custom player overlay. Individual devices can also switch between StreamFlix Home and classic Jellyfin Home in <strong>Settings</strong>.</div>
-                        </div>
-
-                        <div id="StreamFlixUiBrandingBox" class="bfx-grid-2" style="margin-top:6px;">
-                            <div class="inputContainer" style="margin-bottom:6px;">
-                                <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom upper-left logo text (optional)</label>
-                                <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
-                                <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
-                            </div>
-                            <div class="inputContainer" style="margin-bottom:6px;">
-                                <label class="inputLabel inputLabelUnfocused" for="CustomAccentColor">Brand accent color</label>
-                                <div class="bfx-row" style="gap:8px;">
-                                    <input type="color" id="CustomAccentColorPicker" value="#E50914" style="width:42px;height:38px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:transparent;cursor:pointer;padding:2px;" aria-label="Pick brand accent color" />
-                                    <input id="CustomAccentColor" name="CustomAccentColor" type="text" maxlength="7" is="emby-input" autocomplete="off" value="#E50914" placeholder="#E50914" style="max-width:130px;font-family:monospace;" />
-                                </div>
-                                <div class="bfx-accent-presets" id="StreamFlixAccentPresets">
-                                    <button type="button" class="bfx-accent-swatch is-selected" data-accent-preset="#E50914" style="background:#E50914;" title="Netflix Red (#E50914)"></button>
-                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#F59E0B" style="background:#F59E0B;" title="Cinema Gold (#F59E0B)"></button>
-                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#8B5CF6" style="background:#8B5CF6;" title="Royal Purple (#8B5CF6)"></button>
-                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#06B6D4" style="background:#06B6D4;" title="Ocean Cyan (#06B6D4)"></button>
-                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#10B981" style="background:#10B981;" title="Emerald (#10B981)"></button>
-                                    <button type="button" class="bfx-accent-swatch" data-accent-preset="#EC4899" style="background:#EC4899;" title="Rose Pink (#EC4899)"></button>
-                                </div>
+                    <!-- 2. Appearance, Navigation & Home Layout -->
+                    <div class="bfx-section bfx-tab-hidden" id="StreamFlixHomeSection" data-cfg-section="home">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Appearance, Navigation &amp; Home</h3>
+                                <div class="fieldDescription">Configure server-wide branding, default visual theme, navigation tabs, Home rows, Hero Billboard, and player overlays.</div>
                             </div>
                         </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:10px;">
-                            <label class="emby-checkbox-label">
-                                <input id="EnableWatchTogether" name="EnableWatchTogether" type="checkbox" is="emby-checkbox" />
-                                <span>Enable Watch Together (synced watch parties)</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Adds a clean Watch Together modal, title/player action, and 1-click invite links powered by Jellyfin SyncPlay while keeping Jellyfin's stock header icon hidden. Automatically hidden in Kids mode.</div>
+                        <div class="bfx-subbox">
+                            <div class="bfx-subbox-title">Interface, Branding &amp; Default Theme</div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:0 0 12px;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableStreamFlixUi" name="EnableStreamFlixUi" type="checkbox" is="emby-checkbox" />
+                                    <span>Enable the StreamFlix interface (server-wide)</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Applies the cinema Home screen, Top 10 rows, profile switcher, and custom player overlay. Individual devices can also toggle StreamFlix Home in <strong>Settings</strong>.</div>
+                            </div>
+
+                            <div id="StreamFlixUiBrandingBox">
+                                <div class="bfx-grid-2" style="margin-bottom:12px;">
+                                    <div class="inputContainer" style="margin:0;">
+                                        <label class="inputLabel inputLabelUnfocused" for="CustomBrandName">Custom brand name (optional)</label>
+                                        <input id="CustomBrandName" name="CustomBrandName" type="text" maxlength="32" is="emby-input" autocomplete="off" placeholder="STREAMFLIX" />
+                                        <div class="fieldDescription">Leave blank to display <strong>STREAMFLIX</strong>.</div>
+                                    </div>
+                                    <div class="inputContainer" style="margin:0;">
+                                        <label class="inputLabel inputLabelUnfocused" for="CustomAccentColor">Brand accent color</label>
+                                        <div class="bfx-row" style="gap:8px;">
+                                            <input type="color" id="CustomAccentColorPicker" value="#E50914" style="width:42px;height:38px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:transparent;cursor:pointer;padding:2px;" aria-label="Pick brand accent color" />
+                                            <input id="CustomAccentColor" name="CustomAccentColor" type="text" maxlength="7" is="emby-input" autocomplete="off" value="#E50914" placeholder="#E50914" style="max-width:130px;font-family:monospace;" />
+                                        </div>
+                                        <div class="bfx-accent-presets" id="StreamFlixAccentPresets">
+                                            <button type="button" class="bfx-accent-swatch is-selected" data-accent-preset="#E50914" style="background:#E50914;" title="Netflix Red (#E50914)"></button>
+                                            <button type="button" class="bfx-accent-swatch" data-accent-preset="#F59E0B" style="background:#F59E0B;" title="Cinema Gold (#F59E0B)"></button>
+                                            <button type="button" class="bfx-accent-swatch" data-accent-preset="#8B5CF6" style="background:#8B5CF6;" title="Royal Purple (#8B5CF6)"></button>
+                                            <button type="button" class="bfx-accent-swatch" data-accent-preset="#06B6D4" style="background:#06B6D4;" title="Ocean Cyan (#06B6D4)"></button>
+                                            <button type="button" class="bfx-accent-swatch" data-accent-preset="#10B981" style="background:#10B981;" title="Emerald (#10B981)"></button>
+                                            <button type="button" class="bfx-accent-swatch" data-accent-preset="#EC4899" style="background:#EC4899;" title="Rose Pink (#EC4899)"></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bfx-grid-2">
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="VisualPreset">Default Visual Preset</label>
+                                        <select is="emby-select" id="VisualPreset" class="emby-select-withcolor emby-select">
+                                            <option value="netflix">Netflix Classic (#141414)</option>
+                                            <option value="oled">OLED Pure Black (#000000)</option>
+                                            <option value="glass">Cinema Frosted Glass</option>
+                                            <option value="midnight">Prime Midnight Slate</option>
+                                        </select>
+                                        <div class="fieldDescription">Server default theme (profiles can override their own in Settings).</div>
+                                    </div>
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="CardDensity">Default Poster Card Size</label>
+                                        <select is="emby-select" id="CardDensity" class="emby-select-withcolor emby-select">
+                                            <option value="compact">Compact (More titles per row)</option>
+                                            <option value="standard">Standard (Balanced)</option>
+                                            <option value="large">Large (Cinema showcase)</option>
+                                        </select>
+                                        <div class="fieldDescription">Default poster and wide card size across Home and browse carousels.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="StreamFlixHomeDetailsWrap">
+                            <div class="bfx-subbox">
+                                <div class="bfx-subbox-title">Navigation Bar &amp; Home Screen Rows</div>
+                                <div style="margin-bottom:12px;">
+                                    <div class="inputLabel" style="margin-bottom:4px;">Built-in navigation items</div>
+                                    <div class="bfx-libs-grid" id="StreamFlixNavBuiltInsList">
+                                        <label class="bfx-lib-chip" style="opacity:.72;cursor:default;">
+                                            <input type="checkbox" checked disabled />
+                                            <span>Home</span>
+                                            <span class="bfx-lib-type">PINNED</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="series" checked />
+                                            <span>Shows</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="movies" checked />
+                                            <span>Movies</span>
+                                        </label>
+                                        <label class="bfx-lib-chip hide" id="StreamFlixNavLiveTvChip">
+                                            <input type="checkbox" data-nav-builtin="livetv" checked />
+                                            <span>Live TV</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="hot" checked />
+                                            <span>New &amp; Popular</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="collections" checked />
+                                            <span>Collections</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="top10" checked />
+                                            <span>Top 10</span>
+                                        </label>
+                                        <label class="bfx-lib-chip">
+                                            <input type="checkbox" data-nav-builtin="mylist" checked />
+                                            <span>My List</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 6px;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="ShowLibrariesInNav" name="ShowLibrariesInNav" type="checkbox" is="emby-checkbox" checked />
+                                        <span>Show Jellyfin media libraries in navigation bar</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Surfaces configured Jellyfin libraries (e.g. Anime, Documentaries) as dedicated tabs while honoring per-user permissions.</div>
+                                </div>
+
+                                <div id="StreamFlixNavLibrariesWrap" style="margin-top:6px;">
+                                    <div class="inputLabel" style="margin-bottom:4px;">Visible Jellyfin libraries</div>
+                                    <div class="bfx-libs-grid" id="StreamFlixNavLibrariesList">
+                                        <div class="bfx-empty">Loading libraries…</div>
+                                    </div>
+                                </div>
+
+                                <details class="bfx-details" id="HomeRowsCollapseDetails" style="margin-top:14px;">
+                                    <summary>
+                                        <span>Home Page Row Order &amp; Visibility (12 sections)</span>
+                                        <span class="bfx-pill" id="HomeRowsCustomPill">Default Order</span>
+                                    </summary>
+                                    <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <div class="fieldDescription" style="margin:0;">Reorder or hide default rows on the StreamFlix Home screen (individual profiles can also customize their own order).</div>
+                                        <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixResetHomeRowsBtn">Reset Default Order</button>
+                                    </div>
+                                    <div id="StreamFlixHomeRowsEditor" style="display:flex; flex-direction:column; gap:6px;"></div>
+                                </details>
+                            </div>
+
+                            <div class="bfx-subbox">
+                                <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div class="bfx-subbox-title" style="margin:0;">Hero Billboard &amp; Top 10</div>
+                                    <span class="bfx-pill ok" id="HeroTrailerStatusPill">Trailers Active</span>
+                                </div>
+
+                                <div class="bfx-grid-2" style="margin-bottom:10px;">
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="HeroSelectionMode">Hero billboard featured selection</label>
+                                        <select id="HeroSelectionMode" name="HeroSelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
+                                            <option value="recent">Recently Added &amp; New Releases</option>
+                                            <option value="top10">Top 10 Lineup</option>
+                                            <option value="top_rated">Highest Community Rated</option>
+                                            <option value="random">Randomized Library Spotlight</option>
+                                        </select>
+                                    </div>
+                                    <div class="selectContainer" style="margin:0;">
+                                        <label class="selectLabel" for="Top10SelectionMode">Top 10 ranking logic</label>
+                                        <select id="Top10SelectionMode" name="Top10SelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
+                                            <option value="most_played">Server-Wide Most Popular (Plays &amp; Viewers)</option>
+                                            <option value="community_rating">Highest Community Rating (IMDb / TMDb)</option>
+                                            <option value="recently_added">Recently Added to Library</option>
+                                            <option value="daily_random">Daily Spotlight (Seeded Daily Random)</option>
+                                            <option value="session_random">Session Shuffle (Fresh Each Visit)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="EnableHeroTrailerPreview" name="EnableHeroTrailerPreview" type="checkbox" is="emby-checkbox" checked />
+                                        <span>Autoplay muted ~3s YouTube trailer previews on Hero Billboard</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Smoothly crossfades into a brief YouTube trailer teaser on the featured Hero slide, plus a full-length <strong>Trailer</strong> button inside Detail Modals.</div>
+                                </div>
+
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="ShowHeroAdvanced" type="checkbox" is="emby-checkbox" />
+                                        <span>Customize hero media filter, slide count, rotation speed &amp; source libraries</span>
+                                    </label>
+                                </div>
+
+                                <div class="bfx-collapse-body hide" id="HeroAdvancedBody">
+                                    <div class="bfx-grid-2">
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="HeroContentType">Hero billboard media type</label>
+                                            <select id="HeroContentType" name="HeroContentType" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="all">Movies &amp; TV Series</option>
+                                                <option value="movies">Movies Only</option>
+                                                <option value="series">TV Series Only</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label class="inputLabel inputLabelUnfocused" for="HeroRotationSeconds">Auto-rotation interval (seconds)</label>
+                                            <input id="HeroRotationSeconds" name="HeroRotationSeconds" type="number" min="0" max="120" step="1" is="emby-input" />
+                                            <div class="fieldDescription">Set to <strong>0</strong> to disable auto-rotation. Default: 9s.</div>
+                                        </div>
+
+                                        <div class="inputContainer">
+                                            <label class="inputLabel inputLabelUnfocused" for="HeroSlideCount">Number of hero slides (1–15)</label>
+                                            <input id="HeroSlideCount" name="HeroSlideCount" type="number" min="1" max="15" step="1" is="emby-input" />
+                                            <div class="fieldDescription">Maximum featured titles on the Home billboard. Default: 8.</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="margin-top:6px;">
+                                        <div class="inputLabel" style="margin-bottom:4px;">Hero billboard library filter (optional)</div>
+                                        <div class="fieldDescription">Leave all unchecked to include every Movie &amp; TV library, or pick specific libraries below.</div>
+                                        <div class="bfx-libs-grid" id="StreamFlixHeroLibrariesList">
+                                            <div class="bfx-empty">Loading libraries…</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bfx-subbox">
+                                <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div class="bfx-subbox-title" style="margin:0;">Title Details &amp; Video Player</div>
+                                    <span class="bfx-pill ok" id="DetailBadgesStatusPill">All Active</span>
+                                </div>
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="EnableRichDetailBadges" name="EnableRichDetailBadges" type="checkbox" is="emby-checkbox" checked />
+                                        <span>Show technical quality badges in Detail Modals (<code>4K</code>, <code>HDR10</code>, <code>Dolby Vision</code>, <code>Atmos</code>, <code>5.1</code>/<code>7.1</code>)</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Displays monochrome video/audio spec tags, critic scores, and studio metadata inside Title Detail Modals.</div>
+                                </div>
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="EnableSkipIntro" name="EnableSkipIntro" type="checkbox" is="emby-checkbox" checked />
+                                        <span>Enable Skip Intro / Recap / Credits pill (MediaSegments, Intro Skipper plugin &amp; chapters)</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Shows an animated glass Skip pill with countdown and <code>S</code> shortcut whenever segment markers are available.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Sign-In & SSO -->
+                    <div class="bfx-section bfx-tab-hidden" data-cfg-section="signin">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Sign-In &amp; Household Authentication</h3>
+                                <div class="fieldDescription">Household sign-in unlocks "Who's watching?". Enable one or more sign-in providers — setup fields appear automatically when enabled.</div>
+                            </div>
                         </div>
 
                         <div id="StreamFlixGateMethodsWrap">
-                            <div class="bfx-subbox-title" style="margin:14px 0 4px;">Sign-In Methods</div>
+                            <div class="bfx-group-kicker" style="margin-top:4px;">Sign-In Providers</div>
                             <div class="bfx-method-stack">
                                 <!-- Method 1: Google Sign-In -->
                                 <div class="bfx-method-card" id="GoogleMethodCard">
@@ -434,32 +650,11 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <!-- Method 4: Admin-Only Sign-In Fallback -->
-                                <div class="bfx-method-card" id="AdminFallbackMethodCard">
-                                    <div class="bfx-method-top">
-                                        <div class="checkboxContainer checkboxContainer-withDescription">
-                                            <label class="emby-checkbox-label">
-                                                <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
-                                                <span>Admin-Only Password Fallback Link</span>
-                                            </label>
-                                            <div class="fieldDescription checkboxFieldDescription">Adds a subtle <em>Admin Sign-In</em> link on SSO screens that strictly rejects non-administrator Jellyfin accounts.</div>
-                                        </div>
-                                        <span class="bfx-pill" id="AdminFallbackCardPill">Off</span>
-                                    </div>
-
-                                    <div class="bfx-method-body hide" id="AdminFallbackConfigBody">
-                                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
-                                            <label class="emby-checkbox-label">
-                                                <input id="AdminFallbackLanOnly" name="AdminFallbackLanOnly" type="checkbox" is="emby-checkbox" />
-                                                <span>Restrict "Admin Sign-In" to local network (LAN) IPs only</span>
-                                            </label>
-                                            <div class="fieldDescription checkboxFieldDescription">Hides and blocks the Admin Sign-In fallback when connecting from external WAN addresses.</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Method 5: Local LAN Bypass -->
+                            <div class="bfx-group-kicker">Network Rules &amp; Admin Fallback</div>
+                            <div class="bfx-method-stack">
+                                <!-- Method 4: Local LAN Bypass -->
                                 <div class="bfx-method-card" id="LanBypassMethodCard">
                                     <div class="bfx-method-top">
                                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -486,6 +681,30 @@
                                         <div class="fieldDescription checkboxFieldDescription">Recognizes Tailscale CGNAT addresses as trusted private LAN traffic for Server Admin LAN-only rules, LAN sign-in bypass, and Jellyfin Dashboard access.</div>
                                     </div>
                                 </div>
+
+                                <!-- Method 5: Admin-Only Sign-In Fallback -->
+                                <div class="bfx-method-card" id="AdminFallbackMethodCard">
+                                    <div class="bfx-method-top">
+                                        <div class="checkboxContainer checkboxContainer-withDescription">
+                                            <label class="emby-checkbox-label">
+                                                <input id="AllowAdminFallbackLogin" name="AllowAdminFallbackLogin" type="checkbox" is="emby-checkbox" />
+                                                <span>Admin-Only Password Fallback Link</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Adds a subtle <em>Admin Sign-In</em> link on SSO screens that strictly rejects non-administrator Jellyfin accounts.</div>
+                                        </div>
+                                        <span class="bfx-pill" id="AdminFallbackCardPill">Off</span>
+                                    </div>
+
+                                    <div class="bfx-method-body hide" id="AdminFallbackConfigBody">
+                                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0;">
+                                            <label class="emby-checkbox-label">
+                                                <input id="AdminFallbackLanOnly" name="AdminFallbackLanOnly" type="checkbox" is="emby-checkbox" />
+                                                <span>Restrict "Admin Sign-In" to local network (LAN) IPs only</span>
+                                            </label>
+                                            <div class="fieldDescription checkboxFieldDescription">Hides and blocks the Admin Sign-In fallback when connecting from external WAN addresses.</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="bfx-callout hide" id="StreamFlixNoAuthMethodWarning">
@@ -499,15 +718,176 @@
                                     <div class="fieldDescription">Household session duration per device (1–365 days).</div>
                                 </div>
                                 <div class="bfx-row">
-                                    <button type="button" class="bfx-btn" data-jump-tab="devices">Manage active devices →</button>
-                                    <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">⚠ Sign out all devices</button>
+                                    <button type="button" class="bfx-btn" data-jump-tab="devices">Manage Active Devices →</button>
+                                    <button type="button" class="bfx-btn bfx-btn-danger" id="StreamFlixRevokeAllBtn">Sign Out All Devices</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 3. Active Devices & Sessions (Dedicated Tab & Section) -->
-                    <div class="bfx-section" id="StreamFlixDevicesSection" data-cfg-section="devices">
+                    <!-- 4. Features, Guest Passes & Media Requests -->
+                    <div class="bfx-section bfx-tab-hidden" data-cfg-section="features">
+                        <div class="bfx-section-head">
+                            <div>
+                                <h3>Features, Guest Passes &amp; Media Requests</h3>
+                                <div class="fieldDescription">Manage optional Watch Together rooms, Live TV, temporary QR Guest Passes, and Seerr / Jellyseerr requests.</div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox">
+                            <div class="bfx-subbox-title">Playback &amp; Broadcast Features</div>
+                            <div class="bfx-row" style="justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:0; flex:1; min-width:220px;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="EnableWatchTogether" name="EnableWatchTogether" type="checkbox" is="emby-checkbox" />
+                                        <span>Enable Watch Together (synced watch parties)</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Adds Watch Together rooms, title/player actions, and 1-click invite links powered by SyncPlay (hidden in Kids mode).</div>
+                                </div>
+                                <span class="bfx-pill ok" id="WatchTogetherStatusPill">Enabled</span>
+                            </div>
+
+                            <div class="bfx-row" style="justify-content:space-between; align-items:flex-start; padding-top:10px; border-top:1px solid rgba(255,255,255,.07);">
+                                <div class="checkboxContainer checkboxContainer-withDescription" style="margin:0; flex:1; min-width:220px;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="EnableLiveTv" name="EnableLiveTv" type="checkbox" is="emby-checkbox" />
+                                        <span>Enable Live TV in StreamFlix (off by default)</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Adds a Live TV hub with On Now programs, inline 3-hour TV Guide timeline, and 1-click DVR recording for permitted users.</div>
+                                </div>
+                                <span class="bfx-pill" id="LiveTvStatusPill">Off</span>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" id="StreamFlixGuestPassesSection">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <div class="bfx-subbox-title" style="margin:0;">Temporary Guest Passes</div>
+                                <span class="bfx-pill" id="GuestPassesSectionPill">Enabled</span>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableGuestPasses" name="EnableGuestPasses" type="checkbox" is="emby-checkbox" />
+                                    <span>Enable Temporary Guest Passes &amp; QR invites</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Share an expiring invite link or locally generated QR code locked to one non-admin profile — revocable in one click.</div>
+                            </div>
+
+                            <div class="bfx-collapse-body hide" id="GuestPassesConfigBody">
+                                <div style="margin:0 0 14px;">
+                                    <div class="inputLabel" style="margin-bottom:4px;">Allowed Guest Pass Managers</div>
+                                    <div class="fieldDescription" style="margin-bottom:8px;">Admins can always manage Guest Passes. Select any adult household profiles that may also create and revoke passes.</div>
+                                    <div class="bfx-libs-grid" id="GuestPassManagerProfiles">
+                                        <div class="bfx-empty">Loading profiles…</div>
+                                    </div>
+                                </div>
+
+                                <div style="padding-top:12px; border-top:1px solid rgba(255,255,255,.07); margin-bottom:14px;">
+                                    <div class="inputLabel" style="margin-bottom:8px;">Create New Guest Pass</div>
+                                    <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
+                                        Create at least one non-administrator viewer profile in <strong>Profiles</strong> before issuing a Guest Pass.
+                                    </div>
+                                    <div class="bfx-grid-4">
+                                        <div class="inputContainer" style="margin:0;">
+                                            <label class="inputLabel inputLabelUnfocused" for="GuestPassLabel">Pass label (optional)</label>
+                                            <input id="GuestPassLabel" type="text" maxlength="48" is="emby-input" autocomplete="off" placeholder="Weekend Guest" />
+                                        </div>
+                                        <div class="selectContainer" style="margin:0;">
+                                            <label class="selectLabel" for="GuestPassProfileId">Assigned non-admin profile</label>
+                                            <select id="GuestPassProfileId" is="emby-select" class="emby-select-withcolor emby-select"></select>
+                                        </div>
+                                        <div class="selectContainer" style="margin:0;">
+                                            <label class="selectLabel" for="GuestPassDurationHours">Expires after</label>
+                                            <select id="GuestPassDurationHours" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="4">4 hours</option>
+                                                <option value="12">12 hours</option>
+                                                <option value="24" selected>24 hours (1 day)</option>
+                                                <option value="48">48 hours (Weekend)</option>
+                                                <option value="72">3 days</option>
+                                                <option value="168">7 days (1 week)</option>
+                                                <option value="336">14 days (2 weeks)</option>
+                                            </select>
+                                        </div>
+                                        <div class="selectContainer" style="margin:0;">
+                                            <label class="selectLabel" for="GuestPassMaxRedemptions">Device / redemption cap</label>
+                                            <select id="GuestPassMaxRedemptions" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="1">1 device / browser</option>
+                                                <option value="2" selected>Up to 2 devices</option>
+                                                <option value="4">Up to 4 devices</option>
+                                                <option value="10">Up to 10 devices</option>
+                                                <option value="0">Unlimited until expiry</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="bfx-row" style="margin-top:12px;">
+                                        <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixCreateGuestPassBtn">+ Generate Guest Pass &amp; QR</button>
+                                        <span class="fieldDescription" style="margin:0;">QR codes are rendered 100% locally on your Jellyfin server.</span>
+                                    </div>
+                                </div>
+
+                                <div class="bfx-passes" id="StreamFlixGuestPassesList">
+                                    <div class="bfx-empty">No Guest Passes created yet.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bfx-subbox" id="StreamFlixSeerrSection">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <div class="bfx-row" style="gap:8px;">
+                                    <div class="bfx-subbox-title" style="margin:0;">Seerr / Jellyseerr Media Requests</div>
+                                    <span class="bfx-pill" id="SeerrSectionPill">Off</span>
+                                </div>
+                                <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixTestSeerrBtn">✓ Test Seerr Connection</button>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
+                                <label class="emby-checkbox-label">
+                                    <input id="EnableSeerr" name="EnableSeerr" type="checkbox" is="emby-checkbox" />
+                                    <span>Enable Seerr / Jellyseerr / Overseerr requests in Search</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">Proxies requests securely through your Jellyfin server so your Seerr API key is never exposed to browsers.</div>
+                            </div>
+
+                            <div class="bfx-collapse-body hide" id="SeerrConfigBody">
+                                <div class="bfx-oauth-results hide" id="StreamFlixSeerrTestResult" role="status" aria-live="polite" style="margin:0 0 14px;"></div>
+
+                                <div class="bfx-grid-2">
+                                    <div class="inputContainer">
+                                        <label class="inputLabel inputLabelUnfocused" for="SeerrUrl">Seerr / Jellyseerr URL</label>
+                                        <input id="SeerrUrl" name="SeerrUrl" type="text" is="emby-input" autocomplete="off" placeholder="http://localhost:5055" />
+                                        <div class="fieldDescription">URL reachable from the Jellyfin Server host/container (e.g. <code>http://jellyseerr:5055</code>).</div>
+                                    </div>
+
+                                    <div class="inputContainer">
+                                        <label class="inputLabel inputLabelUnfocused" for="SeerrApiKey">Seerr API Key (Settings → General)</label>
+                                        <div class="bfx-secret-row">
+                                            <input id="SeerrApiKey" name="SeerrApiKey" type="password" is="emby-input" autocomplete="new-password" placeholder="Paste X-Api-Key" />
+                                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearSeerrApiKeyBtn">Clear</button>
+                                        </div>
+                                        <div class="bfx-secret-status hide" id="SeerrApiKeySavedHint">✓ API key stored securely on server (leave blank to keep current key)</div>
+                                    </div>
+                                </div>
+
+                                <div class="checkboxContainer checkboxContainer-withDescription">
+                                    <label class="emby-checkbox-label">
+                                        <input id="SeerrAllowKids" name="SeerrAllowKids" type="checkbox" is="emby-checkbox" />
+                                        <span>Allow Kids profiles to search &amp; submit media requests</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Off by default. Filters out adult and Horror/Crime TMDB genres automatically when enabled.</div>
+                                </div>
+
+                                <div class="checkboxContainer checkboxContainer-withDescription" id="SeerrAllowGuestsRow" style="margin-bottom:0;">
+                                    <label class="emby-checkbox-label">
+                                        <input id="SeerrAllowGuests" name="SeerrAllowGuests" type="checkbox" is="emby-checkbox" />
+                                        <span>Allow Temporary Guest Pass viewers to submit media requests</span>
+                                    </label>
+                                    <div class="fieldDescription checkboxFieldDescription">Off by default so guests can watch your existing library without queuing downloads unless permitted.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Active Devices & Sessions -->
+                    <div class="bfx-section bfx-tab-hidden" id="StreamFlixDevicesSection" data-cfg-section="devices">
                         <div class="bfx-section-head" style="margin-bottom:6px;">
                             <div>
                                 <h3>Active Devices &amp; Sessions <span class="bfx-pill" id="StreamFlixDevicesCountPill">0 signed in</span></h3>
@@ -523,7 +903,7 @@
                             </div>
                             <div class="bfx-row">
                                 <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixRefreshDevicesBtn">↻ Refresh</button>
-                                <button type="button" class="bfx-btn bfx-btn-sm bfx-btn-danger" id="StreamFlixDevicesRevokeAllBtn">⚠ Sign out all devices</button>
+                                <button type="button" class="bfx-btn bfx-btn-sm bfx-btn-danger" id="StreamFlixDevicesRevokeAllBtn">Sign Out All Devices</button>
                             </div>
                         </div>
 
@@ -532,351 +912,37 @@
                         </div>
                     </div>
 
-                    <!-- 4. Temporary Guest Passes (Toggleable) -->
-                    <div class="bfx-section" id="StreamFlixGuestPassesSection" data-cfg-section="guests">
-                        <div class="bfx-section-head" style="margin-bottom:6px;">
-                            <div>
-                                <h3>Temporary Guest Passes <span class="bfx-pill" id="GuestPassesSectionPill">Enabled</span></h3>
-                                <div class="fieldDescription">Share an expiring invite link or locally generated QR code locked to one non-admin profile — revocable in one click.</div>
-                            </div>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
-                            <label class="emby-checkbox-label">
-                                <input id="EnableGuestPasses" name="EnableGuestPasses" type="checkbox" is="emby-checkbox" />
-                                <span>Enable Temporary Guest Passes</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Turn off to hide Guest Passes from the Sign-In screen and account menu and block all Guest Pass redemptions &amp; sessions.</div>
-                        </div>
-
-                        <div class="bfx-collapse-body hide" id="GuestPassesConfigBody">
-                            <div class="bfx-subbox" style="margin:0 0 14px;">
-                                <div class="bfx-subbox-title">Guest Pass Managers</div>
-                                <div class="fieldDescription" style="margin-bottom:8px;">Administrator profiles can always create, view, and revoke Guest Passes. Select any adult household profiles below that should also be allowed to manage Guest Passes (Kids profiles are never eligible).</div>
-                                <div class="bfx-libs-grid" id="GuestPassManagerProfiles">
-                                    <div class="bfx-empty">Loading profiles…</div>
-                                </div>
-                            </div>
-
-                            <div class="bfx-subbox" style="margin-top:0;">
-                                <div class="bfx-subbox-title">Create New Guest Pass</div>
-                                <div class="bfx-callout hide" id="StreamFlixNoGuestProfilesHint">
-                                    Create at least one non-administrator viewer profile in <strong>Manage profiles</strong> above before issuing a Guest Pass.
-                                </div>
-                                <div class="bfx-grid-4">
-                                    <div class="inputContainer" style="margin:0;">
-                                        <label class="inputLabel inputLabelUnfocused" for="GuestPassLabel">Pass label (optional)</label>
-                                        <input id="GuestPassLabel" type="text" maxlength="48" is="emby-input" autocomplete="off" placeholder="Weekend Guest" />
-                                    </div>
-                                    <div class="selectContainer" style="margin:0;">
-                                        <label class="selectLabel" for="GuestPassProfileId">Assigned non-admin profile</label>
-                                        <select id="GuestPassProfileId" is="emby-select" class="emby-select-withcolor emby-select"></select>
-                                    </div>
-                                    <div class="selectContainer" style="margin:0;">
-                                        <label class="selectLabel" for="GuestPassDurationHours">Expires after</label>
-                                        <select id="GuestPassDurationHours" is="emby-select" class="emby-select-withcolor emby-select">
-                                            <option value="4">4 hours</option>
-                                            <option value="12">12 hours</option>
-                                            <option value="24" selected>24 hours (1 day)</option>
-                                            <option value="48">48 hours (Weekend)</option>
-                                            <option value="72">3 days</option>
-                                            <option value="168">7 days (1 week)</option>
-                                            <option value="336">14 days (2 weeks)</option>
-                                        </select>
-                                    </div>
-                                    <div class="selectContainer" style="margin:0;">
-                                        <label class="selectLabel" for="GuestPassMaxRedemptions">Device / redemption cap</label>
-                                        <select id="GuestPassMaxRedemptions" is="emby-select" class="emby-select-withcolor emby-select">
-                                            <option value="1">1 device / browser</option>
-                                            <option value="2" selected>Up to 2 devices</option>
-                                            <option value="4">Up to 4 devices</option>
-                                            <option value="10">Up to 10 devices</option>
-                                            <option value="0">Unlimited until expiry</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="bfx-row" style="margin-top:12px;">
-                                    <button type="button" class="bfx-btn bfx-btn-red" id="StreamFlixCreateGuestPassBtn">+ Generate Guest Pass &amp; QR</button>
-                                    <span class="fieldDescription" style="margin:0;">QR codes are rendered 100% locally on your Jellyfin server.</span>
-                                </div>
-                            </div>
-
-                            <div class="bfx-passes" id="StreamFlixGuestPassesList">
-                                <div class="bfx-empty">No Guest Passes created yet.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 5. Home, Navigation, Hero Billboard & Top 10 -->
-                    <div class="bfx-section" id="StreamFlixHomeSection" data-cfg-section="home">
+                    <!-- 6. System Diagnostics & Configuration Backup -->
+                    <div class="bfx-section bfx-tab-hidden" id="StreamFlixSystemSection" data-cfg-section="system">
                         <div class="bfx-section-head">
                             <div>
-                                <h3>Home, Navigation &amp; Hero Billboard</h3>
-                                <div class="fieldDescription">Customize the top navigation bar, Jellyfin library pills, featured billboard slides, and <strong>#1–#10</strong> ranking.</div>
+                                <h3>System Diagnostics &amp; Backup</h3>
+                                <div class="fieldDescription">Run automated configuration health checks or export/restore your StreamFlix server setup.</div>
                             </div>
                         </div>
 
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-subbox-title">Top Navigation Bar</div>
-                            <div class="fieldDescription" style="margin-bottom:8px;">Select which built-in categories and Jellyfin media libraries appear in the top-left navigation bar (and phone navigation). Per-user Jellyfin library permissions are always respected.</div>
-
-                            <div style="margin-bottom:12px;">
-                                <div class="inputLabel" style="margin-bottom:4px;">Built-in navigation items</div>
-                                <div class="bfx-libs-grid" id="StreamFlixNavBuiltInsList">
-                                    <label class="bfx-lib-chip" style="opacity:.72;cursor:default;">
-                                        <input type="checkbox" checked disabled />
-                                        <span>Home</span>
-                                        <span class="bfx-lib-type">PINNED</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="series" checked />
-                                        <span>Shows</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="movies" checked />
-                                        <span>Movies</span>
-                                    </label>
-                                    <label class="bfx-lib-chip hide" id="StreamFlixNavLiveTvChip">
-                                        <input type="checkbox" data-nav-builtin="livetv" checked />
-                                        <span>Live TV</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="hot" checked />
-                                        <span>New &amp; Popular</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="collections" checked />
-                                        <span>Collections</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="top10" checked />
-                                        <span>Top 10</span>
-                                    </label>
-                                    <label class="bfx-lib-chip">
-                                        <input type="checkbox" data-nav-builtin="mylist" checked />
-                                        <span>My List</span>
-                                    </label>
+                        <div class="bfx-subbox">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; gap:12px;">
+                                <div style="flex:1; min-width:220px;">
+                                    <div class="bfx-subbox-title" style="margin:0 0 4px;">8-Point Configuration &amp; Proxy Health Check</div>
+                                    <div class="fieldDescription" style="margin:0;">Checks reverse-proxy HTTPS headers, OAuth/OIDC readiness, profile-to-Jellyfin user links, Admin PIN safety, and Seerr connectivity.</div>
                                 </div>
+                                <button type="button" class="bfx-btn" id="StreamFlixHealthCheckBtn">Run Health Check</button>
                             </div>
+                            <div class="bfx-oauth-results hide" id="StreamFlixHealthCheckPanel" role="status" aria-live="polite" style="margin:12px 0 0;"></div>
+                        </div>
 
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 6px;">
-                                <label class="emby-checkbox-label">
-                                    <input id="ShowLibrariesInNav" name="ShowLibrariesInNav" type="checkbox" is="emby-checkbox" checked />
-                                    <span>Show Jellyfin media libraries in navigation bar</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Surfaces configured Jellyfin libraries (e.g. Anime, Anime Movies, Documentaries) as dedicated navigation tabs.</div>
-                            </div>
-
-                            <div id="StreamFlixNavLibrariesWrap" style="margin-top:6px;">
-                                <div class="inputLabel" style="margin-bottom:4px;">Visible Jellyfin libraries</div>
-                                <div class="fieldDescription">Choose which Jellyfin libraries appear in the top bar (only shown to users granted access to each library).</div>
-                                <div class="bfx-libs-grid" id="StreamFlixNavLibrariesList">
-                                    <div class="bfx-empty">Loading libraries…</div>
+                        <div class="bfx-subbox">
+                            <div class="bfx-row" style="justify-content:space-between; align-items:center; gap:12px;">
+                                <div style="flex:1; min-width:220px;">
+                                    <div class="bfx-subbox-title" style="margin:0 0 4px;">Configuration &amp; Profiles Backup (JSON)</div>
+                                    <div class="fieldDescription" style="margin:0;">Export or restore settings, Home layout, and Household Profiles. Server OAuth/OIDC/Seerr secrets are never exported in plaintext and remain preserved on import.</div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                <div class="bfx-subbox-title" style="margin:0;">Live TV Compatibility</div>
-                                <span class="bfx-pill" id="LiveTvStatusPill">Off</span>
-                            </div>
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="EnableLiveTv" name="EnableLiveTv" type="checkbox" is="emby-checkbox" />
-                                    <span>Enable Live TV in StreamFlix (off by default)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Adds a <strong>Live TV</strong> tab to the top navigation bar with live channels, On Now programs, inline 3-hour TV Guide timeline, 1-click DVR recording, and Live TV channel search. Respects each Jellyfin user's Live TV access permission and stays hidden in Kids mode.</div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                <div class="bfx-subbox-title" style="margin:0;">YouTube Hero Trailer Previews</div>
-                                <span class="bfx-pill ok" id="HeroTrailerStatusPill">Active</span>
-                            </div>
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="EnableHeroTrailerPreview" name="EnableHeroTrailerPreview" type="checkbox" is="emby-checkbox" checked />
-                                    <span>Autoplay muted YouTube trailer previews on Hero Billboard</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">After resting on a featured Hero Billboard slide (~1.5s), smoothly crossfades into a brief ~3-second official YouTube trailer teaser (resolved from Jellyfin <code>RemoteTrailers</code> or verified YouTube Official Trailer search) with a live Mute / Unmute button, plus a full-length on-demand <strong>Trailer</strong> button inside every Detail Modal.</div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                <div class="bfx-subbox-title" style="margin:0;">Rich Detail Quality Badges &amp; Skip Intro Pill</div>
-                                <span class="bfx-pill ok" id="DetailBadgesStatusPill">Enabled</span>
-                            </div>
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="EnableRichDetailBadges" name="EnableRichDetailBadges" type="checkbox" is="emby-checkbox" checked />
-                                    <span>Show rich quality badges in Detail Modals (<code>4K</code>, <code>HDR10</code>, <code>Dolby Vision</code>, <code>Atmos</code>, <code>5.1</code>/<code>7.1</code> &amp; Studio chips)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Automatically inspects Jellyfin <code>MediaStreams</code> to display crisp technical video/audio badges, critic scores, and studio tags inside Title Detail Modals. Uncheck for a minimal metadata row.</div>
-                            </div>
-                            <div class="checkboxContainer checkboxContainer-withDescription" style="margin:10px 0 0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="EnableSkipIntro" name="EnableSkipIntro" type="checkbox" is="emby-checkbox" checked />
-                                    <span>Enable Skip Intro / Recap / Credits pill (MediaSegments, Intro Skipper plugin &amp; chapters)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Displays an animated glass <strong>Skip Intro</strong> / <strong>Skip Recap</strong> / <strong>Skip Credits</strong> pill with live segment countdown and <code>S</code> shortcut during playback whenever Jellyfin 10.10+/12 MediaSegments, the Intro Skipper plugin, or chapter markers are present.</div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-subbox-title" style="margin:0 0 8px;">Default Visual Preset &amp; Card Density</div>
-                            <div class="bfx-grid-2">
-                                <div class="selectContainer" style="margin:0;">
-                                    <label class="selectLabel" for="VisualPreset">Server Visual Preset</label>
-                                    <select is="emby-select" id="VisualPreset" class="emby-select-withcolor emby-select">
-                                        <option value="netflix">Netflix Classic (#141414)</option>
-                                        <option value="oled">OLED Pure Black (#000000)</option>
-                                        <option value="glass">Cinema Frosted Glass</option>
-                                        <option value="midnight">Prime Midnight Slate</option>
-                                    </select>
-                                    <div class="fieldDescription">Default theme across profiles (individual profiles can also override their own theme &amp; card size).</div>
+                                <div class="bfx-row">
+                                    <button type="button" class="bfx-btn" id="StreamFlixExportBackupBtn">Export JSON</button>
+                                    <button type="button" class="bfx-btn" id="StreamFlixImportBackupBtn">Import JSON</button>
+                                    <input type="file" id="StreamFlixImportFileInput" accept=".json,application/json" class="hide" />
                                 </div>
-                                <div class="selectContainer" style="margin:0;">
-                                    <label class="selectLabel" for="CardDensity">Default Poster Card Size</label>
-                                    <select is="emby-select" id="CardDensity" class="emby-select-withcolor emby-select">
-                                        <option value="compact">Compact (More titles per row)</option>
-                                        <option value="standard">Standard (Balanced)</option>
-                                        <option value="large">Large (Cinema showcase)</option>
-                                    </select>
-                                    <div class="fieldDescription">Controls default poster and wide carousel card dimensions on Home and browse rows.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bfx-subbox" style="margin:0 0 16px;">
-                            <div class="bfx-row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <div>
-                                    <div class="bfx-subbox-title" style="margin:0;">Home Page Row Order &amp; Visibility</div>
-                                    <div class="fieldDescription">Reorder or hide sections on the StreamFlix Home screen across your server (profiles can also personalize their own order).</div>
-                                </div>
-                                <button type="button" class="bfx-btn bfx-btn-sm" id="StreamFlixResetHomeRowsBtn">Reset Default Order</button>
-                            </div>
-                            <div id="StreamFlixHomeRowsEditor" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
-                        </div>
-
-                        <div class="bfx-grid-2">
-                            <div class="selectContainer" style="margin-bottom:8px;">
-                                <label class="selectLabel" for="Top10SelectionMode">Top 10 ranking logic</label>
-                                <select id="Top10SelectionMode" name="Top10SelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
-                                    <option value="most_played">Server-Wide Most Popular (Plays &amp; Viewers)</option>
-                                    <option value="community_rating">Highest Community Rating (IMDb / TMDb)</option>
-                                    <option value="recently_added">Recently Added to Library</option>
-                                    <option value="daily_random">Daily Spotlight (Seeded Daily Random)</option>
-                                    <option value="session_random">Session Shuffle (Fresh Each Visit)</option>
-                                </select>
-                            </div>
-
-                            <div class="selectContainer" style="margin-bottom:8px;">
-                                <label class="selectLabel" for="HeroSelectionMode">Hero billboard featured selection</label>
-                                <select id="HeroSelectionMode" name="HeroSelectionMode" is="emby-select" class="emby-select-withcolor emby-select">
-                                    <option value="recent">Recently Added &amp; New Releases</option>
-                                    <option value="top10">Top 10 Lineup</option>
-                                    <option value="top_rated">Highest Community Rated</option>
-                                    <option value="random">Randomized Library Spotlight</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:6px 0 0;">
-                            <label class="emby-checkbox-label">
-                                <input id="ShowHeroAdvanced" type="checkbox" is="emby-checkbox" />
-                                <span>Customize hero media filter, slide count, rotation speed &amp; source libraries</span>
-                            </label>
-                        </div>
-
-                        <div class="bfx-collapse-body hide" id="HeroAdvancedBody">
-                            <div class="bfx-grid-2">
-                                <div class="selectContainer">
-                                    <label class="selectLabel" for="HeroContentType">Hero billboard media type</label>
-                                    <select id="HeroContentType" name="HeroContentType" is="emby-select" class="emby-select-withcolor emby-select">
-                                        <option value="all">Movies &amp; TV Series</option>
-                                        <option value="movies">Movies Only</option>
-                                        <option value="series">TV Series Only</option>
-                                    </select>
-                                </div>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="HeroRotationSeconds">Auto-rotation interval (seconds)</label>
-                                    <input id="HeroRotationSeconds" name="HeroRotationSeconds" type="number" min="0" max="120" step="1" is="emby-input" />
-                                    <div class="fieldDescription">Set to <strong>0</strong> to disable auto-rotation. Default: 9s.</div>
-                                </div>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="HeroSlideCount">Number of hero slides (1–15)</label>
-                                    <input id="HeroSlideCount" name="HeroSlideCount" type="number" min="1" max="15" step="1" is="emby-input" />
-                                    <div class="fieldDescription">Maximum featured titles on the Home billboard. Default: 8.</div>
-                                </div>
-                            </div>
-
-                            <div style="margin-top:6px;">
-                                <div class="inputLabel" style="margin-bottom:4px;">Hero billboard library filter (optional)</div>
-                                <div class="fieldDescription">Leave all unchecked to include every Movie &amp; TV library, or pick specific libraries below.</div>
-                                <div class="bfx-libs-grid" id="StreamFlixHeroLibrariesList">
-                                    <div class="bfx-empty">Loading libraries…</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 6. Seerr / Jellyseerr Media Requests (Collapsed Until Enabled) -->
-                    <div class="bfx-section" id="StreamFlixSeerrSection" data-cfg-section="seerr">
-                        <div class="bfx-section-head" style="margin-bottom:6px;">
-                            <div>
-                                <h3>Seerr / Jellyseerr Media Requests <span class="bfx-pill" id="SeerrSectionPill">Off</span></h3>
-                                <div class="fieldDescription">Let household members search and request missing Movies &amp; TV Seasons right inside StreamFlix Live Search.</div>
-                            </div>
-                            <button type="button" class="bfx-btn bfx-btn-sm hide" id="StreamFlixTestSeerrBtn">✓ Test Seerr Connection</button>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin:8px 0 0;">
-                            <label class="emby-checkbox-label">
-                                <input id="EnableSeerr" name="EnableSeerr" type="checkbox" is="emby-checkbox" />
-                                <span>Enable Seerr / Jellyseerr / Overseerr requests in Search</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">Proxies requests securely through your Jellyfin server so your Seerr API key is never exposed to browsers.</div>
-                        </div>
-
-                        <div class="bfx-collapse-body hide" id="SeerrConfigBody">
-                            <div class="bfx-oauth-results hide" id="StreamFlixSeerrTestResult" role="status" aria-live="polite" style="margin:0 0 14px;"></div>
-
-                            <div class="bfx-grid-2">
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="SeerrUrl">Seerr / Jellyseerr URL</label>
-                                    <input id="SeerrUrl" name="SeerrUrl" type="text" is="emby-input" autocomplete="off" placeholder="http://localhost:5055" />
-                                    <div class="fieldDescription">URL reachable from the Jellyfin Server host/container (e.g. <code>http://jellyseerr:5055</code>).</div>
-                                </div>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="SeerrApiKey">Seerr API Key (Settings → General)</label>
-                                    <div class="bfx-secret-row">
-                                        <input id="SeerrApiKey" name="SeerrApiKey" type="password" is="emby-input" autocomplete="new-password" placeholder="Paste X-Api-Key" />
-                                        <button type="button" class="bfx-btn bfx-btn-sm hide" id="ClearSeerrApiKeyBtn">Clear</button>
-                                    </div>
-                                    <div class="bfx-secret-status hide" id="SeerrApiKeySavedHint">✓ API key stored securely on server (leave blank to keep current key)</div>
-                                </div>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="emby-checkbox-label">
-                                    <input id="SeerrAllowKids" name="SeerrAllowKids" type="checkbox" is="emby-checkbox" />
-                                    <span>Allow Kids profiles to search &amp; submit media requests</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Off by default. Filters out adult and Horror/Crime TMDB genres automatically when enabled.</div>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription" id="SeerrAllowGuestsRow" style="margin-bottom:0;">
-                                <label class="emby-checkbox-label">
-                                    <input id="SeerrAllowGuests" name="SeerrAllowGuests" type="checkbox" is="emby-checkbox" />
-                                    <span>Allow Temporary Guest Pass viewers to submit media requests</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">Off by default so guests can watch your existing library without queuing downloads unless permitted.</div>
                             </div>
                         </div>
                     </div>
@@ -927,7 +993,7 @@
                 var eligibleGuestProfiles = [];
                 var activeDevices = [];
                 var activeDeviceFilter = 'all';
-                var activeConfigTab = 'all';
+                var activeConfigTab = 'profiles';
                 var lastQrSharePayload = null;
                 var lastPublic = null;
                 var availableLibraries = [];
@@ -1101,8 +1167,10 @@
                 }
 
                 function setConfigTab(tabName) {
-                    var valid = ['all', 'profiles', 'signin', 'devices', 'guests', 'home', 'seerr'];
-                    var next = valid.indexOf(tabName) !== -1 ? tabName : 'all';
+                    var aliasMap = { guests: 'features', seerr: 'features', appearance: 'home', backup: 'system' };
+                    var mapped = aliasMap[tabName] || tabName;
+                    var valid = ['profiles', 'home', 'signin', 'features', 'devices', 'system', 'all'];
+                    var next = valid.indexOf(mapped) !== -1 ? mapped : 'profiles';
                     activeConfigTab = next;
 
                     Array.prototype.forEach.call(page.querySelectorAll('[data-cfg-tab]'), function (btn) {
@@ -1118,11 +1186,22 @@
 
                     var saveBar = $('#StreamFlixSaveBar');
                     if (saveBar) {
-                        saveBar.classList.toggle('bfx-tab-hidden', next === 'devices');
+                        saveBar.classList.toggle('bfx-tab-hidden', next === 'devices' || next === 'system');
                     }
 
                     if (next === 'devices') {
                         loadActiveDevices();
+                    }
+                    if (tabName === 'guests') {
+                        var gpBox = $('#StreamFlixGuestPassesSection');
+                        if (gpBox && typeof gpBox.scrollIntoView === 'function') {
+                            try { gpBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+                        }
+                    } else if (tabName === 'seerr') {
+                        var srBox = $('#StreamFlixSeerrSection');
+                        if (srBox && typeof srBox.scrollIntoView === 'function') {
+                            try { srBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+                        }
                     }
                 }
 
@@ -1132,7 +1211,7 @@
                     if (m && m[1]) {
                         setConfigTab(m[1].toLowerCase());
                     } else {
-                        setConfigTab(activeConfigTab || 'all');
+                        setConfigTab(activeConfigTab || 'profiles');
                     }
                 }
 
@@ -1476,7 +1555,10 @@
                     var enableSeerr = $('#EnableSeerr').checked;
 
                     $('#StreamFlixUiBrandingBox').classList.toggle('hide', !uiEnabled);
-                    $('#StreamFlixHomeSection').classList.toggle('hide', !uiEnabled);
+                    var homeDetailsWrap = $('#StreamFlixHomeDetailsWrap');
+                    if (homeDetailsWrap) {
+                        homeDetailsWrap.classList.toggle('hide', !uiEnabled);
+                    }
 
                     $('#GoogleMethodCard').classList.toggle('is-on', enableGoogle);
                     $('#GoogleConfigBody').classList.toggle('hide', !enableGoogle);
@@ -1522,14 +1604,16 @@
                     var adminLanOnly = $('#AdminFallbackLanOnly').checked;
                     var lanBypass = $('#BypassLoginGateOnLan').checked;
                     var enableGuestPasses = $('#EnableGuestPasses').checked;
+                    var enableWatchTogether = $('#EnableWatchTogether').checked;
                     var enableLiveTv = $('#EnableLiveTv').checked;
                     var enableHeroTrailer = $('#EnableHeroTrailerPreview').checked;
                     var enableRichBadges = $('#EnableRichDetailBadges').checked;
                     var enableSkipIntro = $('#EnableSkipIntro').checked;
                     var accounts = parseEmails($('#ApprovedGoogleEmails').value);
 
+                    setPill('WatchTogetherStatusPill', enableWatchTogether ? 'ok' : '', enableWatchTogether ? 'Enabled' : 'Off');
                     setPill('LiveTvStatusPill', enableLiveTv ? 'ok' : '', enableLiveTv ? 'Enabled' : 'Off');
-                    setPill('HeroTrailerStatusPill', enableHeroTrailer ? 'ok' : '', enableHeroTrailer ? 'Enabled' : 'Off');
+                    setPill('HeroTrailerStatusPill', enableHeroTrailer ? 'ok' : '', enableHeroTrailer ? 'Trailers Active' : 'Trailers Off');
                     setPill('DetailBadgesStatusPill', (enableRichBadges || enableSkipIntro) ? 'ok' : '', (enableRichBadges && enableSkipIntro) ? 'All Active' : (enableRichBadges ? 'Badges Only' : (enableSkipIntro ? 'Skip Pill Only' : 'Minimal')));
 
                     var enableSeerr = $('#EnableSeerr').checked;
@@ -2639,16 +2723,16 @@
                     var btn = $('#StreamFlixHealthCheckBtn');
                     var panel = $('#StreamFlixHealthCheckPanel');
                     btn.disabled = true;
-                    btn.textContent = '🩺 Checking…';
+                    btn.textContent = 'Checking…';
                     panel.classList.remove('hide');
                     panel.innerHTML = '<div class="bfx-oauth-summary">Running 8-point StreamFlix release health check…</div>';
                     streamflixApi('GET', 'AdminConfig/HealthCheck').then(function (res) {
                         btn.disabled = false;
-                        btn.textContent = '🩺 Health Check';
+                        btn.textContent = 'Run Health Check';
                         renderDiagnosticOutput(panel, res, 'Health check complete.');
                     }).catch(function (err) {
                         btn.disabled = false;
-                        btn.textContent = '🩺 Health Check';
+                        btn.textContent = 'Run Health Check';
                         panel.innerHTML = '<div class="bfx-oauth-summary"><span class="bfx-dot bad"></span><span>' + esc((err && err.message) || 'Health check failed.') + '</span></div>';
                     });
                 });
@@ -2738,6 +2822,7 @@
                     '#BypassLoginGateOnLan',
                     '#TreatTailscaleAsLocalLan',
                     '#EnableGuestPasses',
+                    '#EnableWatchTogether',
                     '#EnableLiveTv',
                     '#EnableHeroTrailerPreview',
                     '#EnableRichDetailBadges',
@@ -2860,6 +2945,9 @@
                             }
                         });
                     });
+                    var isDefaultRows = currentHomeRowOrder.join(',') === CANONICAL_HOME_ROWS.map(function (r) { return r.id; }).join(',')
+                        && Object.keys(currentHomeHiddenMap).length === 0;
+                    setPill('HomeRowsCustomPill', isDefaultRows ? '' : 'ok', isDefaultRows ? 'Default Order' : 'Customized');
                 }
 
                 function getHomeRowOrderForSave() {
@@ -2927,6 +3015,13 @@
                     $('#CardDensity').value = cfg.cardDensity || 'standard';
                     normalizeAdminHomeRowState(cfg.homeRowOrder, cfg.homeHiddenRows);
                     renderHomeRowsEditor();
+                    var hasCustomHomeRows = (Array.isArray(cfg.homeRowOrder) && cfg.homeRowOrder.length > 0)
+                        || (Array.isArray(cfg.homeHiddenRows) && cfg.homeHiddenRows.length > 0);
+                    var rowsDet = $('#HomeRowsCollapseDetails');
+                    if (rowsDet) {
+                        rowsDet.open = hasCustomHomeRows;
+                    }
+                    setPill('HomeRowsCustomPill', hasCustomHomeRows ? 'ok' : '', hasCustomHomeRows ? 'Customized' : 'Default Order');
                     $('#SessionLifetimeDays').value = cfg.sessionLifetimeDays > 0 ? cfg.sessionLifetimeDays : 30;
                     $('#Top10SelectionMode').value = cfg.top10SelectionMode || 'most_played';
                     $('#HeroSelectionMode').value = cfg.heroSelectionMode || 'recent';

@@ -1008,6 +1008,12 @@ console.log('[PASS] QtWebEngine CSS fallbacks, Flexbox gap polyfill, auto-closin
     assert.match(combinedJs, /\/LiveTv\/Timers\/Defaults\?programId=/, 'DVR recording must fetch Jellyfin /LiveTv/Timers/Defaults');
     assert.match(configHtml, /id="EnableHeroTrailerPreview"/, 'configPage.html must expose EnableHeroTrailerPreview toggle');
     assert.match(configHtml, /id="StreamFlixHomeRowsEditor"/, 'configPage.html must expose Home Page Row Order & Visibility editor');
+    assert.match(configHtml, /data-cfg-tab="profiles"/, 'configPage.html must expose organized Profiles tab');
+    assert.match(configHtml, /data-cfg-tab="home"[^>]*>Appearance &amp; Home</, 'configPage.html must expose organized Appearance & Home tab');
+    assert.match(configHtml, /data-cfg-tab="signin"/, 'configPage.html must expose organized Sign-In & SSO tab');
+    assert.match(configHtml, /data-cfg-tab="features"[^>]*>Features &amp; Requests</, 'configPage.html must expose organized Features & Requests tab');
+    assert.match(configHtml, /data-cfg-tab="devices"/, 'configPage.html must expose organized Active Devices tab');
+    assert.match(configHtml, /data-cfg-tab="system"[^>]*>System &amp; Backup</, 'configPage.html must expose organized System & Backup tab');
 
     console.log('[PASS] End-to-End VM YouTube Hero & Modal Trailers, Live TV EPG Timeline, DVR Record, Home Row Customizer & New & Popular Hub verified');
 
