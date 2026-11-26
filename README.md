@@ -2,7 +2,7 @@
 
 # StreamFlix for Jellyfin
 
-**A Netflix-style web UI, multi-auth household sign-in gate (Google OAuth, Custom OIDC, Jellyfin & QR Guest Passes), Dedicated Kids Mode, real-time synced Watch Together, liquid-glass mobile dock, native Seerr requests, and household profiles backed by real Jellyfin users.**
+**A Netflix-style web UI, multi-auth household sign-in gate (Google OAuth, Custom OIDC, Jellyfin & QR Guest Passes), Dedicated Kids Mode, real-time synced Watch Together, Skip Intro & Credits support, liquid-glass mobile dock, native Seerr requests, and household profiles backed by real Jellyfin users.**
 
 [![Release](https://img.shields.io/github/v/release/streamflix-dev/jellyfin-streamflix?style=flat-square&label=version&color=E50914)](https://github.com/streamflix-dev/jellyfin-streamflix/releases)
 [![Downloads](https://img.shields.io/github/downloads/streamflix-dev/jellyfin-streamflix/total?style=flat-square&label=downloads&color=46d369)](https://github.com/streamflix-dev/jellyfin-streamflix/releases)
@@ -254,8 +254,9 @@ Pushing code changes to `main` triggers [`.github/workflows/build-plugin.yml`](.
 
 ## Compatible Plugins
 
-StreamFlix works out of the box alongside supported third-party Jellyfin plugins (more integrations will be added over time):
+StreamFlix works out of the box alongside supported third-party Jellyfin plugins and native segment providers (more integrations will be added over time):
 
+- **[Intro Skipper](https://github.com/intro-skipper/intro-skipper) &amp; Jellyfin `MediaSegments` (Skip Intro / Credits)** — Automatically detected with zero extra configuration (supports `Intro Skipper` v1/v2 endpoints, native Jellyfin 10.10+/12 `MediaSegments`, and MKV chapter markers to surface the frosted-glass **Skip Intro / Recap / Credits** pill in the StreamFlix player).
 - **[WebGPU Player](https://github.com/alchemyyy/jellyfin-plugin-webgpu-player)** — Automatically detected when installed with zero configuration required (uses WebGPU on supported desktop browsers and automatically falls back to Jellyfin's standard player on mobile, TV, plain HTTP, or incompatible media streams).
 
 ## Credits

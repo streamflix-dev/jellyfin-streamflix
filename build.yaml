@@ -11,11 +11,12 @@ description: >
   flexible authentication (server-verified Google Sign-In, Beta Custom OpenID Connect SSO,
   themed Standard/Hybrid Jellyfin login, opt-in Administrator-only fallback, Local LAN bypass,
   and toggleable QR Guest Passes), dedicated Kids Mode, real-time synced Watch Together,
-  optional Live TV compatibility, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support,
+  Skip Intro & Credits support (Intro Skipper & Jellyfin MediaSegments), optional Live TV compatibility,
+  optional Seerr/Jellyseerr search requests, automatic WebGPU Player support,
   and Netflix "Who's watching?" profiles backed by real Jellyfin Server Users.
 category: "General"
 imageUrl: "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/main/Jellyfin.Plugin.StreamFlix/thumb.png"
 artifacts:
   - "Jellyfin.Plugin.StreamFlix.dll"
 changelog: >
-  - v0.9.9.4 Release Candidate (Dev Test Channel): Auto-close external Windows/desktop browser tab & popup after Jellyfin Media Player Google/OIDC sign-in via single-history /StreamFlix/Auth/DesktopLaunch relay, plus working Close Tab button & reorganized Dashboard/User Settings.
+  - v0.9.9.4 Release Candidate (Dev Test Channel): Skip Intro & Credits support (Intro Skipper & Jellyfin MediaSegments), auto-close external Windows/desktop browser tab & popup after Jellyfin Media Player Google/OIDC sign-in via /StreamFlix/Auth/DesktopLaunch relay, working Close Tab button, and reorganized Dashboard & User Settings.

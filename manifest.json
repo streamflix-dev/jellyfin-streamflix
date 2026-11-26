@@ -3,14 +3,14 @@
     "guid": "7cc1a505-91f6-4661-b4f9-7eee8be33b19",
     "name": "StreamFlix",
     "overview": "Netflix-style UI, Household Profiles, Guest Passes & Seerr Requests for Jellyfin",
-    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users.",
+    "description": "Transforms Jellyfin Web into StreamFlix: a Netflix-style cinema UI with flexible Google/OIDC/Jellyfin sign-in, dedicated Kids profiles, real-time synced Watch Together, Skip Intro & Credits support (Intro Skipper & MediaSegments), toggleable QR Guest Passes, optional Seerr/Jellyseerr search requests, automatic WebGPU Player support, and 'Who's watching?' profiles mapped to real Jellyfin users.",
     "owner": "StreamFlix",
     "category": "General",
     "imageUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/Jellyfin.Plugin.StreamFlix/thumb.png",
     "versions": [
       {
         "version": "0.9.9.4",
-        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "changelog": "Build for Jellyfin 12.x (.NET 10).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Skip Intro & Credits support (Intro Skipper & Jellyfin MediaSegments), automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_12.0.0.zip",
         "checksum": "f5aec244cb3e8c245d412f9404b83c55",
@@ -18,7 +18,7 @@
       },
       {
         "version": "0.9.9.4",
-        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "changelog": "Build for Jellyfin 10.11.x (.NET 9).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Skip Intro & Credits support (Intro Skipper & Jellyfin MediaSegments), automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_10.11.0.zip",
         "checksum": "ab04971a7e66c82568b0af59b66fc629",
@@ -26,7 +26,7 @@
       },
       {
         "version": "0.9.9.4",
-        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
+        "changelog": "Build for Jellyfin 10.9 - 10.10 (.NET 8).\n\n- v0.9.9.4 Release Candidate (Dev Test Channel): Skip Intro & Credits support (Intro Skipper & Jellyfin MediaSegments), automatically close external browser tab & popup after signing in from Jellyfin Media Player / Desktop on Windows, fix Close Tab button via single-history /StreamFlix/Auth/DesktopLaunch relay, and include updated README & reorganized settings.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/streamflix-dev/jellyfin-streamflix/dev/dist/Jellyfin.Plugin.StreamFlix_0.9.9.4_10.9.0.zip",
         "checksum": "5226f8c325fa072ad7c5c55564d7215c",
