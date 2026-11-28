@@ -283,7 +283,8 @@ public partial class StreamFlixController
         if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
-            return StatusCode(429, new { code = "rate_limited", retryAfterSeconds = secs, message = "Too many QR pairing requests. Please wait a moment." });
+            Response.Headers["Retry-After"] = secs.ToString(CultureInfo.InvariantCulture);
+            return StatusCode(429, new { code = "login_locked", retryAfterSeconds = secs, message = "Too many QR pairing requests. Please wait a moment." });
         }
 
         var baseOriginAndPath = BuildExternalServerBaseUrl(request?.ClientOrigin);
@@ -347,8 +348,26 @@ public partial class StreamFlixController
         SetNoStoreSecurityHeaders();
         var config = Config;
         var caller = await GetCallerAsync(config).ConfigureAwait(false);
-        var hasDirectJellyfinUser = caller.IsJellyfinAuthenticated && caller.JellyfinUser != null;
-        if (!HasHouseholdAccess(config, caller) || IsGuestSession(caller) || (caller.Session == null && !hasDirectJellyfinUser))
+        if (IsGuestSession(caller))
+        {
+            return StatusCode(403, new { ok = false, code = "guest_pass_restricted", message = "Temporary Guest Passes cannot authorize new TV devices. Sign in with a household account instead." });
+        }
+
+        if (caller.JellyfinUser != null && IsJellyfinUserKidsProfile(config, caller.JellyfinUser.Id))
+        {
+            return StatusCode(403, new { ok = false, code = "kids_forbidden", message = "Exit Kids mode on this phone first before signing in a TV." });
+        }
+
+        var hasDirectJellyfinUser = caller.IsJellyfinAuthenticated
+            && caller.JellyfinUser != null
+            && CanDirectJellyfinUserApproveTvPair(
+                config,
+                caller.JellyfinUser.Id,
+                StreamFlixStartupTask.IsUserAdminCompat(caller.JellyfinUser),
+                StreamFlixStartupTask.IsUserDisabledCompat(caller.JellyfinUser),
+                StreamFlixStartupTask.HasRemoteAccessCompat(caller.JellyfinUser),
+                caller.IsLocalLan);
+        if (!HasHouseholdAccess(config, caller) || (caller.Session == null && !hasDirectJellyfinUser))
         {
             return StatusCode(401, new { ok = false, code = "auth_required", message = "Sign in with your household account on this phone first to unlock the TV." });
         }
@@ -363,7 +382,8 @@ public partial class StreamFlixController
         if (StreamFlixSessionService.IsLoginLockedOut(lockKey, out var retryAfter))
         {
             var secs = (int)Math.Ceiling(retryAfter.TotalSeconds);
-            return StatusCode(429, new { ok = false, code = "rate_limited", retryAfterSeconds = secs, message = "Too many attempts. Please wait and scan a fresh QR code." });
+            Response.Headers["Retry-After"] = secs.ToString(CultureInfo.InvariantCulture);
+            return StatusCode(429, new { ok = false, code = "login_locked", retryAfterSeconds = secs, message = "Too many attempts. Please wait and scan a fresh QR code." });
         }
 
         // Mint an independent household session token for the TV matching the approving phone's verified identity
@@ -396,12 +416,23 @@ public partial class StreamFlixController
         }
         else
         {
-            var jfKind = caller.IsAdmin ? StreamFlixSessionService.AuthKindJellyfinAdmin : StreamFlixSessionService.AuthKindJellyfin;
+            var isDirectAdmin = StreamFlixStartupTask.IsUserAdminCompat(caller.JellyfinUser);
+            var jfKind = isDirectAdmin ? StreamFlixSessionService.AuthKindJellyfinAdmin : StreamFlixSessionService.AuthKindJellyfin;
             resolvedEmail = string.Empty;
             resolvedUsername = caller.JellyfinUser!.Username ?? "User";
             resolvedUserId = caller.JellyfinUser.Id.ToString("N");
             minted = StreamFlixSessionService.IssueJellyfinSession(config, jfKind, resolvedUserId, resolvedUsername, out tvSessionToken);
         }
+
+        if (StreamFlixSessionService.Validate(config, tvSessionToken) == null)
+        {
+            return StatusCode(401, new { ok = false, code = "auth_required", message = "Sign in with your household account on this phone first to unlock the TV." });
+        }
+
+        var mintedIsAdmin = string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal)
+            || ((string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindGoogle, StringComparison.Ordinal)
+                    || string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindOidc, StringComparison.Ordinal))
+                && IsVerifiedSsoAdminOwner(config, minted));
 
         var displayWho = !string.IsNullOrWhiteSpace(resolvedEmail)
             ? resolvedEmail
@@ -415,7 +446,7 @@ public partial class StreamFlixController
             UserId: resolvedUserId,
             Name: displayWho,
             Picture: string.Empty,
-            IsAdmin: string.Equals(minted.AuthKind, StreamFlixSessionService.AuthKindJellyfinAdmin, StringComparison.Ordinal) || caller.IsAdmin,
+            IsAdmin: mintedIsAdmin,
             ExpiresAt: minted.ExpiresAt);
 
         if (!StreamFlixTvPairService.ApprovePair(cleanCode, approvedPayload))
@@ -1950,23 +1981,68 @@ public partial class StreamFlixController
 </html>";
     }
 
-    private string BuildExternalServerBaseUrl(string? clientOriginHint)
+    internal static bool IsJellyfinUserKidsProfile(PluginConfiguration config, Guid userId)
     {
-        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value.TrimEnd('/') : string.Empty;
-        if (!string.IsNullOrWhiteSpace(clientOriginHint)
-            && Uri.TryCreate(clientOriginHint.Trim(), UriKind.Absolute, out var hinted)
-            && (string.Equals(hinted.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(hinted.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            && IsSafeHostHeader(hinted.Authority))
+        return (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Any(p => p.IsKids
+                && !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+                && Guid.TryParse(p.JellyfinUserId, out var linkedUid)
+                && linkedUid == userId);
+    }
+
+    internal static bool IsPluginCreatedProfileUser(PluginConfiguration config, Guid userId)
+    {
+        return (config.Profiles ?? new List<StreamFlixProfileConfig>())
+            .Any(p => p.IsPluginCreatedJellyfinUser
+                && !string.IsNullOrWhiteSpace(p.JellyfinUserId)
+                && Guid.TryParse(p.JellyfinUserId, out var linkedUid)
+                && linkedUid == userId);
+    }
+
+    internal static bool CanDirectJellyfinUserApproveTvPair(
+        PluginConfiguration config,
+        Guid userId,
+        bool isUserAdmin,
+        bool isUserDisabled,
+        bool hasRemoteAccess,
+        bool isLocalLan)
+    {
+        if (isUserDisabled || IsJellyfinUserKidsProfile(config, userId))
         {
-            return hinted.GetLeftPart(UriPartial.Authority) + pathBase;
+            return false;
         }
 
-        var callbackUri = BuildAbsoluteOidcCallbackUri();
-        const string suffix = "/StreamFlix/Oidc/Callback";
-        return callbackUri.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
-            ? callbackUri.Substring(0, callbackUri.Length - suffix.Length)
-            : $"{Request.Scheme}://{Request.Host.Value}{pathBase}";
+        if (isUserAdmin)
+        {
+            return true;
+        }
+
+        return config.AllowStandardJellyfinLogin
+            && (isLocalLan || hasRemoteAccess)
+            && !IsPluginCreatedProfileUser(config, userId);
+    }
+
+    internal static string ResolveTrustedTvPairBaseUrl(string serverPublicBaseUrl, string? clientOriginHint)
+    {
+        var cleanServerBase = (serverPublicBaseUrl ?? string.Empty).Trim().TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(clientOriginHint)
+            && Uri.TryCreate(cleanServerBase, UriKind.Absolute, out var serverUri)
+            && Uri.TryCreate(clientOriginHint.Trim(), UriKind.Absolute, out var hinted)
+            && string.Equals(hinted.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(serverUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(hinted.Authority, serverUri.Authority, StringComparison.OrdinalIgnoreCase)
+            && IsSafeHostHeader(hinted.Authority))
+        {
+            var pathPart = serverUri.AbsolutePath == "/" ? string.Empty : serverUri.AbsolutePath.TrimEnd('/');
+            return hinted.GetLeftPart(UriPartial.Authority) + pathPart;
+        }
+
+        return cleanServerBase;
+    }
+
+    private string BuildExternalServerBaseUrl(string? clientOriginHint)
+    {
+        return ResolveTrustedTvPairBaseUrl(BuildAbsolutePublicBaseUrl(), clientOriginHint);
     }
 
     private string BuildTvPairPhoneApprovalHtml(PluginConfiguration config, string displayCode, bool isPending)
@@ -2064,13 +2140,21 @@ public partial class StreamFlixController
     if (raw) sess = JSON.parse(raw);
   }} catch (e) {{}}
 
-  var hasToken = Boolean(sess && sess.token && (!sess.expiresAt || Date.parse(sess.expiresAt) > Date.now()));
+  var isGuestToken = Boolean(sess && sess.authKind === 'guest_pass');
+  var hasToken = Boolean(!isGuestToken && sess && sess.token && (!sess.expiresAt || Date.parse(sess.expiresAt) > Date.now()));
+  if (isGuestToken) {{
+    titleEl.textContent = 'Household Account Required';
+    descEl.textContent = 'Temporary Guest Passes cannot sign in new TV devices. Open StreamFlix and sign in with a household account instead.';
+    btnEl.classList.add('hide');
+    return;
+  }}
   if (!hasToken) {{
     descEl.textContent = 'Sign in on your phone first — your TV (' + code + ') will unlock automatically right after.';
     btnEl.textContent = 'Continue to Sign In';
     btnEl.addEventListener('click', function() {{
-      try {{ sessionStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (e1) {{}}
-      try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (e2) {{}}
+      var pendingPayload = JSON.stringify({{ code: code, savedAt: Date.now() }});
+      try {{ sessionStorage.setItem('streamflix_pending_tv_pair_v1', pendingPayload); }} catch (e1) {{}}
+      try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', pendingPayload); }} catch (e2) {{}}
       window.location.assign(webUrl + '?tvpair=' + encodeURIComponent(code) + '#/home');
     }});
     return;
@@ -2088,7 +2172,13 @@ public partial class StreamFlixController
       headers: {{ 'Content-Type': 'application/json', 'X-StreamFlix-Session': sess.token }},
       body: JSON.stringify({{ code: code }})
     }})
-    .then(function(r) {{ return r.json().then(function(d) {{ return {{ ok: r.ok, data: d }}; }}); }})
+    .then(function(r) {{
+      return r.text().then(function(txt) {{
+        var d = null;
+        try {{ d = txt ? JSON.parse(txt) : null; }} catch (eJson) {{}}
+        return {{ ok: r.ok, data: d }};
+      }});
+    }})
     .then(function(res) {{
       if (res.ok && res.data && res.data.ok) {{
         okIco.classList.remove('hide');
@@ -2099,8 +2189,10 @@ public partial class StreamFlixController
         return;
       }}
       if (res.data && res.data.code === 'auth_required') {{
+        var pendingPayload2 = JSON.stringify({{ code: code, savedAt: Date.now() }});
         try {{ localStorage.removeItem('streamflix_session_v7'); }} catch (eR) {{}}
-        try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', code); }} catch (eS) {{}}
+        try {{ sessionStorage.setItem('streamflix_pending_tv_pair_v1', pendingPayload2); }} catch (eS1) {{}}
+        try {{ localStorage.setItem('streamflix_pending_tv_pair_v1', pendingPayload2); }} catch (eS2) {{}}
         window.location.assign(webUrl + '?tvpair=' + encodeURIComponent(code) + '#/home');
         return;
       }}

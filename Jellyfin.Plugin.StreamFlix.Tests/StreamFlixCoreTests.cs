@@ -656,4 +656,63 @@ public class StreamFlixCoreTests
         var replayPoll = StreamFlixTvPairService.PollPair(started.PairId, started.PollSecret);
         Assert.Equal("expired", replayPoll.Status);
     }
+
+    [Fact]
+    public void TvPairSecurity_RejectsUntrustedOriginAndBlocksLanBypassKidsOrUnallowedDirectUsers()
+    {
+        // 1. Untrusted phishing clientOrigin must NEVER override server base URL in minted QR codes
+        Assert.Equal(
+            "https://cinema.example.com",
+            StreamFlixController.ResolveTrustedTvPairBaseUrl("https://cinema.example.com", "https://evil-phishing.example"));
+        Assert.Equal(
+            "http://192.168.1.50:8096",
+            StreamFlixController.ResolveTrustedTvPairBaseUrl("http://192.168.1.50:8096", "https://attacker.example:8443"));
+
+        // Same-authority HTTPS upgrade behind TLS-terminating proxy without X-Forwarded-Proto is permitted
+        Assert.Equal(
+            "https://cinema.example.com/jellyfin",
+            StreamFlixController.ResolveTrustedTvPairBaseUrl("http://cinema.example.com/jellyfin/", "https://cinema.example.com"));
+
+        // 2. Direct Jellyfin token approval rules
+        var adminUid = Guid.NewGuid();
+        var pluginMemberUid = Guid.NewGuid();
+        var kidsUid = Guid.NewGuid();
+        var realJfUid = Guid.NewGuid();
+
+        var cfg = new PluginConfiguration
+        {
+            AllowStandardJellyfinLogin = false,
+            Profiles = new List<StreamFlixProfileConfig>
+            {
+                new() { Id = "streamflix_owner", Name = "Owner", JellyfinUserId = adminUid.ToString("N"), IsPluginCreatedJellyfinUser = false },
+                new() { Id = "streamflix_member", Name = "Living Room", JellyfinUserId = pluginMemberUid.ToString("N"), IsPluginCreatedJellyfinUser = true },
+                new() { Id = "streamflix_kids", Name = "Kids", IsKids = true, JellyfinUserId = kidsUid.ToString("N"), IsPluginCreatedJellyfinUser = false },
+                new() { Id = "streamflix_friend", Name = "Friend", JellyfinUserId = realJfUid.ToString("N"), IsPluginCreatedJellyfinUser = false },
+            },
+        };
+
+        // Active Jellyfin Administrator is allowed even when Standard Login is off
+        Assert.True(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, adminUid, isUserAdmin: true, isUserDisabled: false, hasRemoteAccess: true, isLocalLan: false));
+
+        // Disabled user or Kids profile user is strictly blocked
+        Assert.False(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, adminUid, isUserAdmin: true, isUserDisabled: true, hasRemoteAccess: true, isLocalLan: true));
+        Assert.False(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, kidsUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: true, isLocalLan: true));
+
+        // Non-admin direct Jellyfin user is blocked when AllowStandardJellyfinLogin == false (prevents burning QR codes with unvalidatable tokens)
+        Assert.False(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, realJfUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: true, isLocalLan: true));
+
+        // When Standard Login is enabled, real Jellyfin accounts are allowed (subject to remote access), while LAN-bypass plugin-created profile tokens stay blocked
+        cfg.AllowStandardJellyfinLogin = true;
+        Assert.False(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, pluginMemberUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: true, isLocalLan: true));
+        Assert.True(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, realJfUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: true, isLocalLan: false));
+        Assert.False(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, realJfUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: false, isLocalLan: false));
+        Assert.True(StreamFlixController.CanDirectJellyfinUserApproveTvPair(cfg, realJfUid, isUserAdmin: false, isUserDisabled: false, hasRemoteAccess: false, isLocalLan: true));
+
+        // 3. Error code mappings for TV Pair endpoints
+        Assert.Equal(StreamFlixErrorCodes.HouseholdSignInRequired, StreamFlixErrorCodes.Resolve("auth_required", 401, "/StreamFlix/Auth/TvPair/Approve"));
+        Assert.Equal(StreamFlixErrorCodes.LoginRateLimited, StreamFlixErrorCodes.Resolve("login_locked", 429, "/StreamFlix/Auth/TvPair/Begin"));
+        Assert.Equal(StreamFlixErrorCodes.LoginRateLimited, StreamFlixErrorCodes.Resolve(null, 429, "/StreamFlix/Auth/TvPair/Approve"));
+        Assert.Equal(StreamFlixErrorCodes.BadRequestPayload, StreamFlixErrorCodes.Resolve("invalid_code", 400, "/StreamFlix/Auth/TvPair/Approve"));
+        Assert.Equal(StreamFlixErrorCodes.NotFoundGeneric, StreamFlixErrorCodes.Resolve("code_expired", 404, "/StreamFlix/Auth/TvPair/Approve"));
+    }
 }

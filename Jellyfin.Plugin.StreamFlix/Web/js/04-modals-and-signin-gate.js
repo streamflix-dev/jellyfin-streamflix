@@ -855,11 +855,13 @@
                     clearLocalJellyfinAuth();
                 }
 
-                if (typeof completePendingTvPairApprovalIfAny === 'function') {
-                    completePendingTvPairApprovalIfAny();
-                }
                 var pendingId = takePendingProfileId();
-                return fetchPublicConfig().then(function () {
+                var tvPairDone = typeof completePendingTvPairApprovalIfAny === 'function'
+                    ? completePendingTvPairApprovalIfAny()
+                    : null;
+                return Promise.resolve(tvPairDone).then(function () {
+                    return fetchPublicConfig();
+                }).then(function () {
                     var pending = pendingId ? findProfileById(pendingId) : null;
                     if (!pending && !res.isAdmin && !adminOnly) {
                         var allProfs = (state.config && Array.isArray(state.config.profiles)) ? state.config.profiles : [];
@@ -1183,6 +1185,9 @@
             expandAdminBtn.addEventListener('click', function () {
                 state.guestPassExpanded = false;
                 state.adminLoginExpanded = true;
+                if (typeof stopTvPairSignInPolling === 'function') {
+                    stopTvPairSignInPolling();
+                }
                 renderGoogleAuthGate();
             });
         }
@@ -1200,6 +1205,9 @@
             expandGuestBtn.addEventListener('click', function () {
                 state.adminLoginExpanded = false;
                 state.guestPassExpanded = true;
+                if (typeof stopTvPairSignInPolling === 'function') {
+                    stopTvPairSignInPolling();
+                }
                 renderGoogleAuthGate();
             });
         }

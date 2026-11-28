@@ -566,7 +566,7 @@ public partial class StreamFlixController
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : string.Empty;
 
         var remoteIp = HttpContext.Connection.RemoteIpAddress;
-        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp))
+        if (remoteIp != null && StreamFlixSessionService.IsPrivateOrLoopbackIp(remoteIp, Config.TreatTailscaleAsLocalLan))
         {
             var fwdProto = Request.Headers["X-Forwarded-Proto"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
             if (fwdProto != null && (string.Equals(fwdProto, "https", StringComparison.OrdinalIgnoreCase)

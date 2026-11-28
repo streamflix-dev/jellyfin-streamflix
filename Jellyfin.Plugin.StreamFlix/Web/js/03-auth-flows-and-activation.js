@@ -54,6 +54,9 @@
         if (typeof capturePendingWatchPartyFromUrl === 'function') {
             capturePendingWatchPartyFromUrl();
         }
+        if (typeof capturePendingTvPairFromUrl === 'function') {
+            capturePendingTvPairFromUrl();
+        }
         // Strip the token from the address bar without adding a session history entry (preserves window.close() eligibility)
         try {
             window.history.replaceState(null, document.title, window.location.pathname + '#/home');
@@ -74,13 +77,52 @@
         return pid;
     }
 
+    var TV_PAIR_PENDING_MAX_AGE_MS = 6 * 60 * 1000;
+
+    function parseStoredTvPairCode(rawVal) {
+        if (!rawVal) {
+            return '';
+        }
+        var str = String(rawVal).trim();
+        if (!str) {
+            return '';
+        }
+        if (str.charAt(0) === '{') {
+            try {
+                var parsed = JSON.parse(str);
+                if (!parsed || !parsed.code) {
+                    return '';
+                }
+                if (parsed.savedAt && (Date.now() - Number(parsed.savedAt) > TV_PAIR_PENDING_MAX_AGE_MS)) {
+                    return '';
+                }
+                return String(parsed.code).trim().toUpperCase();
+            } catch (eJson) {
+                return '';
+            }
+        }
+        return /^[A-Za-z0-9-]{6,9}$/.test(str) ? str.toUpperCase() : '';
+    }
+
     function capturePendingTvPairFromUrl() {
         try {
             var raw = (window.location.search || '') + '&' + (window.location.hash || '');
             var m = raw.match(/(?:[?&#]|^)tvpair=([A-Za-z0-9-]{6,9})/);
             if (m && m[1]) {
-                sessionStorage.setItem(TV_PAIR_PENDING_KEY, m[1].toUpperCase());
-                localStorage.setItem(TV_PAIR_PENDING_KEY, m[1].toUpperCase());
+                var codeUpper = m[1].toUpperCase();
+                var payload = JSON.stringify({ code: codeUpper, savedAt: Date.now() });
+                try { sessionStorage.setItem(TV_PAIR_PENDING_KEY, payload); } catch (eS1) {}
+                try { localStorage.setItem(TV_PAIR_PENDING_KEY, payload); } catch (eS2) {}
+                var hasAuthCb = /(?:^|[?&#])(access_token|sf_oidc|sf_oidc_error|sf_guest|sf_guest_error)=/.test(raw);
+                if (!hasAuthCb && window.history && typeof window.history.replaceState === 'function') {
+                    var cleanSearch = (window.location.search || '')
+                        .replace(/([?&])tvpair=[^&#]*(&?)/gi, function (_, p1, p2) { return p2 ? p1 : ''; })
+                        .replace(/[?&]$/, '');
+                    var cleanHash = (window.location.hash || '#/home')
+                        .replace(/([?&])tvpair=[^&#]*(&?)/gi, function (_, p1, p2) { return p2 ? p1 : ''; })
+                        .replace(/[?&]$/, '');
+                    window.history.replaceState(null, document.title, window.location.pathname + cleanSearch + cleanHash);
+                }
             }
         } catch (e) {}
     }
@@ -88,22 +130,30 @@
     function completePendingTvPairApprovalIfAny() {
         var code = '';
         try {
-            code = sessionStorage.getItem(TV_PAIR_PENDING_KEY) || localStorage.getItem(TV_PAIR_PENDING_KEY) || '';
+            var rawStored = sessionStorage.getItem(TV_PAIR_PENDING_KEY) || localStorage.getItem(TV_PAIR_PENDING_KEY) || '';
             sessionStorage.removeItem(TV_PAIR_PENDING_KEY);
             localStorage.removeItem(TV_PAIR_PENDING_KEY);
+            code = parseStoredTvPairCode(rawStored);
         } catch (e) {}
-        if (!code || !state.googleUser || !state.googleUser.token) {
-            return;
+        if (!code || !state.googleUser || !state.googleUser.token || isGuestPassSession()) {
+            return Promise.resolve(null);
         }
-        apiFetch('/StreamFlix/Auth/TvPair/Approve', {
+        if (typeof isKidsProfileActive === 'function' && isKidsProfileActive()) {
+            return Promise.resolve(null);
+        }
+        return apiFetch('/StreamFlix/Auth/TvPair/Approve', {
             method: 'POST',
+            keepalive: true,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code: code })
         }).then(function (res) {
             if (res && res.ok) {
                 showToast('TV (' + (res.code || code) + ') unlocked! Pick who\'s watching on your TV.', 'success', 4500);
             }
-        }).catch(function () {});
+            return res;
+        }).catch(function () {
+            return null;
+        });
     }
 
     var tvPairPollTimer = null;
@@ -179,7 +229,7 @@
             return;
         }
         tvPairPollTimer = setInterval(function () {
-            if (!isGateOpen() || hasHouseholdAccess() && !state.explicitAuthPrompt) {
+            if (!isGateOpen() || (hasHouseholdAccess() && !state.explicitAuthPrompt)) {
                 stopTvPairSignInPolling();
                 return;
             }
@@ -205,7 +255,7 @@
                 if (!res || !res.status || res.status === 'pending') {
                     return;
                 }
-                if (res.status === 'expired') {
+                if (res.status === 'expired' || res.status === 'invalid') {
                     state.tvPairData = null;
                     startOrRefreshTvPairQr(true);
                     return;
@@ -231,8 +281,14 @@
                     clearLocalJellyfinAuth();
                     var pendingId = takePendingProfileId();
                     fetchPublicConfig().then(function () {
-                        renderProfilePickerGate();
                         var pending = pendingId ? findProfileById(pendingId) : null;
+                        if (!pending && res.authKind === 'jellyfin' && !res.isAdmin) {
+                            var activatable = getProfiles().filter(function (p) { return p && p.canActivate !== false; });
+                            if (activatable.length === 1) {
+                                pending = activatable[0];
+                            }
+                        }
+                        renderProfilePickerGate();
                         if (pending) {
                             handleSelectProfile(pending);
                         } else {
@@ -240,8 +296,12 @@
                         }
                     });
                 }
-            }).catch(function () {
+            }).catch(function (err) {
                 state.tvPairInFlight = false;
+                if (err && (err.status === 401 || err.status === 404)) {
+                    state.tvPairData = null;
+                    startOrRefreshTvPairQr(true);
+                }
             });
         }, 2000);
     }
@@ -337,6 +397,8 @@
         state.explicitAuthPrompt = false;
         state.adminLoginExpanded = false;
         state.guestPassExpanded = false;
+        state.tvQrExpanded = false;
+        stopTvPairSignInPolling();
         state.startingGoogleDesktopRelay = false;
         state.startingOidcRedirect = false;
         clearPendingGoogleDesktopFlow();
@@ -406,7 +468,9 @@
                 clearActiveProfileState(true);
                 clearLocalJellyfinAuth();
                 var pendingId = res.pendingProfileId || takePendingProfileId();
-                fetchPublicConfig().then(function () {
+                Promise.resolve(completePendingTvPairApprovalIfAny()).then(function () {
+                    return fetchPublicConfig();
+                }).then(function () {
                     renderProfilePickerGate();
                     var pending = pendingId ? findProfileById(pendingId) : null;
                     if (pending) {
@@ -620,13 +684,14 @@
                 picture: res.picture || '',
                 expiresAt: res.expiresAt || ''
             });
-            completePendingTvPairApprovalIfAny();
             // Netflix-style: always choose who's watching after signing in
             clearActiveProfileState(true);
             clearLocalJellyfinAuth();
 
             var pendingId = takePendingProfileId();
-            return fetchPublicConfig().then(function () {
+            return Promise.resolve(completePendingTvPairApprovalIfAny()).then(function () {
+                return fetchPublicConfig();
+            }).then(function () {
                 renderProfilePickerGate();
                 var pending = pendingId ? findProfileById(pendingId) : null;
                 if (pending) {
@@ -681,6 +746,9 @@
         state.justCompletedGoogleOAuth = true;
         if (typeof capturePendingWatchPartyFromUrl === 'function') {
             capturePendingWatchPartyFromUrl();
+        }
+        if (typeof capturePendingTvPairFromUrl === 'function') {
+            capturePendingTvPairFromUrl();
         }
         try {
             window.history.replaceState(null, document.title, window.location.pathname + '#/home');
@@ -866,13 +934,13 @@
             picture: res.picture || '',
             expiresAt: res.expiresAt || ''
         });
-        completePendingTvPairApprovalIfAny();
-
         clearActiveProfileState(true);
         clearLocalJellyfinAuth();
 
         var pendingId = res.pendingProfileId || takePendingProfileId();
-        return fetchPublicConfig().then(function () {
+        return Promise.resolve(completePendingTvPairApprovalIfAny()).then(function () {
+            return fetchPublicConfig();
+        }).then(function () {
             renderProfilePickerGate();
             var pending = pendingId ? findProfileById(pendingId) : null;
             if (pending) {

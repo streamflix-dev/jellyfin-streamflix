@@ -81,6 +81,7 @@ public static class StreamFlixErrorCodes
     private static readonly Dictionary<string, string> BySymbolicCode = new(StringComparer.OrdinalIgnoreCase)
     {
         ["google_required"] = HouseholdSignInRequired,
+        ["auth_required"] = HouseholdSignInRequired,
         ["jellyfin_auth_required"] = JellyfinSessionRequired,
         ["invalid_credentials"] = InvalidCredentials,
         ["login_locked"] = LoginRateLimited,
@@ -147,6 +148,8 @@ public static class StreamFlixErrorCodes
         ["watchparty_disabled"] = WatchPartyForbidden,
         ["kids_forbidden"] = WatchPartyForbidden,
         ["invalid_item_id"] = BadRequestPayload,
+        ["invalid_code"] = BadRequestPayload,
+        ["code_expired"] = NotFoundGeneric,
         ["item_not_found"] = NotFoundGeneric,
     };
 
@@ -158,6 +161,19 @@ public static class StreamFlixErrorCodes
         }
 
         var path = (routePath ?? string.Empty).ToLowerInvariant();
+        if (path.Contains("/auth/tvpair/", StringComparison.Ordinal))
+        {
+            return statusCode switch
+            {
+                400 => BadRequestPayload,
+                401 => HouseholdSignInRequired,
+                403 => ForbiddenGeneric,
+                404 => NotFoundGeneric,
+                429 => LoginRateLimited,
+                _ => InternalServerError,
+            };
+        }
+
         if (path.Contains("/seerr/", StringComparison.Ordinal))
         {
             return statusCode switch

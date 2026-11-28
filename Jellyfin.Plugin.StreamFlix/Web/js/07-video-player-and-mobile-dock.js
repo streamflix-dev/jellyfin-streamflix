@@ -27,6 +27,7 @@
         tracksOpen: false,
         selectedSeason: null,
         nextEpisode: null,
+        nextMovieRec: null,
         nextEpisodeForId: '',
         upNextVisible: false,
         upNextDismissedForId: '',
@@ -755,12 +756,27 @@
             if (!uid) {
                 return;
             }
-            apiFetch('/Items/' + encodeURIComponent(item.Id) + '/Similar?userId=' + uid + '&Limit=6&Fields=Overview,PrimaryImageAspectRatio,ProductionYear,OfficialRating')
+            apiFetch('/Items/' + encodeURIComponent(item.Id) + '/Similar?userId=' + uid + '&Limit=8&Fields=Overview,Genres,PrimaryImageAspectRatio,ProductionYear,OfficialRating,ParentId')
                 .then(function (res) {
                     if (!osdState.info || normalizeGuid(osdState.info.Id) !== normCur) {
                         return;
                     }
                     var sim = (res && Array.isArray(res.Items)) ? res.Items : [];
+                    if (typeof filterItemsForKidsMode === 'function') {
+                        sim = filterItemsForKidsMode(sim);
+                    }
+                    var allowedLibs = (state.activeProfile && Array.isArray(state.activeProfile.allowedLibraryIds) && state.activeProfile.allowedLibraryIds.length)
+                        ? state.activeProfile.allowedLibraryIds.map(normalizeGuid)
+                        : null;
+                    if (allowedLibs) {
+                        sim = sim.filter(function (cand) {
+                            if (!cand || !cand.ParentId) {
+                                return true;
+                            }
+                            var pNorm = normalizeGuid(cand.ParentId);
+                            return !isKnownTopLevelViewId(cand.ParentId) || allowedLibs.indexOf(pNorm) !== -1;
+                        });
+                    }
                     var pick = null;
                     for (var k = 0; k < sim.length; k++) {
                         if (sim[k] && sim[k].Id && normalizeGuid(sim[k].Id) !== normCur && !(sim[k].UserData && sim[k].UserData.Played)) {
@@ -1525,11 +1541,15 @@
 
     function checkOsdUpNext() {
         var v = osdState.video;
-        var nextTarget = osdState.nextEpisode || osdState.nextMovieRec;
-        var isMovieRec = !osdState.nextEpisode && Boolean(osdState.nextMovieRec);
+        var activeWpRoom = (typeof watchPartyState !== 'undefined' && watchPartyState && typeof isWatchTogetherEnabled === 'function' && isWatchTogetherEnabled())
+            ? watchPartyState.activeGroup
+            : null;
+        var wpHostLockedForViewer = Boolean(activeWpRoom && typeof canControlWatchPartyRoom === 'function' && !canControlWatchPartyRoom(activeWpRoom));
+        var nextTarget = osdState.nextEpisode || (wpHostLockedForViewer ? null : osdState.nextMovieRec);
+        var isMovieRec = !osdState.nextEpisode && !wpHostLockedForViewer && Boolean(osdState.nextMovieRec);
         var curIt = osdState.info;
         if (!v || !nextTarget || !curIt || !isVideoPlayerActive() || osdState.episodesOpen || osdState.tracksOpen) {
-            if (osdState.upNextVisible && (osdState.episodesOpen || osdState.tracksOpen || !isVideoPlayerActive())) {
+            if (osdState.upNextVisible && (osdState.episodesOpen || osdState.tracksOpen || !isVideoPlayerActive() || !nextTarget)) {
                 hideOsdUpNextCard();
             }
             return;
@@ -1706,6 +1726,7 @@
         osdState.lastSwitchedEpisodeId = '';
         osdState.episodesCache = {};
         osdState.nextEpisode = null;
+        osdState.nextMovieRec = null;
         osdState.nextEpisodeForId = '';
         osdState.upNextDismissedForId = '';
         osdState.segments = [];

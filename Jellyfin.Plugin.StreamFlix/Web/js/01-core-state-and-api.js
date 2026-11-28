@@ -160,6 +160,10 @@
         pluginDisabled: false,
         adminLoginExpanded: false,
         guestPassExpanded: false,
+        tvQrExpanded: false,
+        tvPairData: null,
+        tvPairStarting: false,
+        tvPairInFlight: false,
         heroPaused: false,
         heroPreviewMuted: true,
         heroVideoActive: false,
@@ -1256,6 +1260,7 @@
 
     var CLIENT_ERROR_CODE_MAP = {
         google_required: 'SF-AUTH-101',
+        auth_required: 'SF-AUTH-101',
         jellyfin_auth_required: 'SF-AUTH-110',
         invalid_credentials: 'SF-AUTH-102',
         login_locked: 'SF-AUTH-103',
@@ -1316,6 +1321,8 @@
         watchparty_disabled: 'SF-WP-621',
         kids_forbidden: 'SF-WP-621',
         invalid_item_id: 'SF-REQ-740',
+        invalid_code: 'SF-REQ-740',
+        code_expired: 'SF-REQ-744',
         item_not_found: 'SF-REQ-744'
     };
 
@@ -1325,6 +1332,13 @@
             return CLIENT_ERROR_CODE_MAP[sym];
         }
         var p = String(path || '').toLowerCase();
+        if (p.indexOf('/auth/tvpair/') !== -1) {
+            if (status === 429) { return 'SF-AUTH-103'; }
+            if (status === 401) { return 'SF-AUTH-101'; }
+            if (status === 403) { return 'SF-REQ-743'; }
+            if (status === 404) { return 'SF-REQ-744'; }
+            return status === 400 ? 'SF-REQ-740' : 'SF-SRV-750';
+        }
         if (p.indexOf('/seerr/') !== -1) {
             if (status === 504) { return 'SF-SEERR-403'; }
             if (status === 429) { return 'SF-SEERR-405'; }

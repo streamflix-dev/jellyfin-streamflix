@@ -1226,6 +1226,10 @@
             try { state.activeDetailModal.close(true); } catch (eDm) {}
             state.activeDetailModal = null;
         }
+        state.tvQrExpanded = false;
+        if (typeof stopTvPairSignInPolling === 'function') {
+            stopTvPairSignInPolling();
+        }
         clearHouseholdSession();
         var openAccess = isOpenWithoutLogin(state.config);
         if (!openAccess && typeof detachEndedWatchPartyCleanly === 'function') {

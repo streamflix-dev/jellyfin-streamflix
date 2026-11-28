@@ -13,6 +13,9 @@
             if (typeof stopHeroVideoPreview === 'function') {
                 stopHeroVideoPreview(false);
             }
+            if (typeof stopTvPairSignInPolling === 'function') {
+                stopTvPairSignInPolling();
+            }
             if (typeof stopWatchPartySyncEngine === 'function') {
                 stopWatchPartySyncEngine();
             }
@@ -655,6 +658,15 @@
                         renderGoogleAuthGate();
                         return;
                     }
+                    if (gateView.indexOf('auth') === 0 && state.tvQrExpanded && !detectTvEnvironment()) {
+                        ev.preventDefault();
+                        state.tvQrExpanded = false;
+                        if (typeof stopTvPairSignInPolling === 'function') {
+                            stopTvPairSignInPolling();
+                        }
+                        renderGoogleAuthGate();
+                        return;
+                    }
                     if ((gateView.indexOf('auth') === 0 || gateView === 'setup')
                         && typeof canCancelExplicitAuthToPicker === 'function'
                         && canCancelExplicitAuthToPicker()) {
@@ -1196,7 +1208,7 @@
                     || scope.roots[0].querySelector('.streamflix-dd-item')
                     || scope.roots[0].querySelector('button:not(:disabled)');
             } else if (scope.kind === 'osd-overlay') {
-                initial = scope.roots[0].querySelector('.streamflix-osd-upnext-play, button:not(:disabled), [tabindex="0"]');
+                initial = scope.roots[0].querySelector('#streamflix-upnext-play, .bfx-upnext-play-btn, .streamflix-osd-upnext-play, button:not(:disabled), [tabindex="0"]');
             } else if (scope.kind === 'hub') {
                 initial = document.querySelector('#streamflix-hero-billboard .streamflix-hero-play')
                     || document.querySelector('#streamflix-cinema-hub .streamflix-pill.active')

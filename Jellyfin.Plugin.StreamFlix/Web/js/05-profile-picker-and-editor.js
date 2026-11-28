@@ -600,6 +600,11 @@
         state.manageMode = false;
         state.adminLoginExpanded = false;
         state.guestPassExpanded = false;
+        state.tvQrExpanded = false;
+        state.tvPairData = null;
+        if (typeof stopTvPairSignInPolling === 'function') {
+            stopTvPairSignInPolling();
+        }
         state.startingGoogleDesktopRelay = false;
         state.startingOidcRedirect = false;
         if (typeof clearPendingGoogleDesktopFlow === 'function') {

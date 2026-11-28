@@ -332,6 +332,8 @@ assert.match(combinedJs, /streamflix_desktop_sso_v1/, 'BroadcastChannel auto-clo
 assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Begin/, 'Smart TV Scan-to-Sign-In QR Begin endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Poll/, 'Smart TV Scan-to-Sign-In QR Poll endpoint must be wired');
 assert.match(combinedJs, /\/StreamFlix\/Auth\/TvPair\/Approve/, 'Smart TV Scan-to-Sign-In QR Approve endpoint must be wired');
+assert.match(combinedJs, /keepalive:\s*true/, 'Phone TV QR approval must use keepalive fetch so profile reload never aborts TV unlock');
+assert.match(combinedJs, /function\s+parseStoredTvPairCode\s*\(/, 'Pending TV QR pairing code storage parser with TTL must be wired');
 assert.match(combinedJs, /function\s+getExactOutroCreditsStartSec\s*\(/, 'Exact-credits Next Episode & Movie Up Next segment detector must be wired');
 assert.match(combinedJs, /osdState\.nextMovieRec/, 'Movie credits Up Next recommendation state must be wired');
 assert.match(combinedJs, /function\s+completeDesktopBrowserTabClose\s*\(/, 'Auto-closing desktop SSO browser tab helper must be wired');
